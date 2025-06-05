@@ -56,6 +56,28 @@ HailyDB is a comprehensive National Weather Service (NWS) Alert Ingestion Platfo
 - `GET /internal/dashboard` - Administrative interface
 - `POST /internal/spc-reupload/{date}` - Force SPC data re-ingestion
 
+### Alert Summaries
+- **GET** `/alerts/summary` - AI-enriched alert summaries and verification data
+
+### SPC Verified Matches
+- **GET** `/spc-matches` - Web interface for verified alert matches
+- **GET** `/spc-matches/data` - API data for verified matches with filtering
+
+### AI Enrichment
+- **POST** `/api/alerts/enrich-batch` - Batch enrichment of unenriched alerts
+- **POST** `/api/alerts/enrich-by-category` - Category-specific enrichment
+- **POST** `/api/alerts/enrich-priority` - Priority alert enrichment
+- **GET** `/api/alerts/enrichment-stats` - Enrichment coverage statistics
+- **GET** `/api/alerts/unenriched-counts` - Counts of unenriched alerts by category
+
+### SPC Data Verification
+- **GET** `/internal/spc-verify` - Data integrity verification interface
+- **GET** `/api/spc/calendar-verification` - 2-month verification calendar data
+- **GET** `/internal/spc-verify-today` - Recent verification data for dashboard
+
+### System Status
+- **GET** `/internal/status` - Comprehensive system health and metrics
+
 ### Health Status Response
 ```json
 {
@@ -99,6 +121,16 @@ HailyDB is a comprehensive National Weather Service (NWS) Alert Ingestion Platfo
 - **Format**: Multi-section CSV (tornado, wind, hail)
 - **Coverage**: Historical storm verification data
 - **Matching**: Geographic proximity and temporal correlation
+
+## Example Usage:
+```
+GET https://your-app.replit.app/api/alerts/active
+GET https://your-app.replit.app/api/alerts/search?state=TX&severity=Severe&active_only=true
+GET https://your-app.replit.app/api/spc/reports?type=tornado&state=KS&date=2025-01-15
+GET https://your-app.replit.app/spc-matches/data?hours=168&confidence=high
+GET https://your-app.replit.app/api/alerts/enrichment-stats
+POST https://your-app.replit.app/api/alerts/enrich-by-category (JSON: {"category": "Severe Weather Alert"})
+```
 
 ## Deployment
 
