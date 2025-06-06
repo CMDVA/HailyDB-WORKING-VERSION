@@ -118,9 +118,9 @@ class EnrichmentService:
         if not description:
             return None
         
-        # Enhanced prompt focused on damage assessment for storm restoration professionals
+        # Enhanced prompt focused on damage likelihood reporting
         prompt = f"""
-        Summarize this weather alert in 2-3 clear sentences specifically for storm restoration professionals tracking property damage. EMPHASIZE these damage-related keywords when present:
+        Summarize this weather alert in 2-3 clear sentences focusing on damage potential to homes and personal property. EMPHASIZE these damage-related keywords when present:
         - DAMAGE indicators: "dangerous", "wind gusts", "destroyed", "damage", "damaged", "destroy"
         - STRUCTURAL impacts: "damage to roofs", "windows", "siding", "vehicles", "trees", "power lines"
         - RADAR/REPORTS: "radar indicated", "reported", "confirmed", "observed"
@@ -129,10 +129,10 @@ class EnrichmentService:
         
         Focus on:
         1. Specific damage threats and intensities (wind speeds, hail size, tornado strength)
-        2. Geographic areas affected (counties/cities for restoration deployment)
-        3. Duration and movement (for damage assessment timing)
+        2. Geographic areas with highest likelihood of damage (counties/cities)
+        3. Duration and movement for damage assessment timing
         
-        Prioritize information relevant to property damage assessment and restoration planning.
+        Use language like "Areas with the highest likelihood of damage to homes and personal property are located..." when identifying geographic zones of concern.
         
         Alert Type: {alert.event}
         Severity: {alert.severity}
@@ -150,7 +150,7 @@ class EnrichmentService:
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are a meteorological analyst specializing in property damage assessment for storm restoration professionals. Create summaries that emphasize damage potential, structural threats, and restoration-relevant information. Highlight wind speeds, hail sizes, debris risks, and specific damage indicators. Focus on historical damage documentation rather than real-time public safety warnings."
+                            "content": "You are a meteorological analyst specializing in property damage assessment. Create summaries that emphasize damage potential, structural threats, and property damage information. Highlight wind speeds, hail sizes, debris risks, and specific damage indicators. Focus on historical damage documentation and likelihood of property damage rather than real-time public safety warnings."
                         },
                         {
                             "role": "user",
@@ -181,7 +181,7 @@ class EnrichmentService:
             
             # Prepare classification prompt focused on damage potential
             prompt = f"""
-            Classify this weather alert into damage-focused tags for storm restoration professionals. Choose from these categories:
+            Classify this weather alert into damage-focused tags for property damage assessment. Choose from these categories:
             - Property Damage (structural-damage, roof-damage, window-damage, siding-damage, vehicle-damage)
             - Wind Damage (high-wind, destructive-wind, wind-gusts, flying-debris)
             - Hail Damage (hail-damage, large-hail, roof-impact, vehicle-impact)
@@ -207,7 +207,7 @@ class EnrichmentService:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a storm damage assessment expert specializing in property restoration. Classify weather alerts based on damage potential and restoration needs. Focus on structural threats, wind/hail damage indicators, and property impact categories."
+                        "content": "You are a storm damage assessment expert specializing in property damage analysis. Classify weather alerts based on damage potential and property impact needs. Focus on structural threats, wind/hail damage indicators, and property impact categories."
                     },
                     {
                         "role": "user",
