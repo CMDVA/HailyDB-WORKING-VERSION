@@ -56,12 +56,50 @@
     </div>
 </div>
 
+<!-- Search Bar -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" id="alertSearch" name="search" 
+                                   placeholder="Search alerts by location, event type, or description..." 
+                                   value="{{ request.args.get('search', '') }}">
+                            <button class="btn btn-primary" type="submit" form="filterForm">
+                                <i class="fas fa-search me-1"></i>Search
+                            </button>
+                            {% if request.args.get('search') %}
+                            <a href="{{ url_for('get_alerts') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>Clear
+                            </a>
+                            {% endif %}
+                        </div>
+                        {% if request.args.get('search') %}
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Searching for: "<strong>{{ request.args.get('search') }}</strong>"
+                            </small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Filters -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
             <div class="card-body">
-                <form method="GET" class="row g-3">
+                <form method="GET" id="filterForm" class="row g-3">
+                    <!-- Hidden search field to maintain search query with filters -->
+                    <input type="hidden" name="search" value="{{ request.args.get('search', '') }}">
                     <div class="col-md-6 col-lg-3">
                         <label for="severity" class="form-label">Severity</label>
                         <select class="form-select" id="severity" name="severity">
@@ -595,6 +633,34 @@ async function getEnrichmentStats() {
 // Load enrichment counts when page loads
 document.addEventListener('DOMContentLoaded', function() {
     loadEnrichmentCounts();
+    
+    // Enhanced search functionality
+    const searchInput = document.getElementById('alertSearch');
+    const filterForm = document.getElementById('filterForm');
+    
+    // Submit form when Enter is pressed in search box
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                filterForm.submit();
+            }
+        });
+        
+        // Auto-focus search if there's a search query
+        if (searchInput.value.trim()) {
+            searchInput.focus();
+        }
+    }
+    
+    // Update hidden search field when search input changes
+    if (searchInput && filterForm) {
+        searchInput.addEventListener('input', function() {
+            const hiddenSearch = filterForm.querySelector('input[name="search"]');
+            if (hiddenSearch) {
+                hiddenSearch.value = this.value;
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

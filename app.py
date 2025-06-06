@@ -91,6 +91,7 @@ def get_alerts():
     area = request.args.get('area')
     effective_date = request.args.get('effective_date')
     active_only = request.args.get('active_only', 'false').lower() == 'true'
+    search_query = request.args.get('search', '').strip()
     
     # Category mapping - maps category names to their corresponding alert types
     category_mapping = {
@@ -144,6 +145,20 @@ def get_alerts():
     }
     
     query = Alert.query.order_by(Alert.effective.desc())
+    
+    # Apply search query across multiple fields
+    if search_query:
+        search_pattern = f'%{search_query}%'
+        query = query.filter(
+            db.or_(
+                Alert.event.ilike(search_pattern),
+                Alert.area_desc.ilike(search_pattern),
+                Alert.ai_summary.ilike(search_pattern),
+                Alert.properties['headline'].astext.ilike(search_pattern),
+                Alert.properties['description'].astext.ilike(search_pattern),
+                Alert.raw['properties']['areaDesc'].astext.ilike(search_pattern)
+            )
+        )
     
     if severity:
         query = query.filter(Alert.severity == severity)
@@ -357,12 +372,26 @@ def search_alerts():
     severity = request.args.get('severity')
     event_type = request.args.get('event_type')
     active_only = request.args.get('active_only', 'false').lower() == 'true'
+    search_query = request.args.get('q', '').strip()  # 'q' for API consistency
     
     # Pagination
     page = request.args.get('page', 1, type=int)
     limit = min(request.args.get('limit', 50, type=int), 100)
     
     query = Alert.query
+    
+    # Apply search query
+    if search_query:
+        search_pattern = f'%{search_query}%'
+        query = query.filter(
+            db.or_(
+                Alert.event.ilike(search_pattern),
+                Alert.area_desc.ilike(search_pattern),
+                Alert.ai_summary.ilike(search_pattern),
+                Alert.properties['headline'].astext.ilike(search_pattern),
+                Alert.properties['description'].astext.ilike(search_pattern)
+            )
+        )
     
     # Apply filters
     if state:
@@ -399,7 +428,8 @@ def search_alerts():
             'area': area,
             'severity': severity,
             'event_type': event_type,
-            'active_only': active_only
+            'active_only': active_only,
+            'search_query': search_query
         },
         'alerts': [alert.to_dict() for alert in alerts]
     })
