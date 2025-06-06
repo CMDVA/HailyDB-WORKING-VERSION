@@ -118,14 +118,21 @@ class EnrichmentService:
         if not description:
             return None
         
-        # Enhanced prompt with specific instructions for better summaries
+        # Enhanced prompt focused on damage assessment for storm restoration professionals
         prompt = f"""
-        Summarize this weather alert in 2-3 clear sentences that focus on:
-        1. What hazard is happening (wind speeds, hail size, tornado threat, etc.)
-        2. Where it's affecting (specific counties/cities)
-        3. When it's valid until and movement direction if applicable
+        Summarize this weather alert in 2-3 clear sentences specifically for storm restoration professionals tracking property damage. EMPHASIZE these damage-related keywords when present:
+        - DAMAGE indicators: "dangerous", "wind gusts", "destroyed", "damage", "damaged", "destroy"
+        - STRUCTURAL impacts: "damage to roofs", "windows", "siding", "vehicles", "trees", "power lines"
+        - RADAR/REPORTS: "radar indicated", "reported", "confirmed", "observed"
+        - DEBRIS: "flying debris", "debris", "projectiles"
+        - SEVERITY: wind speeds (especially 58+ mph), hail size (especially 1"+ diameter), tornado intensity
         
-        Keep the language accessible and actionable for the public.
+        Focus on:
+        1. Specific damage threats and intensities (wind speeds, hail size, tornado strength)
+        2. Geographic areas affected (counties/cities for restoration deployment)
+        3. Duration and movement (for damage assessment timing)
+        
+        Prioritize information relevant to property damage assessment and restoration planning.
         
         Alert Type: {alert.event}
         Severity: {alert.severity}
@@ -143,7 +150,7 @@ class EnrichmentService:
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are a professional meteorologist creating public safety summaries. Write clear, actionable weather alert summaries that help people understand immediate risks and protective actions. Focus on specific hazards, locations, and timing. Avoid jargon and keep language accessible to the general public."
+                            "content": "You are a meteorological analyst specializing in property damage assessment for storm restoration professionals. Create summaries that emphasize damage potential, structural threats, and restoration-relevant information. Highlight wind speeds, hail sizes, debris risks, and specific damage indicators. Focus on historical damage documentation rather than real-time public safety warnings."
                         },
                         {
                             "role": "user",
@@ -172,24 +179,25 @@ class EnrichmentService:
             description = alert.properties.get('description', '')
             severity = alert.severity or ''
             
-            # Prepare classification prompt
+            # Prepare classification prompt focused on damage potential
             prompt = f"""
-            Classify this weather alert into relevant tags. Choose from these categories:
-            - Severe Weather (tornado, severe-thunderstorm, hail, wind)
-            - Flooding (flood, flash-flood, coastal-flood)
-            - Winter Weather (winter-storm, ice-storm, blizzard, snow)
-            - Fire Weather (fire-weather, red-flag)
-            - Marine Weather (marine-warning, small-craft)
-            - Air Quality (air-quality, smoke)
-            - Hurricane/Tropical (hurricane, tropical-storm, storm-surge)
-            - Heat/Cold (heat, excessive-heat, cold, freeze)
-            - Other hazards
+            Classify this weather alert into damage-focused tags for storm restoration professionals. Choose from these categories:
+            - Property Damage (structural-damage, roof-damage, window-damage, siding-damage, vehicle-damage)
+            - Wind Damage (high-wind, destructive-wind, wind-gusts, flying-debris)
+            - Hail Damage (hail-damage, large-hail, roof-impact, vehicle-impact)
+            - Tornado Damage (tornado-damage, debris-field, structural-destruction)
+            - Flood Damage (flood-damage, water-damage, basement-flooding)
+            - Tree Damage (tree-damage, power-line-damage, blocked-roads)
+            - Fire Damage (fire-damage, structure-fire, wildfire-damage)
+            - Storm Intensity (radar-indicated, confirmed-damage, reported-damage)
+            
+            PRIORITIZE tags that indicate actual or potential property damage.
             
             Alert Event: {event}
             Severity: {severity}
             Description: {description[:500]}
             
-            Return only a JSON array of relevant tag strings.
+            Return only a JSON array of relevant damage-focused tag strings.
             """
             
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
@@ -199,7 +207,7 @@ class EnrichmentService:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a weather classification expert. Return only valid JSON arrays of relevant weather tags."
+                        "content": "You are a storm damage assessment expert specializing in property restoration. Classify weather alerts based on damage potential and restoration needs. Focus on structural threats, wind/hail damage indicators, and property impact categories."
                     },
                     {
                         "role": "user",
