@@ -1642,9 +1642,24 @@ def spc_matches_data():
         method_filter = request.args.get('method', '')
         confidence_filter = request.args.get('confidence', '')
         state_filter = request.args.get('state', '')
+        search_query = request.args.get('search', '').strip()
         
         # Build query for verified alerts
         query = Alert.query.filter(Alert.spc_verified == True)
+        
+        # Apply search query across multiple fields
+        if search_query:
+            search_pattern = f'%{search_query}%'
+            query = query.filter(
+                db.or_(
+                    Alert.event.ilike(search_pattern),
+                    Alert.area_desc.ilike(search_pattern),
+                    Alert.spc_ai_summary.ilike(search_pattern),
+                    Alert.properties['headline'].astext.ilike(search_pattern),
+                    Alert.properties['description'].astext.ilike(search_pattern),
+                    Alert.raw['properties']['areaDesc'].astext.ilike(search_pattern)
+                )
+            )
         
         # Filter by time
         since = datetime.utcnow() - timedelta(hours=hours)

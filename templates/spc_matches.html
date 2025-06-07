@@ -74,11 +74,37 @@
     </div>
 </div>
 
-<!-- Filters -->
+<!-- Search and Filters -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
             <div class="card-body">
+                <!-- Search Bar -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <label for="search-input" class="form-label">
+                            <i class="fas fa-search me-1"></i>Search Confirmed Warnings
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="search-input" 
+                                   placeholder="Search by event type, location, AI summary, or SPC report details..."
+                                   onkeypress="handleSearchKeyPress(event)"
+                                   oninput="handleSearchInput()">
+                            <button class="btn btn-outline-secondary" type="button" id="clear-search-btn" 
+                                    onclick="clearSearch()" style="display: none;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <button class="btn btn-primary" type="button" onclick="performSearch()">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Search across event types, locations, AI summaries, and SPC report details
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filters -->
                 <div class="row g-3">
                     <div class="col-md-6 col-lg-3">
                         <label for="event-filter" class="form-label">Event Type</label>
@@ -180,13 +206,15 @@
             const confidenceFilter = document.getElementById('confidence-filter').value;
             const stateFilter = document.getElementById('state-filter').value;
             const timeFilter = document.getElementById('time-filter').value;
+            const searchQuery = document.getElementById('search-input').value.trim();
             
             const params = new URLSearchParams({
                 hours: timeFilter,
                 event: eventFilter,
                 method: methodFilter,
                 confidence: confidenceFilter,
-                state: stateFilter
+                state: stateFilter,
+                search: searchQuery
             });
             
             fetch(`/spc-matches/data?${params}`)
@@ -199,8 +227,41 @@
                 .catch(error => {
                     console.error('Error loading matches:', error);
                     document.getElementById('matches-tbody').innerHTML = 
-                        '<tr><td colspan="7" class="text-center text-danger">Error loading matches</td></tr>';
+                        '<tr><td colspan="8" class="text-center text-danger">Error loading matches</td></tr>';
                 });
+        }
+        
+        // Search functionality
+        function handleSearchKeyPress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                performSearch();
+            }
+        }
+        
+        function handleSearchInput() {
+            const searchInput = document.getElementById('search-input');
+            const clearButton = document.getElementById('clear-search-btn');
+            
+            if (searchInput.value.trim()) {
+                clearButton.style.display = 'block';
+            } else {
+                clearButton.style.display = 'none';
+            }
+        }
+        
+        function performSearch() {
+            loadMatches();
+        }
+        
+        function clearSearch() {
+            const searchInput = document.getElementById('search-input');
+            const clearButton = document.getElementById('clear-search-btn');
+            
+            searchInput.value = '';
+            clearButton.style.display = 'none';
+            searchInput.focus();
+            loadMatches();
         }
         
         function updateSummaryStats(summary) {
@@ -370,6 +431,12 @@
         // Load matches on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadMatches();
+            
+            // Initialize search functionality
+            const searchInput = document.getElementById('search-input');
+            if (searchInput.value.trim()) {
+                document.getElementById('clear-search-btn').style.display = 'block';
+            }
             
             // Auto-refresh every 60 seconds
             setInterval(loadMatches, 60000);
