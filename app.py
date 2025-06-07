@@ -652,15 +652,48 @@ def get_spc_reports():
 
 @app.route('/spc/reports')
 def view_spc_reports():
-    """View SPC reports in web interface"""
+    """View SPC reports in web interface with search functionality"""
     try:
-        # Get recent reports for display
-        reports = SPCReport.query.order_by(
+        # Get search parameters
+        search_query = request.args.get('search', '').strip()
+        report_type = request.args.get('type', '').strip()
+        state = request.args.get('state', '').strip()
+        date = request.args.get('date', '').strip()
+        
+        # Build query
+        query = SPCReport.query
+        
+        # Apply search across multiple fields
+        if search_query:
+            search_pattern = f'%{search_query}%'
+            query = query.filter(
+                db.or_(
+                    SPCReport.location.ilike(search_pattern),
+                    SPCReport.county.ilike(search_pattern),
+                    SPCReport.comments.ilike(search_pattern)
+                )
+            )
+        
+        # Apply filters
+        if report_type:
+            query = query.filter(SPCReport.report_type == report_type)
+        if state:
+            query = query.filter(SPCReport.state.ilike(f'%{state.upper()}%'))
+        if date:
+            try:
+                from datetime import datetime
+                filter_date = datetime.strptime(date, '%Y-%m-%d').date()
+                query = query.filter(SPCReport.report_date == filter_date)
+            except ValueError:
+                pass  # Invalid date format, ignore filter
+        
+        # Get filtered reports
+        reports = query.order_by(
             SPCReport.report_date.desc(), 
             SPCReport.time_utc.desc()
-        ).limit(50).all()
+        ).limit(100).all()  # Increased limit for search results
         
-        # Get summary stats
+        # Get summary stats (total, not filtered)
         total_reports = SPCReport.query.count()
         type_counts = db.session.query(
             SPCReport.report_type,

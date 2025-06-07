@@ -11,6 +11,54 @@
         </a>
     </div>
 
+    <!-- Search and Filters -->
+    <div class="card shadow mb-4">
+        <div class="card-header">
+            <h6 class="m-0 font-weight-bold text-primary">Search & Filter Reports</h6>
+        </div>
+        <div class="card-body">
+            <form id="search-form" class="row g-3">
+                <div class="col-md-4">
+                    <label for="search-query" class="form-label">Search</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="search-query" name="search" 
+                               placeholder="Search location, county, comments..." value="{{ request.args.get('search', '') }}">
+                        <button class="btn btn-outline-secondary" type="button" id="clear-search" title="Clear search">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label for="filter-type" class="form-label">Type</label>
+                    <select class="form-select" id="filter-type" name="type">
+                        <option value="">All Types</option>
+                        <option value="tornado" {{ 'selected' if request.args.get('type') == 'tornado' }}>Tornado</option>
+                        <option value="wind" {{ 'selected' if request.args.get('type') == 'wind' }}>Wind</option>
+                        <option value="hail" {{ 'selected' if request.args.get('type') == 'hail' }}>Hail</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="filter-state" class="form-label">State</label>
+                    <input type="text" class="form-control" id="filter-state" name="state" 
+                           placeholder="TX, KS, etc." value="{{ request.args.get('state', '') }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="filter-date" class="form-label">Date</label>
+                    <input type="date" class="form-control" id="filter-date" name="date" 
+                           value="{{ request.args.get('date', '') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search me-1"></i>Search
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Summary Stats -->
     <div class="row mb-4">
         <div class="col-md-3">
@@ -155,4 +203,54 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='spc-calendar.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchForm = document.getElementById('search-form');
+    const searchQuery = document.getElementById('search-query');
+    const clearButton = document.getElementById('clear-search');
+    
+    // Handle form submission
+    searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        performSearch();
+    });
+    
+    // Handle Enter key in search input
+    searchQuery.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            performSearch();
+        }
+    });
+    
+    // Handle clear button
+    clearButton.addEventListener('click', function() {
+        searchQuery.value = '';
+        document.getElementById('filter-type').value = '';
+        document.getElementById('filter-state').value = '';
+        document.getElementById('filter-date').value = '';
+        performSearch();
+    });
+    
+    function performSearch() {
+        const formData = new FormData(searchForm);
+        const params = new URLSearchParams();
+        
+        for (let [key, value] of formData.entries()) {
+            if (value.trim()) {
+                params.append(key, value.trim());
+            }
+        }
+        
+        // Reload page with search parameters
+        window.location.href = '/spc/reports?' + params.toString();
+    }
+    
+    // Auto-focus search input if there's an existing search
+    if (searchQuery.value) {
+        searchQuery.focus();
+        searchQuery.setSelectionRange(searchQuery.value.length, searchQuery.value.length);
+    }
+});
+</script>
 {% endblock %}
