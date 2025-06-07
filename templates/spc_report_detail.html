@@ -1,0 +1,182 @@
+
+{% extends "base.html" %}
+
+{% block title %}SPC Report Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">SPC Report Details</h1>
+        <a href="/spc/reports" class="btn btn-primary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Reports
+        </a>
+    </div>
+
+    {% if report %}
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Report Information</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Basic Information</h6>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Report Type:</strong></td>
+                                    <td>
+                                        <span class="badge bg-{% if report.report_type == 'tornado' %}danger{% elif report.report_type == 'wind' %}warning{% else %}info{% endif %} fs-6">
+                                            {{ report.report_type.title() }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Date:</strong></td>
+                                    <td>{{ report.report_date.strftime('%B %d, %Y') if report.report_date else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Time (UTC):</strong></td>
+                                    <td>{{ report.time_utc[:2] + ':' + report.time_utc[2:] if report.time_utc and report.time_utc|length == 4 else report.time_utc or 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Location:</strong></td>
+                                    <td>{{ report.location or 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>County:</strong></td>
+                                    <td>{{ report.county or 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>State:</strong></td>
+                                    <td>{{ report.state or 'N/A' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Coordinates & Magnitude</h6>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Latitude:</strong></td>
+                                    <td>{{ "%.4f"|format(report.latitude) if report.latitude else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Longitude:</strong></td>
+                                    <td>{{ "%.4f"|format(report.longitude) if report.longitude else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Magnitude:</strong></td>
+                                    <td>
+                                        {% if report.magnitude %}
+                                            {% if report.report_type == 'tornado' and report.magnitude.f_scale is defined %}
+                                                <span class="badge bg-danger">F{{ report.magnitude.f_scale }}</span>
+                                            {% elif report.report_type == 'wind' %}
+                                                {% if report.magnitude.speed_text is defined %}
+                                                    <span class="badge bg-warning">{{ report.magnitude.speed_text }}</span>
+                                                {% elif report.magnitude.speed is defined and report.magnitude.speed %}
+                                                    <span class="badge bg-warning">{{ report.magnitude.speed }} mph</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">Unknown Speed</span>
+                                                {% endif %}
+                                            {% elif report.report_type == 'hail' %}
+                                                {% if report.magnitude.size_text is defined %}
+                                                    <span class="badge bg-info">{{ report.magnitude.size_text }}</span>
+                                                {% elif report.magnitude.size_inches is defined and report.magnitude.size_inches %}
+                                                    <span class="badge bg-info">{{ "%.2f"|format(report.magnitude.size_inches) }}" diameter</span>
+                                                {% elif report.magnitude.size_hundredths is defined and report.magnitude.size_hundredths %}
+                                                    <span class="badge bg-info">{{ "%.2f"|format(report.magnitude.size_hundredths / 100.0) }}" diameter</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">Unknown Size</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge bg-secondary">N/A</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-secondary">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Ingested:</strong></td>
+                                    <td>{{ report.ingested_at.strftime('%Y-%m-%d %H:%M UTC') if report.ingested_at else 'N/A' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if report.comments %}
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Comments</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ report.comments }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Technical Details</h6>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-muted">Database Information</h6>
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td><strong>Report ID:</strong></td>
+                            <td>{{ report.id }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Row Hash:</strong></td>
+                            <td><code class="small">{{ report.row_hash[:16] + '...' if report.row_hash else 'N/A' }}</code></td>
+                        </tr>
+                    </table>
+
+                    {% if report.raw_csv_line %}
+                    <h6 class="text-muted mt-4">Original CSV Data</h6>
+                    <div class="bg-light p-2 rounded">
+                        <small class="font-monospace">{{ report.raw_csv_line }}</small>
+                    </div>
+                    {% endif %}
+
+                    {% if report.magnitude %}
+                    <h6 class="text-muted mt-4">Raw Magnitude Data</h6>
+                    <div class="bg-light p-2 rounded">
+                        <pre class="mb-0 small">{{ report.magnitude | tojson(indent=2) }}</pre>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Map placeholder if coordinates available -->
+            {% if report.latitude and report.longitude %}
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Location Map</h6>
+                </div>
+                <div class="card-body text-center">
+                    <p class="text-muted mb-3">Coordinates: {{ "%.4f"|format(report.latitude) }}, {{ "%.4f"|format(report.longitude) }}</p>
+                    <a href="https://www.google.com/maps?q={{ report.latitude }},{{ report.longitude }}" 
+                       target="_blank" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-map-marker-alt me-1"></i>View on Google Maps
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-danger" role="alert">
+        <h4 class="alert-heading">Report Not Found</h4>
+        <p>The requested SPC report could not be found.</p>
+        <hr>
+        <p class="mb-0">Please check the report ID and try again, or <a href="/spc/reports">return to the reports list</a>.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

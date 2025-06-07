@@ -144,6 +144,7 @@
                             <th>State</th>
                             <th>Magnitude</th>
                             <th>Comments</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -188,6 +189,13 @@
                                 {% endif %}
                             </td>
                             <td>{{ report.comments[:100] + '...' if report.comments and report.comments|length > 100 else report.comments or 'N/A' }}</td>
+                            <td>
+                                <a href="{{ url_for('view_spc_report_detail', report_id=report.id) }}" 
+                                   class="btn btn-sm btn-outline-primary" 
+                                   title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>

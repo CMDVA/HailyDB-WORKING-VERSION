@@ -709,6 +709,16 @@ def view_spc_reports():
         logger.error(f"Error viewing SPC reports: {e}")
         return render_template('error.html', error=str(e))
 
+@app.route('/spc/reports/<int:report_id>')
+def view_spc_report_detail(report_id):
+    """View detailed information for a specific SPC report"""
+    try:
+        report = SPCReport.query.get_or_404(report_id)
+        return render_template('spc_report_detail.html', report=report)
+    except Exception as e:
+        logger.error(f"Error viewing SPC report {report_id}: {e}")
+        return render_template('error.html', error=str(e))
+
 # Internal/Admin Routes
 @app.route('/internal/status')
 def internal_status():
