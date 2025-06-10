@@ -307,7 +307,8 @@ def get_alerts():
                 'effective': alert.effective.isoformat() if alert.effective else None,
                 'expires': alert.expires.isoformat() if alert.expires else None,
                 'ai_summary': alert.ai_summary,
-                'ai_tags': alert.ai_tags
+                'ai_tags': alert.ai_tags,
+                'radar_indicated': alert.radar_indicated
             } for alert in alerts.items],
             'pagination': {
                 'page': alerts.page,
@@ -344,6 +345,7 @@ def get_alert(alert_id):
             'ai_tags': alert.ai_tags,
             'spc_verified': alert.spc_verified,
             'spc_reports': alert.spc_reports,
+            'radar_indicated': alert.radar_indicated,
             'ingested_at': alert.ingested_at.isoformat()
         })
     
@@ -461,6 +463,47 @@ def get_active_alerts():
         'timestamp': now.isoformat(),
         'total_active': len(alerts),
         'alerts': [alert.to_dict() for alert in alerts]
+    })
+
+@app.route('/api/test/radar-parsing', methods=['POST'])
+def test_radar_parsing():
+    """Test endpoint for radar-indicated parsing"""
+    from ingest import IngestService
+    
+    test_data = request.json if request.json else {}
+    
+    # Sample test cases
+    test_cases = [
+        {
+            'event': 'Severe Thunderstorm Warning',
+            'headline': 'Severe Thunderstorm Warning with quarter size hail and winds up to 70 mph',
+            'description': 'This storm is producing damaging winds of 70 mph and hail up to 1 inch in diameter.'
+        },
+        {
+            'event': 'Severe Thunderstorm Warning', 
+            'headline': 'Golf ball hail and 80 mph wind gusts expected',
+            'description': 'Wind gusts to 80 mph and golf ball size hail are possible.'
+        },
+        test_data.get('properties', {})
+    ]
+    
+    ingest_service = IngestService(db)
+    results = []
+    
+    for i, properties in enumerate(test_cases):
+        if not properties.get('event'):
+            continue
+            
+        radar_data = ingest_service._parse_radar_indicated(properties)
+        results.append({
+            'test_case': i + 1,
+            'input': properties,
+            'radar_indicated': radar_data
+        })
+    
+    return jsonify({
+        'status': 'success',
+        'test_results': results
     })
 
 @app.route('/api/alerts/search')

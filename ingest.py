@@ -251,3 +251,133 @@ class IngestService:
                 'alerts_processed': latest_log.alerts_processed if latest_log else 0
             } if latest_log else None
         }
+    
+    def _parse_radar_indicated(self, properties: Dict) -> Optional[Dict]:
+        """
+        Parse radar-indicated hail and wind data from Severe Thunderstorm Warning
+        Returns {"hail_inches": float, "wind_mph": int} or None if not a STW or no data found
+        """
+        event = properties.get('event', '')
+        
+        # Only process Severe Thunderstorm Warnings
+        if 'Severe Thunderstorm Warning' not in event:
+            return None
+        
+        try:
+            # Get text fields to search
+            text_fields = []
+            if properties.get('headline'):
+                text_fields.append(properties['headline'])
+            if properties.get('description'):
+                text_fields.append(properties['description'])
+            if properties.get('instruction'):
+                text_fields.append(properties['instruction'])
+            
+            combined_text = ' '.join(text_fields).lower()
+            
+            if not combined_text.strip():
+                return None
+                
+            radar_data = {}
+            
+            # Parse hail size
+            hail_inches = self._extract_hail_size(combined_text)
+            if hail_inches is not None:
+                radar_data['hail_inches'] = hail_inches
+            
+            # Parse wind speed
+            wind_mph = self._extract_wind_speed(combined_text)
+            if wind_mph is not None:
+                radar_data['wind_mph'] = wind_mph
+            
+            return radar_data if radar_data else None
+            
+        except Exception as e:
+            logger.error(f"Error parsing radar indicated data: {e}")
+            return None
+    
+    def _extract_hail_size(self, text: str) -> Optional[float]:
+        """Extract hail size in inches from text"""
+        try:
+            # Size conversion mapping
+            size_map = {
+                'pea': 0.25,
+                'marble': 0.5,
+                'penny': 0.75,
+                'nickel': 0.88,
+                'quarter': 1.0,
+                'half dollar': 1.25,
+                'ping pong ball': 1.5,
+                'golf ball': 1.75,
+                'tennis ball': 2.5,
+                'baseball': 2.75,
+                'softball': 4.0
+            }
+            
+            # Pattern 1: "hail up to X inch" or "hail up to X inches"
+            pattern1 = r'hail up to (\d+(?:\.\d+)?)\s*inch'
+            match = re.search(pattern1, text)
+            if match:
+                return float(match.group(1))
+            
+            # Pattern 2: "hail size of X inch" or "X inch hail"
+            pattern2 = r'(?:hail size of |)(\d+(?:\.\d+)?)\s*inch'
+            match = re.search(pattern2, text)
+            if match:
+                return float(match.group(1))
+            
+            # Pattern 3: Named sizes (quarter size hail, golf ball hail, etc.)
+            for size_name, inches in size_map.items():
+                if size_name in text and 'hail' in text:
+                    return inches
+            
+            # Pattern 4: "X inch diameter hail"
+            pattern4 = r'(\d+(?:\.\d+)?)\s*inch diameter hail'
+            match = re.search(pattern4, text)
+            if match:
+                return float(match.group(1))
+                
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Error extracting hail size: {e}")
+            return None
+    
+    def _extract_wind_speed(self, text: str) -> Optional[int]:
+        """Extract wind speed in mph from text"""
+        try:
+            # Pattern 1: "winds up to X mph"
+            pattern1 = r'winds up to (\d+)\s*mph'
+            match = re.search(pattern1, text)
+            if match:
+                return int(match.group(1))
+            
+            # Pattern 2: "damaging winds of X mph"
+            pattern2 = r'damaging winds of (\d+)\s*mph'
+            match = re.search(pattern2, text)
+            if match:
+                return int(match.group(1))
+            
+            # Pattern 3: "X mph wind gusts"
+            pattern3 = r'(\d+)\s*mph wind gusts'
+            match = re.search(pattern3, text)
+            if match:
+                return int(match.group(1))
+            
+            # Pattern 4: "wind gusts to X mph"
+            pattern4 = r'wind gusts to (\d+)\s*mph'
+            match = re.search(pattern4, text)
+            if match:
+                return int(match.group(1))
+            
+            # Pattern 5: "winds of X mph"
+            pattern5 = r'winds of (\d+)\s*mph'
+            match = re.search(pattern5, text)
+            if match:
+                return int(match.group(1))
+                
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Error extracting wind speed: {e}")
+            return None
