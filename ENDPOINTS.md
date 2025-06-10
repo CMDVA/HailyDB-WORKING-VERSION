@@ -43,7 +43,7 @@ GET /alerts
 
 **Query Parameters**:
 - `page` (int, default: 1) - Page number for pagination
-- `per_page` (int, default: 50, max: 100) - Results per page
+- `per_page` (int, default: 50, max: 1000) - Results per page
 - `severity` (string) - Filter by severity: "Minor", "Moderate", "Severe", "Extreme"
 - `event` (string) - Filter by event type (partial match)
 - `category` (string) - Filter by predefined category

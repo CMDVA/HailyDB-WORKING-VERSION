@@ -293,7 +293,7 @@ def get_alerts():
     
     alerts = query.paginate(
         page=page,
-        per_page=min(per_page, 100),
+        per_page=min(per_page, 1000),  # Increased limit for dashboard performance
         error_out=False
     )
     
