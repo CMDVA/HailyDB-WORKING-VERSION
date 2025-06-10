@@ -106,8 +106,8 @@ class HurricaneIngestService:
             # Parse HURDAT2 format
             storms_data = self._parse_hurdat2_format(response.text)
             
-            # Filter to recent years for demonstration (2020-2023)
-            recent_storms = [storm for storm in storms_data if storm['year'] >= 2020]
+            # Filter to recent major damage years (2020-2023)
+            recent_storms = [storm for storm in storms_data if storm['year'] >= 2020 and len(storm['track_points']) > 5]
             
             logger.info(f"Parsed {len(recent_storms)} recent storms from HURDAT2 data")
             return recent_storms
