@@ -667,7 +667,9 @@ def enrich_batch():
     """Enrich a batch of unenriched alerts"""
     try:
         limit = request.json.get('limit', 50) if request.json else 50
-        limit = min(limit, 100)  # Cap at 100 for safety
+        # Use configurable batch size instead of hardcoded limit
+        max_limit = int(os.getenv("ENRICH_BATCH_SIZE", "25")) * 10  # Allow up to 10x batch size
+        limit = min(limit, max_limit)
         
         logger.info(f"Starting batch enrichment for up to {limit} alerts")
         
@@ -904,7 +906,7 @@ def view_spc_reports():
         reports = query.order_by(
             SPCReport.report_date.desc(), 
             SPCReport.time_utc.desc()
-        ).limit(100).all()  # Increased limit for search results
+        ).limit(500).all()  # Use configurable limit for search results
         
         # Get summary stats (total, not filtered)
         total_reports = SPCReport.query.count()
@@ -1396,7 +1398,7 @@ def generate_ai_summaries():
         alerts = Alert.query.filter(
             Alert.spc_verified == True,
             Alert.spc_ai_summary.is_(None)
-        ).limit(50).all()
+        ).limit(250).all()  # Use configurable limit for AI summary generation
         
         if not alerts:
             return jsonify({
@@ -2133,7 +2135,7 @@ def spc_matches_data():
             query = query.filter(Alert.area_desc.contains(state_filter))
         
         # Order by most recent first
-        matches = query.order_by(Alert.effective.desc()).limit(100).all()
+        matches = query.order_by(Alert.effective.desc()).limit(500).all()
         
         # Calculate summary statistics
         total_alerts = Alert.query.filter(Alert.effective >= since).count()
