@@ -41,6 +41,107 @@ def number_format(value):
     except (ValueError, TypeError):
         return value
 
+def determine_enhanced_status(log_row):
+    """Determine enhanced status display and color coding for operation logs"""
+    import json
+    
+    # Extract metadata if available
+    metadata = {}
+    if hasattr(log_row, 'operation_metadata') and log_row.operation_metadata:
+        try:
+            if isinstance(log_row.operation_metadata, str):
+                metadata = json.loads(log_row.operation_metadata)
+            else:
+                metadata = log_row.operation_metadata
+        except:
+            pass
+    
+    # Check for detailed status in metadata
+    detailed_status = metadata.get('detailed_status', '')
+    
+    # Determine status if not in progress
+    if not log_row.completed_at:
+        return {
+            'display': 'In Progress',
+            'color': '#007bff',
+            'class': 'log-progress'
+        }
+    
+    # Use detailed status if available
+    if detailed_status:
+        if detailed_status == 'success_with_new_data':
+            return {
+                'display': 'Success',
+                'color': '#28a745',
+                'class': 'log-success'
+            }
+        elif detailed_status == 'success_no_new_data':
+            return {
+                'display': 'Success - No New Data',
+                'color': '#20c997',
+                'class': 'log-success-no-data'
+            }
+        elif detailed_status == 'failed_technical':
+            return {
+                'display': 'Failed - Technical',
+                'color': '#fd7e14',
+                'class': 'log-failed-technical'
+            }
+        elif detailed_status == 'failed_network':
+            return {
+                'display': 'Failed - Network',
+                'color': '#dc3545',
+                'class': 'log-failed-network'
+            }
+        elif detailed_status == 'failed_data':
+            return {
+                'display': 'Failed - Data',
+                'color': '#dc3545',
+                'class': 'log-failed-data'
+            }
+    
+    # Fallback to basic success/failure with enhanced logic
+    if log_row.success:
+        if log_row.records_new == 0 and log_row.records_processed > 0:
+            return {
+                'display': 'Success - No New Data',
+                'color': '#20c997',
+                'class': 'log-success-no-data'
+            }
+        elif log_row.records_new > 0:
+            return {
+                'display': 'Success',
+                'color': '#28a745',
+                'class': 'log-success'
+            }
+        else:
+            return {
+                'display': 'Success',
+                'color': '#28a745',
+                'class': 'log-success'
+            }
+    else:
+        # Determine failure type from error message
+        error_msg = (log_row.error_message or '').lower()
+        if 'network' in error_msg or 'timeout' in error_msg or 'connection' in error_msg:
+            return {
+                'display': 'Failed - Network',
+                'color': '#dc3545',
+                'class': 'log-failed-network'
+            }
+        elif 'database' in error_msg or 'sql' in error_msg or 'pg numeric type' in error_msg:
+            return {
+                'display': 'Failed - Technical',
+                'color': '#fd7e14',
+                'class': 'log-failed-technical'
+            }
+        else:
+            return {
+                'display': 'Failed',
+                'color': '#dc3545',
+                'class': 'log-error'
+            }
+
 # Import other modules after app initialization
 from models import Alert, SPCReport, SPCIngestionLog, SchedulerLog
 from ingest import IngestService
@@ -1707,7 +1808,7 @@ def ingestion_logs_data():
         # Build SQL query to avoid PostgreSQL type issues
         since = datetime.utcnow() - timedelta(hours=hours)
         
-        # Base query with proper type casting
+        # Base query with proper type casting and enhanced status
         base_sql = """
             SELECT 
                 id,
@@ -1718,7 +1819,8 @@ def ingestion_logs_data():
                 success,
                 COALESCE(records_processed, 0) as records_processed,
                 COALESCE(records_new, 0) as records_new,
-                error_message::text
+                error_message::text,
+                operation_metadata
             FROM scheduler_logs 
             WHERE started_at >= :since
         """
@@ -1760,12 +1862,15 @@ def ingestion_logs_data():
         summary_result = db.session.execute(db.text(summary_sql), params)
         summary_data = summary_result.fetchone()
         
-        # Format logs for JSON response
+        # Format logs for JSON response with enhanced status
         formatted_logs = []
         for row in logs_data:
             duration = None
             if row.started_at and row.completed_at:
                 duration = round((row.completed_at - row.started_at).total_seconds(), 1)
+            
+            # Determine enhanced status and color
+            status_info = determine_enhanced_status(row)
             
             formatted_logs.append({
                 'started_at': row.started_at.isoformat() if row.started_at else None,
@@ -1776,7 +1881,10 @@ def ingestion_logs_data():
                 'records_processed': row.records_processed,
                 'records_new': row.records_new,
                 'error_message': row.error_message,
-                'duration': duration
+                'duration': duration,
+                'status_display': status_info['display'],
+                'status_color': status_info['color'],
+                'status_class': status_info['class']
             })
         
         return jsonify({

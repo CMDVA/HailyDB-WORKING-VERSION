@@ -52,33 +52,56 @@ class SchedulerService:
                              processing_duration: float = None):
         """
         Complete an operation log entry with detailed error tracking
+        Uses direct SQL to avoid PostgreSQL type conversion issues
         """
         try:
-            log_entry.completed_at = datetime.utcnow()
-            log_entry.success = success
-            log_entry.records_processed = records_processed
-            log_entry.records_new = records_new
+            # Determine detailed status for enhanced reporting
+            detailed_status = self._determine_detailed_status(
+                success, records_processed, records_new, error_message
+            )
             
-            if error_message:
-                log_entry.error_message = error_message
+            # Use direct SQL update to avoid PostgreSQL type issues
+            update_sql = """
+                UPDATE scheduler_logs 
+                SET 
+                    completed_at = :completed_at,
+                    success = :success,
+                    records_processed = :records_processed,
+                    records_new = :records_new,
+                    error_message = :error_message,
+                    duplicate_count = :duplicate_count,
+                    http_status_code = :http_status_code,
+                    api_response_size = :api_response_size,
+                    processing_duration = :processing_duration,
+                    operation_metadata = :operation_metadata
+                WHERE id = :log_id
+            """
             
-            # Enhanced error tracking
-            if error_details:
-                log_entry.error_details = error_details
-            if failed_alert_ids:
-                log_entry.failed_alert_ids = failed_alert_ids
-            if duplicate_count:
-                log_entry.duplicate_count = duplicate_count
-            if http_status_code:
-                log_entry.http_status_code = http_status_code
-            if api_response_size:
-                log_entry.api_response_size = api_response_size
-            if processing_duration:
-                log_entry.processing_duration = processing_duration
+            # Prepare operation metadata with enhanced status
+            metadata = {
+                'detailed_status': detailed_status,
+                'error_details': error_details or {},
+                'failed_alert_ids': failed_alert_ids or []
+            }
             
+            params = {
+                'completed_at': datetime.utcnow(),
+                'success': success,
+                'records_processed': records_processed or 0,
+                'records_new': records_new or 0,
+                'error_message': error_message,
+                'duplicate_count': duplicate_count or 0,
+                'http_status_code': http_status_code,
+                'api_response_size': api_response_size,
+                'processing_duration': str(processing_duration) if processing_duration else None,
+                'operation_metadata': metadata,
+                'log_id': log_entry.id
+            }
+            
+            self.db.session.execute(self.db.text(update_sql), params)
             self.db.session.commit()
             
-            status = "SUCCESS" if success else "FAILED"
+            status_display = detailed_status.replace('_', ' ').title()
             details = f"(processed: {records_processed}, new: {records_new}"
             if duplicate_count:
                 details += f", duplicates: {duplicate_count}"
@@ -86,12 +109,34 @@ class SchedulerService:
                 details += f", failed: {len(failed_alert_ids)}"
             details += ")"
             
-            logger.info(f"Completed operation {log_entry.operation_type}: {status} {details}")
+            logger.info(f"Completed operation {log_entry.operation_type}: {status_display} {details}")
             
         except Exception as e:
             logger.error(f"Failed to complete operation log: {e}")
             self.db.session.rollback()
-            raise
+            # Don't raise - log the error but don't fail the actual operation
+            logger.warning(f"Operation {log_entry.operation_type} completed successfully but logging failed")
+    
+    def _determine_detailed_status(self, success: bool, records_processed: int, 
+                                 records_new: int, error_message: str = None) -> str:
+        """Determine detailed status based on operation results"""
+        if not success:
+            if error_message:
+                if 'network' in error_message.lower() or 'timeout' in error_message.lower():
+                    return 'failed_network'
+                elif 'database' in error_message.lower() or 'sql' in error_message.lower():
+                    return 'failed_technical'
+                else:
+                    return 'failed_data'
+            return 'failed_unknown'
+        
+        # Success cases
+        if records_new == 0 and records_processed > 0:
+            return 'success_no_new_data'
+        elif records_new > 0:
+            return 'success_with_new_data'
+        else:
+            return 'success_empty'
     
     def get_recent_operations(self, hours: int = 24, operation_type: str = None) -> list:
         """
