@@ -150,7 +150,7 @@ class AutonomousScheduler:
             new_alerts = self.ingest_service.poll_nws_alerts()
             
             self.scheduler_service.log_operation_complete(
-                log_entry, True, new_alerts, new_alerts
+                log_entry, True, records_processed=new_alerts, records_new=new_alerts
             )
             
             self.last_nws_poll = datetime.utcnow()
@@ -172,7 +172,7 @@ class AutonomousScheduler:
             }
             if log_entry:
                 self.scheduler_service.log_operation_complete(
-                    log_entry, False, 0, 0, str(e)
+                    log_entry, False, records_processed=0, records_new=0, error_message=str(e)
                 )
         finally:
             self.nws_lock.release()
@@ -219,7 +219,7 @@ class AutonomousScheduler:
                         continue
             
             self.scheduler_service.log_operation_complete(
-                log_entry, True, total_reports, total_reports
+                log_entry, True, records_processed=total_reports, records_new=total_reports
             )
             
             self.last_spc_poll = datetime.utcnow()

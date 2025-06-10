@@ -51,57 +51,34 @@ class SchedulerService:
                              http_status_code: int = None, api_response_size: int = None,
                              processing_duration: float = None):
         """
-        Complete an operation log entry with detailed error tracking
-        Uses direct SQL to avoid PostgreSQL type conversion issues
+        Complete an operation log entry with simplified approach to avoid PostgreSQL issues
         """
         try:
-            # Determine detailed status for enhanced reporting
-            detailed_status = self._determine_detailed_status(
-                success, records_processed, records_new, error_message
-            )
+            # Update the log entry directly using SQLAlchemy ORM
+            log_entry.completed_at = datetime.utcnow()
+            log_entry.success = success
+            log_entry.records_processed = records_processed or 0
+            log_entry.records_new = records_new or 0
+            log_entry.error_message = error_message
+            log_entry.duplicate_count = duplicate_count or 0
+            log_entry.http_status_code = http_status_code
+            log_entry.api_response_size = api_response_size
+            log_entry.processing_duration = processing_duration
             
-            # Use direct SQL update to avoid PostgreSQL type issues
-            update_sql = """
-                UPDATE scheduler_logs 
-                SET 
-                    completed_at = :completed_at,
-                    success = :success,
-                    records_processed = :records_processed,
-                    records_new = :records_new,
-                    error_message = :error_message,
-                    duplicate_count = :duplicate_count,
-                    http_status_code = :http_status_code,
-                    api_response_size = :api_response_size,
-                    processing_duration = :processing_duration,
-                    operation_metadata = :operation_metadata
-                WHERE id = :log_id
-            """
+            # Simplified metadata without complex nested structures
+            if error_details or failed_alert_ids:
+                detailed_status = self._determine_detailed_status(
+                    success, records_processed, records_new, error_message
+                )
+                log_entry.operation_metadata = {
+                    'detailed_status': detailed_status,
+                    'has_error_details': bool(error_details),
+                    'failed_count': len(failed_alert_ids) if failed_alert_ids else 0
+                }
             
-            # Prepare operation metadata with enhanced status
-            metadata = {
-                'detailed_status': detailed_status,
-                'error_details': error_details or {},
-                'failed_alert_ids': failed_alert_ids or []
-            }
-            
-            params = {
-                'completed_at': datetime.utcnow(),
-                'success': success,
-                'records_processed': records_processed or 0,
-                'records_new': records_new or 0,
-                'error_message': error_message,
-                'duplicate_count': duplicate_count or 0,
-                'http_status_code': http_status_code,
-                'api_response_size': api_response_size,
-                'processing_duration': str(processing_duration) if processing_duration else None,
-                'operation_metadata': metadata,
-                'log_id': log_entry.id
-            }
-            
-            self.db.session.execute(self.db.text(update_sql), params)
             self.db.session.commit()
             
-            status_display = detailed_status.replace('_', ' ').title()
+            status = "SUCCESS" if success else "FAILED"
             details = f"(processed: {records_processed}, new: {records_new}"
             if duplicate_count:
                 details += f", duplicates: {duplicate_count}"
@@ -109,13 +86,39 @@ class SchedulerService:
                 details += f", failed: {len(failed_alert_ids)}"
             details += ")"
             
-            logger.info(f"Completed operation {log_entry.operation_type}: {status_display} {details}")
+            logger.info(f"Completed operation {log_entry.operation_type}: {status} {details}")
             
         except Exception as e:
             logger.error(f"Failed to complete operation log: {e}")
-            self.db.session.rollback()
-            # Don't raise - log the error but don't fail the actual operation
-            logger.warning(f"Operation completed successfully but logging failed due to database error")
+            try:
+                # Fallback: Simple direct update without complex fields
+                simple_update_sql = """
+                    UPDATE scheduler_logs 
+                    SET 
+                        completed_at = NOW(),
+                        success = :success,
+                        records_processed = :records_processed,
+                        records_new = :records_new,
+                        error_message = :error_message
+                    WHERE id = :log_id
+                """
+                
+                params = {
+                    'success': success,
+                    'records_processed': records_processed or 0,
+                    'records_new': records_new or 0,
+                    'error_message': error_message,
+                    'log_id': log_entry.id
+                }
+                
+                self.db.session.execute(self.db.text(simple_update_sql), params)
+                self.db.session.commit()
+                
+                logger.info(f"Fallback completion successful for operation {log_entry.operation_type}")
+                
+            except Exception as fallback_error:
+                logger.error(f"Fallback completion also failed: {fallback_error}")
+                self.db.session.rollback()
     
     def _determine_detailed_status(self, success: bool, records_processed: int, 
                                  records_new: int, error_message: str = None) -> str:
