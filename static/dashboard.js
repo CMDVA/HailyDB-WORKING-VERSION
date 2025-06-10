@@ -269,13 +269,13 @@ async function loadTodaysAlerts() {
     try {
         const today = new Date().toISOString().split('T')[0];
         const cacheBuster = new Date().getTime();
-        const response = await fetch(`/alerts?format=json&per_page=500&effective_date=${today}&_cb=${cacheBuster}`);
+        const response = await fetch(`/alerts?format=json&per_page=500&ingested_date=${today}&_cb=${cacheBuster}`);
         const data = await response.json();
         
         const tableContainer = document.getElementById('todays-alerts-table');
         if (!tableContainer) return;
         
-        // Use alerts directly from API response (already filtered by effective_date parameter)
+        // Use alerts directly from API response (filtered by ingested_date parameter)
         const todaysAlerts = data.alerts || [];
         
         if (todaysAlerts.length > 0) {
@@ -286,7 +286,8 @@ async function loadTodaysAlerts() {
                 return acc;
             }, {});
             
-            let html = `<div class="mb-3"><strong>${todaysAlerts.length} alerts ingested today</strong></div>`;
+            let html = `<div class="mb-3"><strong>${todaysAlerts.length} alerts ingested today</strong></div>
+                       <div class="mb-2"><small class="text-muted">Showing alerts by ingestion date (database completeness)</small></div>`;
             
             // NWS Alert Category mapping
             const alertCategories = {

@@ -283,6 +283,16 @@ def get_alerts():
             query = query.filter(db.func.date(Alert.effective) == filter_date)
         except ValueError:
             pass  # Invalid date format, ignore filter
+    
+    # Add ingested_date filter for database completeness tracking
+    ingested_date = request.args.get('ingested_date')
+    if ingested_date:
+        from datetime import datetime
+        try:
+            filter_date = datetime.strptime(ingested_date, '%Y-%m-%d').date()
+            query = query.filter(db.func.date(Alert.ingested_at) == filter_date)
+        except ValueError:
+            pass  # Invalid date format, ignore filter
     if active_only:
         from datetime import datetime
         now = datetime.utcnow()

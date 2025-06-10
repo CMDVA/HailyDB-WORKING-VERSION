@@ -51,6 +51,7 @@ GET /alerts
 - `county` (string) - Filter by county name
 - `area` (string) - Filter by area description
 - `effective_date` (string, YYYY-MM-DD) - Filter by effective date
+- `ingested_date` (string, YYYY-MM-DD) - Filter by ingestion date (database completeness)
 - `active_only` (boolean, default: false) - Show only currently active alerts
 - `format` (string) - Set to "json" for JSON response
 
