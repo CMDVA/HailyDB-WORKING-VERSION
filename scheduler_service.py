@@ -115,7 +115,7 @@ class SchedulerService:
             logger.error(f"Failed to complete operation log: {e}")
             self.db.session.rollback()
             # Don't raise - log the error but don't fail the actual operation
-            logger.warning(f"Operation {log_entry.operation_type} completed successfully but logging failed")
+            logger.warning(f"Operation completed successfully but logging failed due to database error")
     
     def _determine_detailed_status(self, success: bool, records_processed: int, 
                                  records_new: int, error_message: str = None) -> str:

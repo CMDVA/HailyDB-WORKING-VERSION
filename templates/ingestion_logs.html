@@ -10,7 +10,12 @@
     <style>
         .log-entry { border-left: 4px solid #dee2e6; }
         .log-success { border-left-color: #28a745; }
+        .log-success-no-data { border-left-color: #20c997; }
         .log-error { border-left-color: #dc3545; }
+        .log-failed-technical { border-left-color: #fd7e14; }
+        .log-failed-network { border-left-color: #dc3545; }
+        .log-failed-data { border-left-color: #dc3545; }
+        .log-progress { border-left-color: #007bff; }
         .log-warning { border-left-color: #ffc107; }
         .table-sm th, .table-sm td { padding: 0.5rem; }
         .badge-operation { font-size: 0.75em; }
@@ -216,18 +221,24 @@
             }
 
             tbody.innerHTML = logs.map(log => {
-                const statusBadge = log.success ? 
-                    '<span class="badge bg-success">Success</span>' : 
-                    '<span class="badge bg-danger">Failed</span>';
+                // Use enhanced status display with custom colors
+                const statusBadge = log.status_display ? 
+                    `<span class="badge" style="background-color: ${log.status_color}; color: white;">${log.status_display}</span>` :
+                    (log.success ? 
+                        '<span class="badge bg-success">Success</span>' : 
+                        '<span class="badge bg-danger">Failed</span>');
 
                 const operationBadge = getOperationBadge(log.operation_type);
                 const duration = log.duration ? `${log.duration}s` : '-';
-                const recordsInfo = log.success ? 
+                const recordsInfo = log.records_processed >= 0 ? 
                     `${log.records_new || 0} new / ${log.records_processed || 0} total` : 
                     '-';
 
+                // Use enhanced status class for row styling
+                const rowClass = log.status_class || (log.success ? 'log-success' : 'log-error');
+
                 return `
-                    <tr class="log-entry ${log.success ? 'log-success' : 'log-error'}">
+                    <tr class="log-entry ${rowClass}">
                         <td>${formatTimestamp(log.started_at)}</td>
                         <td>${operationBadge}</td>
                         <td>${statusBadge}</td>

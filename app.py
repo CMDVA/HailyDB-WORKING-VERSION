@@ -1870,7 +1870,38 @@ def ingestion_logs_data():
                 duration = round((row.completed_at - row.started_at).total_seconds(), 1)
             
             # Determine enhanced status and color
-            status_info = determine_enhanced_status(row)
+            if not row.completed_at:
+                status_display = 'In Progress'
+                status_color = '#007bff'
+                status_class = 'log-progress'
+            elif row.success:
+                if row.records_new == 0 and row.records_processed > 0:
+                    status_display = 'Success - No New Data'
+                    status_color = '#20c997'
+                    status_class = 'log-success-no-data'
+                elif row.records_new > 0:
+                    status_display = 'Success'
+                    status_color = '#28a745'
+                    status_class = 'log-success'
+                else:
+                    status_display = 'Success'
+                    status_color = '#28a745'
+                    status_class = 'log-success'
+            else:
+                # Determine failure type from error message
+                error_msg = (row.error_message or '').lower()
+                if 'network' in error_msg or 'timeout' in error_msg or 'connection' in error_msg:
+                    status_display = 'Failed - Network'
+                    status_color = '#dc3545'
+                    status_class = 'log-failed-network'
+                elif 'database' in error_msg or 'sql' in error_msg or 'pg numeric type' in error_msg:
+                    status_display = 'Failed - Technical'
+                    status_color = '#fd7e14'
+                    status_class = 'log-failed-technical'
+                else:
+                    status_display = 'Failed'
+                    status_color = '#dc3545'
+                    status_class = 'log-error'
             
             formatted_logs.append({
                 'started_at': row.started_at.isoformat() if row.started_at else None,
@@ -1882,9 +1913,9 @@ def ingestion_logs_data():
                 'records_new': row.records_new,
                 'error_message': row.error_message,
                 'duration': duration,
-                'status_display': status_info['display'],
-                'status_color': status_info['color'],
-                'status_class': status_info['class']
+                'status_display': status_display,
+                'status_color': status_color,
+                'status_class': status_class
             })
         
         return jsonify({
