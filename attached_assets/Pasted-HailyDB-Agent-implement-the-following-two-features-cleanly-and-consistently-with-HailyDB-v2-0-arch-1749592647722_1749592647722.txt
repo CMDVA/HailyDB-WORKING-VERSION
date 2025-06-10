@@ -1,0 +1,137 @@
+HailyDB Agent — implement the following two features cleanly and consistently with HailyDB v2.0 architecture.
+
+Severe Thunderstorm Warnings → Radar Indicated Parsing
+
+Ingested NWS Alerts already store full properties and raw JSONB fields in the alerts table. Implement parsing logic inside ingest.py to extract radar-indicated hail and radar-indicated wind data from incoming Severe Thunderstorm Warnings.
+
+Parsing logic:
+
+Target fields:
+
+headline
+
+description
+
+instruction
+
+Extraction patterns:
+
+For hail:
+
+Look for phrases like:
+
+"hail up to <size>"
+
+"hail size of <size>"
+
+"<size> hail"
+
+Convert size text to decimal inches.
+
+Example: "Quarter size hail" → 1.0 inch.
+
+For wind:
+
+Look for phrases like:
+
+"winds up to <speed> mph"
+
+"damaging winds of <speed> mph"
+
+"<speed> mph wind gusts"
+
+Convert speed text to integer mph.
+
+Store the parsed values in a new JSONB field in the alerts table:
+
+radar_indicated = {
+"hail_inches": <float or null>,
+"wind_mph": <integer or null>
+}
+
+If no value is detected, store null for that field.
+
+This parsing should run on every Severe Thunderstorm Warning ingest or update. It must not block ingest on parsing failure — log extraction errors but continue ingest.
+
+Radar-indicated values must be exposed through:
+
+/alerts
+
+/alerts/{alert_id}
+
+/api/alerts/search
+
+Field to expose: radar_indicated JSON object.
+
+Do not overwrite this field if a matching SPC report exists; SPC reports remain primary verification. Radar-indicated values supplement SPC-based verification and can be used to populate risk scoring.
+
+Webhooks System
+
+Implement a first-class webhooks registration and dispatch system in HailyDB.
+
+Create a new table:
+
+webhook_rules
+
+Fields:
+
+id (primary key)
+
+user_id (if multi-tenant)
+
+webhook_url (string)
+
+event_type (enum or string): supported types initially include "hail", "wind", "damage_probability"
+
+threshold_value (float): minimum value to trigger webhook
+
+location_filter (string): FIPS code or county name or state
+
+created_at
+
+updated_at
+
+Implement logic in the autonomous_scheduler or relevant ingest processes:
+
+After each ingest or match pass, evaluate if any registered webhook rule conditions are met:
+
+hail: SPC or radar-indicated hail ≥ threshold
+
+wind: SPC or radar-indicated wind ≥ threshold
+
+damage_probability: probability score for location ≥ threshold
+
+When condition is met:
+
+Dispatch webhook as a POST to the registered webhook_url with payload:
+
+{
+"event_type": "<hail|wind|damage_probability>",
+"location": "<location matching rule>",
+"value": <actual value triggered>,
+"timestamp": <UTC time>,
+"source": "<SPC|Radar Indicated|HailyDB Probability Model>",
+"alert_id": "<if applicable>"
+}
+
+Implement retry logic with exponential backoff up to 3 times on HTTP failure (non-2xx status).
+
+Implement admin API endpoints:
+
+GET /internal/webhook-rules — list all registered webhooks
+
+POST /internal/webhook-rules — register a new webhook
+
+DELETE /internal/webhook-rules/{id} — delete a webhook rule
+
+All webhook evaluations and dispatches must be logged in scheduler_logs as standard operations, with operation_type = "webhook_dispatch".
+
+Webhook logic must run server-side in HailyDB, not inside client applications.
+
+Summary:
+
+Implement radar-indicated parsing and storage for Severe Thunderstorm Warnings.
+
+Implement first-class webhooks system to dispatch event triggers based on SPC reports, radar-indicated data, and damage probability scores.
+
+This must be implemented cleanly and consistently with HailyDB v2.0 architecture.

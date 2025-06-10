@@ -322,6 +322,11 @@
             return date.toLocaleString();
         }
 
+        function viewStormDetails(stormId) {
+            // Navigate to storm detail view
+            window.location.href = `/api/hurricanes/storm/${stormId}`;
+        }
+
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
             loadStats();

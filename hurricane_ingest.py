@@ -144,22 +144,25 @@ class HurricaneIngestService:
             if not line.strip():
                 continue
                 
-            # Storm header line (contains storm ID and name)
-            if len(line) >= 50 and ',' in line and line.split(',')[0].strip().endswith(('2020', '2021', '2022', '2023', '2024', '2025')):
-                if current_storm and current_storm.get('track_points'):
-                    storms.append(current_storm)
-                
-                parts = [p.strip() for p in line.split(',')]
-                storm_id = parts[0]
-                name = parts[1] if len(parts) > 1 else "UNKNOWN"
-                year = int(storm_id[-4:]) if len(storm_id) >= 4 else 0
-                
-                current_storm = {
-                    'storm_id': storm_id,
-                    'name': name,
-                    'year': year,
-                    'track_points': []
-                }
+            # Storm header line (AL format with basin and year) 
+            parts = [p.strip() for p in line.split(',')]
+            if len(parts) >= 3 and parts[0].startswith('AL') and len(parts[0]) >= 8:
+                year_part = parts[0][-4:]
+                if year_part.isdigit() and int(year_part) >= 2020 and int(year_part) <= 2025:
+                    if current_storm and current_storm.get('track_points'):
+                        storms.append(current_storm)
+                    
+                    storm_id = parts[0]
+                    name = parts[1] if len(parts) > 1 else "UNKNOWN"
+                    year = int(year_part)
+                    
+                    current_storm = {
+                        'storm_id': storm_id,
+                        'name': name,
+                        'year': year,
+                        'track_points': []
+                    }
+                    continue
             
             # Track point line
             elif current_storm and len(line) >= 50:
