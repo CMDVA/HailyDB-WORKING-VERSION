@@ -760,8 +760,12 @@ def internal_status():
         
         failed_jobs = [log for log in recent_logs if not log.success]
         
-        # Scheduler operation statistics
-        scheduler_stats = scheduler_service.get_operation_stats() if scheduler_service else {}
+        # Scheduler operation statistics  
+        try:
+            scheduler_stats = scheduler_service.get_operation_stats() if scheduler_service else {}
+        except Exception as e:
+            logger.warning(f"Scheduler stats unavailable: {e}")
+            scheduler_stats = {'error': 'Statistics temporarily unavailable'}
         
         # Database health check
         try:
@@ -1053,10 +1057,12 @@ def spc_ingest():
         
     except Exception as e:
         logger.error(f"SPC ingestion failed: {e}")
-        if 'log_entry' in locals():
+        try:
             scheduler_service.log_operation_complete(
                 log_entry, False, 0, 0, str(e)
             )
+        except:
+            pass  # log_entry may not exist if error occurred early
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/internal/spc-backfill', methods=['POST'])
@@ -1123,10 +1129,12 @@ def spc_backfill():
         
     except Exception as e:
         logger.error(f"SPC backfill failed: {e}")
-        if 'log_entry' in locals():
+        try:
             scheduler_service.log_operation_complete(
                 log_entry, False, 0, 0, str(e)
             )
+        except:
+            pass  # log_entry may not exist if error occurred early
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/internal/spc-match', methods=['POST'])
