@@ -36,6 +36,9 @@ class Alert(db.Model):
     spc_match_method = Column(String(10))   # "fips", "latlon", "none"
     spc_report_count = Column(db.Integer, default=0)
     spc_ai_summary = Column(Text)          # AI-generated verification summary
+    
+    # Radar Indicated Parsing (Feature 1)
+    radar_indicated = Column(JSONB)        # {"hail_inches": float, "wind_mph": int}
 
     # Metadata
     ingested_at = Column(DateTime, server_default=func.now())

@@ -1,5 +1,6 @@
 import logging
 import requests
+import re
 from datetime import datetime
 from typing import Optional, Dict, List
 from models import Alert, IngestionLog
@@ -189,7 +190,8 @@ class IngestService:
             sent=self._parse_datetime(properties.get('sent')),
             geometry=feature.get('geometry'),
             properties=properties,
-            raw=feature
+            raw=feature,
+            radar_indicated=self._parse_radar_indicated(properties)
         )
         
         self.db.session.add(alert)
@@ -209,6 +211,7 @@ class IngestService:
         alert.geometry = feature.get('geometry')
         alert.properties = properties
         alert.raw = feature
+        alert.radar_indicated = self._parse_radar_indicated(properties)
         
         return alert
     

@@ -1,0 +1,104 @@
+HailyDB Prompt Update — NWS Alert Ingestion Enhancement: Full Geometry & County Mapping Support
+Objective:
+Enhance existing NWS Alert Ingestion (ingest.py) to fully capture:
+
+✅ GeoJSON geometry field (Polygon / MultiPolygon) → persist as PostGIS geometry
+✅ properties.geocode.FIPS6 → persist as affected_counties array
+✅ properties.geocode.UGC → persist as affected_ugc_zones array
+
+👉 This will allow all HailyDB client apps (IDOLCheck, HailyAI, browser extension, etc) to query and map NWS Alerts cleanly.
+
+Changes Required:
+1️⃣ Database Changes — alerts Table
+Add the following columns:
+
+python
+Copy
+Edit
+# New columns:
+polygon_geom = Column(Geometry("MULTIPOLYGON", srid=4326), nullable=True)  # NWS alert polygon
+affected_counties = Column(ARRAY(String), nullable=True)  # List of FIPS6 codes (strings)
+affected_ugc_zones = Column(ARRAY(String), nullable=True)  # List of UGC codes (strings)
+2️⃣ Ingestion Pipeline — ingest.py
+For each NWS alert feature:
+
+If geometry present:
+
+Parse Polygon or MultiPolygon.
+
+Insert into polygon_geom column.
+
+If properties.geocode.FIPS6 present:
+
+Insert list of FIPS6 codes into affected_counties.
+
+If properties.geocode.UGC present:
+
+Insert list of UGC codes into affected_ugc_zones.
+
+Important:
+
+Continue to store full alert GeoJSON in alerts.raw (no change).
+
+This is additional normalization to support efficient API filtering and spatial queries.
+
+3️⃣ Backfill Process
+Implement /internal/nws-alert-backfill endpoint to re-process last N days of NWS Alerts and populate the new columns.
+
+Example:
+
+http
+Copy
+Edit
+POST /internal/nws-alert-backfill
+Body: {"days_back": 90}
+Use batch processing with proper logging to avoid downtime.
+
+4️⃣ API Enhancements
+Enhance the following endpoints:
+
+/api/alerts/search
+Add ability to filter by:
+
+county=FIPS6
+
+ugc=UGC code
+
+intersects_bbox=west,south,east,north → polygon intersects bounding box
+
+Add polygon_geom to API response → as GeoJSON Polygon or MultiPolygon.
+
+Example response addition:
+
+json
+Copy
+Edit
+"polygon_geom": {
+  "type": "Polygon",
+  "coordinates": [ ... ]
+}
+/alerts/{alert_id}
+Add:
+
+affected_counties
+
+affected_ugc_zones
+
+polygon_geom (if present)
+
+5️⃣ Why This Matters
+✅ Enables accurate mapping of NWS Alerts in all clients
+✅ Enables FIPS-based targeting for claims (IDOLCheck field sales users)
+✅ Enables county and UGC-based targeting for brokers and partners
+✅ Future-proofs HailyDB for higher-order spatial analysis
+
+6️⃣ Summary — Required Work
+✅ Add polygon_geom, affected_counties, affected_ugc_zones columns
+✅ Enhance ingest.py to populate them
+✅ Implement /internal/nws-alert-backfill
+✅ Enhance /api/alerts/search and /alerts/{alert_id} API
+✅ Maintain full raw payload storage (no breaking changes)
+
+If anything is unclear, ask before implementing. We want this enhancement to be stable and 100% backward compatible.
+
+END PROMPT
