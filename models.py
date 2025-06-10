@@ -261,6 +261,44 @@ class SchedulerLog(db.Model):
     def __repr__(self):
         return f'<SchedulerLog {self.id}: {self.operation_type} - {self.success}>'
 
+class WebhookRule(db.Model):
+    """
+    Webhook registration and dispatch rules for real-time notifications
+    Supports hail, wind, and damage probability triggers
+    """
+    __tablename__ = "webhook_rules"
+    
+    id = Column(db.Integer, primary_key=True)
+    user_id = Column(String(50), index=True)  # For multi-tenant support
+    webhook_url = Column(String(500), nullable=False)
+    event_type = Column(String(20), nullable=False, index=True)  # hail, wind, damage_probability
+    threshold_value = Column(db.Float, nullable=False)
+    location_filter = Column(String(100))  # FIPS code, county name, or state
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    __table_args__ = (
+        Index('idx_webhook_event_location', 'event_type', 'location_filter'),
+        Index('idx_webhook_threshold', 'event_type', 'threshold_value'),
+    )
+    
+    def __repr__(self):
+        return f'<WebhookRule {self.id}: {self.event_type} >= {self.threshold_value} -> {self.webhook_url}>'
+    
+    def to_dict(self):
+        """Convert webhook rule to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'webhook_url': self.webhook_url,
+            'event_type': self.event_type,
+            'threshold_value': self.threshold_value,
+            'location_filter': self.location_filter,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
 class HurricaneTrack(db.Model):
     """
     Historical hurricane track data from NOAA sources

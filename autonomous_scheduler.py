@@ -257,6 +257,10 @@ class AutonomousScheduler:
             self.last_matching = datetime.utcnow()
             logger.info(f"SPC matching completed: {matched}/{processed} alerts matched")
             
+            # After matching, evaluate webhooks for newly matched alerts
+            if matched > 0:
+                self._run_webhook_evaluation()
+            
         except Exception as e:
             logger.error(f"SPC matching failed: {e}")
             if log_entry:
@@ -265,6 +269,20 @@ class AutonomousScheduler:
                 )
         finally:
             self.matching_lock.release()
+    
+    def _run_webhook_evaluation(self):
+        """Evaluate and dispatch webhooks for recent alerts"""
+        try:
+            from webhook_service import WebhookService
+            
+            logger.info("Starting webhook evaluation")
+            webhook_service = WebhookService(self.db)
+            result = webhook_service.evaluate_and_dispatch_webhooks()
+            
+            logger.info(f"Webhook evaluation completed: {result}")
+            
+        except Exception as e:
+            logger.error(f"Error in webhook evaluation: {e}")
     
     def get_status(self) -> dict:
         """Get scheduler status for diagnostics"""
