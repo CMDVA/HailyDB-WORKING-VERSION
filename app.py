@@ -1356,7 +1356,7 @@ def spc_match():
     try:
         log_entry = scheduler_service.log_operation_start("spc_match", "manual")
         
-        result = spc_matching_service.match_spc_reports_batch(limit=100)
+        result = spc_matching_service.match_spc_reports_batch(limit=250)
         processed = result.get('processed', 0)
         matched = result.get('matched', 0)
         
