@@ -40,9 +40,9 @@ class SPCIngestService:
         if days_ago == 0:
             return 5  # Every 5 minutes for today (T-0)
         elif 1 <= days_ago <= 4:
-            return 60  # Hourly updates for T-1 through T-4
+            return 30  # Every 30 minutes for T-1 through T-4
         elif 5 <= days_ago <= 7:
-            return 180  # Every 3 hours for T-5 through T-7
+            return 60  # Hourly updates for T-5 through T-7
         elif 8 <= days_ago <= 15:
             return 1440  # Daily updates for T-8 through T-15
         else:
