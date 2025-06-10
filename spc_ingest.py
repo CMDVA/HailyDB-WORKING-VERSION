@@ -782,7 +782,7 @@ class SPCIngestService:
         counts = {'tornado': 0, 'wind': 0, 'hail': 0}
         duplicates_skipped = 0
         errors_count = 0
-        batch_size = 50
+        batch_size = self.db_write_batch_size
         
         # Process reports in batches for performance
         for i in range(0, len(reports), batch_size):
