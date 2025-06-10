@@ -1072,10 +1072,7 @@ async function getEnrichmentStats() {
     }
 }
 
-// View metrics (placeholder for future implementation)
-function viewMetrics() {
-    showNotification('Metrics view not yet implemented', 'info');
-}
+
 
 // Toggle scheduler
 async function toggleScheduler() {
