@@ -1012,6 +1012,11 @@ def internal_status():
                 'python_version': '3.11',
                 'framework': 'flask+sqlalchemy'
             },
+            'ingestion_config': {
+                'db_write_batch_size': int(os.getenv("DB_WRITE_BATCH_SIZE", "500")),
+                'enrich_batch_size': int(os.getenv("ENRICH_BATCH_SIZE", "25")),
+                'spc_match_batch_size': int(os.getenv("SPC_MATCH_BATCH_SIZE", "200"))
+            },
             'scheduler_operations': scheduler_stats
         })
         

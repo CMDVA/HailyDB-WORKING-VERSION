@@ -47,9 +47,11 @@ class IngestService:
             total_processed = 0
             new_alerts = 0
             updated_alerts = 0
+            alerts_to_process = []  # Collect alerts for batch processing
             
             url = self.config.NWS_ALERT_URL
             
+            # Step 1: Collect all alerts from all pages (no processing limits)
             while url:
                 logger.debug(f"Polling URL: {url}")
                 
@@ -63,25 +65,7 @@ class IngestService:
                     features = data.get('features', [])
                     
                     logger.info(f"Retrieved {len(features)} alerts from current page")
-                    
-                    for feature in features:
-                        try:
-                            result = self._process_alert_feature(feature)
-                            total_processed += 1
-                            
-                            if result == 'new':
-                                new_alerts += 1
-                            elif result == 'updated':
-                                updated_alerts += 1
-                            elif result == 'skipped' and hasattr(self, '_failed_alerts') and self._failed_alerts:
-                                # Check if last error was a duplicate
-                                last_error = self._failed_alerts[-1] if self._failed_alerts else {}
-                                if 'duplicate' in last_error.get('error', '').lower():
-                                    duplicate_count += 1
-                                
-                        except Exception as e:
-                            logger.error(f"Error processing alert feature: {e}")
-                            continue
+                    alerts_to_process.extend(features)
                     
                     # Handle pagination
                     pagination = data.get('pagination', {})
@@ -97,8 +81,39 @@ class IngestService:
                     logger.error(f"Unexpected error during page processing: {e}")
                     break
             
-            # Commit all changes
-            self.db.session.commit()
+            logger.info(f"Collected {len(alerts_to_process)} total alerts for processing")
+            
+            # Step 2: Process alerts in configurable batches for database writes
+            for batch in chunks(alerts_to_process, self.db_write_batch_size):
+                logger.debug(f"Processing batch of {len(batch)} alerts")
+                
+                for feature in batch:
+                    try:
+                        result = self._process_alert_feature(feature)
+                        total_processed += 1
+                        
+                        if result == 'new':
+                            new_alerts += 1
+                        elif result == 'updated':
+                            updated_alerts += 1
+                        elif result == 'skipped' and hasattr(self, '_failed_alerts') and self._failed_alerts:
+                            # Check if last error was a duplicate
+                            last_error = self._failed_alerts[-1] if self._failed_alerts else {}
+                            if 'duplicate' in last_error.get('error', '').lower():
+                                duplicate_count += 1
+                            
+                    except Exception as e:
+                        logger.error(f"Error processing alert feature: {e}")
+                        continue
+                
+                # Commit this batch
+                try:
+                    self.db.session.commit()
+                    logger.debug(f"Committed batch of {len(batch)} alerts")
+                except Exception as e:
+                    logger.error(f"Error committing batch: {e}")
+                    self.db.session.rollback()
+                    continue
             
             # Calculate processing duration
             processing_duration = (datetime.utcnow() - start_time).total_seconds()
