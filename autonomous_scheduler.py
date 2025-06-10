@@ -257,7 +257,7 @@ class AutonomousScheduler:
                 "spc_match", "internal_timer"
             )
             
-            result = self.matching_service.match_spc_reports_batch(limit=250)
+            result = self.matching_service.match_spc_reports_batch(limit=500)
             processed = result.get('processed', 0)
             matched = result.get('matched', 0)
             
