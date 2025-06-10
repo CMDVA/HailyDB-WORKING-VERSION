@@ -1704,67 +1704,93 @@ def ingestion_logs_data():
         operation_type = request.args.get('operation_type', '')
         success_param = request.args.get('success', '')
         
-        # Build query
-        query = SchedulerLog.query
-        
-        # Filter by time
+        # Build SQL query to avoid PostgreSQL type issues
         since = datetime.utcnow() - timedelta(hours=hours)
-        query = query.filter(SchedulerLog.started_at >= since)
         
-        # Filter by operation type
+        # Base query with proper type casting
+        base_sql = """
+            SELECT 
+                id,
+                started_at,
+                completed_at,
+                operation_type::text,
+                trigger_method::text,
+                success,
+                COALESCE(records_processed, 0) as records_processed,
+                COALESCE(records_new, 0) as records_new,
+                error_message::text
+            FROM scheduler_logs 
+            WHERE started_at >= :since
+        """
+        
+        params = {'since': since}
+        
+        # Add filters
         if operation_type:
-            query = query.filter(SchedulerLog.operation_type == operation_type)
-        
-        # Filter by success status
+            base_sql += " AND operation_type = :operation_type"
+            params['operation_type'] = operation_type
+            
         if success_param == 'true':
-            query = query.filter(SchedulerLog.success == True)
+            base_sql += " AND success = true"
         elif success_param == 'false':
-            query = query.filter(SchedulerLog.success == False)
+            base_sql += " AND success = false"
+            
+        # Order and limit
+        base_sql += " ORDER BY started_at DESC LIMIT 100"
         
-        # Order by most recent first
-        logs = query.order_by(SchedulerLog.started_at.desc()).limit(100).all()
+        # Execute query
+        result = db.session.execute(db.text(base_sql), params)
+        logs_data = result.fetchall()
         
         # Calculate summary statistics
-        summary_query = SchedulerLog.query.filter(SchedulerLog.started_at >= since)
-        if operation_type:
-            summary_query = summary_query.filter(SchedulerLog.operation_type == operation_type)
+        summary_sql = """
+            SELECT 
+                COUNT(*) as total_count,
+                SUM(CASE WHEN success = true THEN 1 ELSE 0 END) as success_count,
+                SUM(CASE WHEN success = false THEN 1 ELSE 0 END) as error_count,
+                SUM(CASE WHEN success = true THEN COALESCE(records_processed, 0) ELSE 0 END) as total_processed,
+                SUM(CASE WHEN success = true THEN COALESCE(records_new, 0) ELSE 0 END) as total_new
+            FROM scheduler_logs 
+            WHERE started_at >= :since
+        """
         
-        all_logs = summary_query.all()
-        success_count = sum(1 for log in all_logs if log.success)
-        error_count = len(all_logs) - success_count
-        total_processed = sum(log.records_processed or 0 for log in all_logs if log.success)
-        total_new = sum(log.records_new or 0 for log in all_logs if log.success)
+        if operation_type:
+            summary_sql += " AND operation_type = :operation_type"
+            
+        summary_result = db.session.execute(db.text(summary_sql), params)
+        summary_data = summary_result.fetchone()
         
         # Format logs for JSON response
         formatted_logs = []
-        for log in logs:
+        for row in logs_data:
             duration = None
-            if log.started_at and log.completed_at:
-                duration = round((log.completed_at - log.started_at).total_seconds(), 1)
+            if row.started_at and row.completed_at:
+                duration = round((row.completed_at - row.started_at).total_seconds(), 1)
             
             formatted_logs.append({
-                'started_at': log.started_at.isoformat() if log.started_at else None,
-                'completed_at': log.completed_at.isoformat() if log.completed_at else None,
-                'operation_type': log.operation_type,
-                'trigger_method': log.trigger_method,
-                'success': log.success,
-                'records_processed': log.records_processed,
-                'records_new': log.records_new,
-                'error_message': log.error_message,
+                'started_at': row.started_at.isoformat() if row.started_at else None,
+                'completed_at': row.completed_at.isoformat() if row.completed_at else None,
+                'operation_type': row.operation_type,
+                'trigger_method': row.trigger_method,
+                'success': row.success,
+                'records_processed': row.records_processed,
+                'records_new': row.records_new,
+                'error_message': row.error_message,
                 'duration': duration
             })
         
         return jsonify({
             'summary': {
-                'success_count': success_count,
-                'error_count': error_count,
-                'total_processed': total_processed,
-                'total_new': total_new
+                'success_count': int(summary_data[1] or 0) if summary_data else 0,
+                'error_count': int(summary_data[2] or 0) if summary_data else 0,
+                'total_processed': int(summary_data[3] or 0) if summary_data else 0,
+                'total_new': int(summary_data[4] or 0) if summary_data else 0
             },
             'logs': formatted_logs
         })
         
     except Exception as e:
+        logger.error(f"Error in ingestion logs data: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/spc-matches')
