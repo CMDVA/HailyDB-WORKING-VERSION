@@ -83,7 +83,7 @@ class HurricaneIngestService:
             
         except Exception as e:
             logger.error(f"Hurricane ingestion failed: {e}")
-            self.db.session.rollback()
+            self.db.rollback()
             stats['errors'].append(str(e))
             
         return stats
@@ -201,14 +201,15 @@ class HurricaneIngestService:
         """Get hurricane track ingestion statistics"""
         try:
             total_tracks = HurricaneTrack.query.count()
-            unique_storms = self.db.session.query(HurricaneTrack.storm_id).distinct().count()
-            latest_ingestion = self.db.session.query(HurricaneTrack.ingested_at).order_by(
+            unique_storms = self.db.query(HurricaneTrack.storm_id).distinct().count()
+            latest_ingestion = self.db.query(HurricaneTrack.ingested_at).order_by(
                 HurricaneTrack.ingested_at.desc()
             ).first()
             
-            years_range = self.db.session.query(
-                db.func.min(HurricaneTrack.year),
-                db.func.max(HurricaneTrack.year)
+            from sqlalchemy import func
+            years_range = self.db.query(
+                func.min(HurricaneTrack.year),
+                func.max(HurricaneTrack.year)
             ).first()
             
             return {
