@@ -506,6 +506,73 @@ def test_radar_parsing():
         'test_results': results
     })
 
+@app.route('/api/admin/trigger-nws-poll', methods=['POST'])
+def trigger_nws_poll():
+    """Manually trigger NWS alert polling for testing"""
+    try:
+        from ingest import IngestService
+        
+        ingest_service = IngestService(db)
+        new_alerts = ingest_service.poll_nws_alerts()
+        
+        return jsonify({
+            'status': 'success',
+            'new_alerts': new_alerts,
+            'message': f'Polling completed. {new_alerts} new alerts ingested.'
+        })
+    except Exception as e:
+        logger.error(f"Error during manual NWS poll: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/test/radar-summary', methods=['GET'])
+def get_radar_parsing_summary():
+    """Get summary of radar-indicated parsing results"""
+    try:
+        # Count alerts with radar_indicated data
+        total_stw = db.session.query(Alert).filter(
+            Alert.event == 'Severe Thunderstorm Warning'
+        ).count()
+        
+        parsed_stw = db.session.query(Alert).filter(
+            Alert.event == 'Severe Thunderstorm Warning',
+            Alert.radar_indicated.isnot(None)
+        ).count()
+        
+        # Get sample parsed alerts
+        sample_alerts = db.session.query(Alert).filter(
+            Alert.event == 'Severe Thunderstorm Warning',
+            Alert.radar_indicated.isnot(None)
+        ).limit(5).all()
+        
+        samples = []
+        for alert in sample_alerts:
+            samples.append({
+                'id': alert.id,
+                'area': alert.area_desc,
+                'radar_indicated': alert.radar_indicated,
+                'effective': alert.effective.isoformat() if alert.effective else None
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'summary': {
+                'total_severe_thunderstorm_warnings': total_stw,
+                'parsed_with_radar_data': parsed_stw,
+                'parsing_success_rate': f"{(parsed_stw/total_stw*100):.1f}%" if total_stw > 0 else "0%"
+            },
+            'sample_parsed_alerts': samples
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating radar parsing summary: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 @app.route('/api/alerts/search')
 def search_alerts():
     """Advanced search endpoint for external applications"""
