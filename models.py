@@ -247,5 +247,13 @@ class SchedulerLog(db.Model):
     error_message = Column(Text)
     operation_metadata = Column(JSONB)  # Operation-specific data
     
+    # Enhanced error tracking
+    error_details = Column(JSONB)  # Detailed error breakdown
+    failed_alert_ids = Column(JSONB)  # List of specific alert IDs that failed
+    duplicate_count = Column(db.Integer, default=0)  # Number of duplicates encountered
+    http_status_code = Column(db.Integer)  # HTTP response code from NWS API
+    api_response_size = Column(db.Integer)  # Size of API response
+    processing_duration = Column(db.Float)  # Duration in seconds
+    
     def __repr__(self):
         return f'<SchedulerLog {self.id}: {self.operation_type} - {self.success}>'

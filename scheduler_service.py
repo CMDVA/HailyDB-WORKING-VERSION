@@ -46,9 +46,12 @@ class SchedulerService:
     
     def log_operation_complete(self, log_entry: SchedulerLog, success: bool,
                              records_processed: int = 0, records_new: int = 0,
-                             error_message: str = None):
+                             error_message: str = None, error_details: dict = None,
+                             failed_alert_ids: list = None, duplicate_count: int = 0,
+                             http_status_code: int = None, api_response_size: int = None,
+                             processing_duration: float = None):
         """
-        Complete an operation log entry
+        Complete an operation log entry with detailed error tracking
         """
         try:
             log_entry.completed_at = datetime.utcnow()
@@ -59,11 +62,31 @@ class SchedulerService:
             if error_message:
                 log_entry.error_message = error_message
             
+            # Enhanced error tracking
+            if error_details:
+                log_entry.error_details = error_details
+            if failed_alert_ids:
+                log_entry.failed_alert_ids = failed_alert_ids
+            if duplicate_count:
+                log_entry.duplicate_count = duplicate_count
+            if http_status_code:
+                log_entry.http_status_code = http_status_code
+            if api_response_size:
+                log_entry.api_response_size = api_response_size
+            if processing_duration:
+                log_entry.processing_duration = processing_duration
+            
             self.db.session.commit()
             
             status = "SUCCESS" if success else "FAILED"
-            logger.info(f"Completed operation {log_entry.operation_type}: {status} "
-                       f"(processed: {records_processed}, new: {records_new})")
+            details = f"(processed: {records_processed}, new: {records_new}"
+            if duplicate_count:
+                details += f", duplicates: {duplicate_count}"
+            if failed_alert_ids:
+                details += f", failed: {len(failed_alert_ids)}"
+            details += ")"
+            
+            logger.info(f"Completed operation {log_entry.operation_type}: {status} {details}")
             
         except Exception as e:
             logger.error(f"Failed to complete operation log: {e}")

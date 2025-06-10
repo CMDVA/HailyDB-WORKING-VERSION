@@ -1197,6 +1197,95 @@ def generate_ai_summaries():
         
         return jsonify({
             'success': True,
+
+
+@app.route('/internal/missing-alerts-analysis')
+def missing_alerts_analysis():
+    """
+    Analyze how many NWS alerts we might be missing
+    """
+    try:
+        from datetime import datetime, timedelta
+        from sqlalchemy import func, text
+        
+        # Get failure statistics for last 30 days
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        
+        # Query failed operations
+        failed_operations = SchedulerLog.query.filter(
+            SchedulerLog.operation_type == 'nws_poll',
+            SchedulerLog.started_at >= thirty_days_ago,
+            SchedulerLog.success == False
+        ).all()
+        
+        # Query successful operations for comparison
+        successful_operations = SchedulerLog.query.filter(
+            SchedulerLog.operation_type == 'nws_poll',
+            SchedulerLog.started_at >= thirty_days_ago,
+            SchedulerLog.success == True
+        ).all()
+        
+        # Calculate average alerts per successful poll
+        total_alerts_successful = sum(op.records_new or 0 for op in successful_operations)
+        avg_alerts_per_poll = total_alerts_successful / len(successful_operations) if successful_operations else 0
+        
+        # Estimate missed alerts
+        failed_polls_count = len(failed_operations)
+        estimated_missed_alerts = failed_polls_count * avg_alerts_per_poll
+        
+        # Get duplicate statistics
+        total_duplicates = sum(op.duplicate_count or 0 for op in successful_operations)
+        
+        # Get detailed error breakdown
+        error_breakdown = {}
+        for op in failed_operations:
+            error_type = "Unknown"
+            if op.error_message:
+                if "duplicate key" in op.error_message.lower():
+                    error_type = "Duplicate Key Violation"
+                elif "timeout" in op.error_message.lower():
+                    error_type = "HTTP Timeout"
+                elif "connection" in op.error_message.lower():
+                    error_type = "Connection Error"
+                elif "session" in op.error_message.lower():
+                    error_type = "Database Session Error"
+                else:
+                    error_type = "Other Error"
+            
+            error_breakdown[error_type] = error_breakdown.get(error_type, 0) + 1
+        
+        # Calculate uptime percentage
+        total_operations = len(failed_operations) + len(successful_operations)
+        uptime_percentage = (len(successful_operations) / total_operations * 100) if total_operations > 0 else 0
+        
+        analysis = {
+            'period': '30 days',
+            'total_operations': total_operations,
+            'successful_operations': len(successful_operations),
+            'failed_operations': failed_polls_count,
+            'uptime_percentage': round(uptime_percentage, 2),
+            'avg_alerts_per_successful_poll': round(avg_alerts_per_poll, 1),
+            'estimated_missed_alerts': round(estimated_missed_alerts),
+            'total_duplicates_encountered': total_duplicates,
+            'error_breakdown': error_breakdown,
+            'recommendations': []
+        }
+        
+        # Generate recommendations
+        if failed_polls_count > 0:
+            analysis['recommendations'].append(f"Fix duplicate key handling - {error_breakdown.get('Duplicate Key Violation', 0)} failures")
+        if uptime_percentage < 95:
+            analysis['recommendations'].append(f"Improve system reliability - {100-uptime_percentage:.1f}% downtime")
+        if total_duplicates > successful_operations:
+            analysis['recommendations'].append("Optimize duplicate detection logic")
+        
+        return jsonify(analysis)
+        
+    except Exception as e:
+        logger.error(f"Error in missing alerts analysis: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
             'message': f'Generated {generated} AI summaries for verified matches',
             'generated': generated,
             'total_processed': len(alerts)

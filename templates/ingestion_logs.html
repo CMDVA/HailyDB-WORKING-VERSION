@@ -180,13 +180,13 @@
             const operationFilter = document.getElementById('operation-filter').value;
             const statusFilter = document.getElementById('status-filter').value;
             const timeFilter = document.getElementById('time-filter').value;
-            
+
             const params = new URLSearchParams({
                 hours: timeFilter,
                 operation_type: operationFilter,
                 success: statusFilter === 'success' ? 'true' : statusFilter === 'error' ? 'false' : ''
             });
-            
+
             fetch(`/ingestion-logs/data?${params}`)
                 .then(response => response.json())
                 .then(data => {
@@ -199,33 +199,33 @@
                         '<tr><td colspan="7" class="text-center text-danger">Error loading logs</td></tr>';
                 });
         }
-        
+
         function updateSummaryStats(summary) {
             document.getElementById('success-count').textContent = summary.success_count;
             document.getElementById('error-count').textContent = summary.error_count;
             document.getElementById('records-processed').textContent = summary.total_processed.toLocaleString();
             document.getElementById('records-new').textContent = summary.total_new.toLocaleString();
         }
-        
+
         function updateLogsTable(logs) {
             const tbody = document.getElementById('logs-tbody');
-            
+
             if (logs.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No logs found</td></tr>';
                 return;
             }
-            
+
             tbody.innerHTML = logs.map(log => {
                 const statusBadge = log.success ? 
                     '<span class="badge bg-success">Success</span>' : 
                     '<span class="badge bg-danger">Failed</span>';
-                
+
                 const operationBadge = getOperationBadge(log.operation_type);
                 const duration = log.duration ? `${log.duration}s` : '-';
                 const recordsInfo = log.success ? 
                     `${log.records_new || 0} new / ${log.records_processed || 0} total` : 
                     '-';
-                
+
                 return `
                     <tr class="log-entry ${log.success ? 'log-success' : 'log-error'}">
                         <td>${formatTimestamp(log.started_at)}</td>
@@ -239,7 +239,7 @@
                 `;
             }).join('');
         }
-        
+
         function getOperationBadge(operationType) {
             const badges = {
                 'nws_poll': '<span class="badge bg-primary badge-operation">NWS Poll</span>',
@@ -248,7 +248,7 @@
             };
             return badges[operationType] || `<span class="badge bg-secondary badge-operation">${operationType}</span>`;
         }
-        
+
         function formatTimestamp(timestamp) {
             const date = new Date(timestamp);
             return date.toLocaleString('en-US', {
@@ -259,11 +259,11 @@
                 hour12: true
             });
         }
-        
+
         // Load logs on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadLogs();
-            
+
             // Auto-refresh every 30 seconds
             setInterval(loadLogs, 30000);
         });

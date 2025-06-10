@@ -26,6 +26,13 @@ class IngestService:
         self.db.session.add(log_entry)
         self.db.session.commit()
         
+        # Initialize error tracking
+        self._failed_alerts = []
+        start_time = datetime.utcnow()
+        http_status = None
+        api_response_size = 0
+        duplicate_count = 0
+        
         try:
             logger.info("Starting NWS alert ingestion")
             
@@ -41,8 +48,10 @@ class IngestService:
                 try:
                     response = requests.get(url, headers=self.config.NWS_HEADERS, timeout=30)
                     response.raise_for_status()
+                    http_status = response.status_code
                     
                     data = response.json()
+                    api_response_size += len(response.content)
                     features = data.get('features', [])
                     
                     logger.info(f"Retrieved {len(features)} alerts from current page")
@@ -56,6 +65,11 @@ class IngestService:
                                 new_alerts += 1
                             elif result == 'updated':
                                 updated_alerts += 1
+                            elif result == 'skipped' and hasattr(self, '_failed_alerts') and self._failed_alerts:
+                                # Check if last error was a duplicate
+                                last_error = self._failed_alerts[-1] if self._failed_alerts else {}
+                                if 'duplicate' in last_error.get('error', '').lower():
+                                    duplicate_count += 1
                                 
                         except Exception as e:
                             logger.error(f"Error processing alert feature: {e}")
@@ -78,7 +92,10 @@ class IngestService:
             # Commit all changes
             self.db.session.commit()
             
-            # Update log entry
+            # Calculate processing duration
+            processing_duration = (datetime.utcnow() - start_time).total_seconds()
+            
+            # Update log entry with comprehensive details
             log_entry.completed_at = datetime.utcnow()
             log_entry.success = True
             log_entry.alerts_processed = total_processed
@@ -86,13 +103,16 @@ class IngestService:
             log_entry.updated_alerts = updated_alerts
             self.db.session.commit()
             
-            logger.info(f"Ingestion complete: {new_alerts} new, {updated_alerts} updated, {total_processed} total")
+            logger.info(f"Ingestion complete: {new_alerts} new, {updated_alerts} updated, {total_processed} total, {duplicate_count} duplicates, {len(self._failed_alerts)} failed")
             return new_alerts
             
         except Exception as e:
             logger.error(f"Fatal error during ingestion: {e}")
             
-            # Update log entry with error
+            # Calculate processing duration
+            processing_duration = (datetime.utcnow() - start_time).total_seconds()
+            
+            # Update log entry with comprehensive error details
             log_entry.completed_at = datetime.utcnow()
             log_entry.success = False
             log_entry.error_message = str(e)
@@ -113,8 +133,8 @@ class IngestService:
                 logger.warning("Alert feature missing ID, skipping")
                 return 'skipped'
             
-            # Check if alert already exists
-            existing_alert = Alert.query.get(alert_id)
+            # Check if alert already exists using a separate query to avoid session conflicts
+            existing_alert = self.db.session.query(Alert).filter_by(id=alert_id).first()
             
             if existing_alert:
                 # Update existing alert
@@ -122,14 +142,38 @@ class IngestService:
                 logger.debug(f"Updated existing alert: {alert_id}")
                 return 'updated'
             else:
-                # Create new alert
-                self._create_alert(feature)
-                logger.debug(f"Created new alert: {alert_id}")
-                return 'new'
+                # Create new alert with duplicate protection
+                try:
+                    self._create_alert(feature)
+                    logger.debug(f"Created new alert: {alert_id}")
+                    return 'new'
+                except Exception as create_error:
+                    # Check if this is a duplicate key error
+                    if "duplicate key value violates unique constraint" in str(create_error):
+                        logger.warning(f"Duplicate alert detected during creation: {alert_id}")
+                        # Rollback and try to update instead
+                        self.db.session.rollback()
+                        existing_alert = self.db.session.query(Alert).filter_by(id=alert_id).first()
+                        if existing_alert:
+                            self._update_alert(existing_alert, feature)
+                            return 'updated'
+                        else:
+                            logger.error(f"Failed to handle duplicate for {alert_id}")
+                            return 'skipped'
+                    else:
+                        raise create_error
                 
         except Exception as e:
-            logger.error(f"Error processing alert feature: {e}")
-            raise
+            logger.error(f"Error processing alert feature {alert_id}: {e}")
+            # Record failed alert ID for detailed logging
+            if not hasattr(self, '_failed_alerts'):
+                self._failed_alerts = []
+            self._failed_alerts.append({
+                'alert_id': alert_id,
+                'error': str(e),
+                'event_type': properties.get('event', 'Unknown')
+            })
+            return 'skipped'
     
     def _create_alert(self, feature: Dict) -> Alert:
         """Create new alert from NWS feature"""
