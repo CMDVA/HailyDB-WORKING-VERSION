@@ -194,6 +194,9 @@ class IngestService:
             radar_indicated=self._parse_radar_indicated(properties)
         )
         
+        # Process full geometry for Feature 3: Full Geometry & County Mapping
+        alert.process_full_geometry()
+        
         self.db.session.add(alert)
         return alert
     
@@ -212,6 +215,9 @@ class IngestService:
         alert.properties = properties
         alert.raw = feature
         alert.radar_indicated = self._parse_radar_indicated(properties)
+        
+        # Process full geometry for Feature 3: Full Geometry & County Mapping
+        alert.process_full_geometry()
         
         return alert
     

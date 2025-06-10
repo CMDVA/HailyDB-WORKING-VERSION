@@ -141,8 +141,160 @@ class Alert(db.Model):
             'counties': self.extract_counties(),
             'area_description': self.area_desc,
             'geocodes': self.properties.get('geocode', {}) if self.properties else {},
-            'affected_zones': self.properties.get('affectedZones', []) if self.properties else []
+            'affected_zones': self.properties.get('affectedZones', []) if self.properties else [],
+            'fips_codes': self.fips_codes or [],
+            'geometry_type': self.geometry_type,
+            'coordinate_count': self.coordinate_count,
+            'geometry_bounds': self.geometry_bounds
         }
+    
+    def process_full_geometry(self):
+        """
+        Process full geometry data for Feature 3: Full Geometry & County Mapping
+        Extracts FIPS codes, county mappings, geometry analysis, and coordinate bounds
+        """
+        if not self.geometry:
+            return
+            
+        try:
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # Determine geometry type
+            geom_type = self.geometry.get('type', 'Unknown')
+            self.geometry_type = geom_type
+            
+            # Extract coordinates and calculate bounds
+            coordinates = self.geometry.get('coordinates', [])
+            coord_count, bounds = self._analyze_coordinates(coordinates, geom_type)
+            self.coordinate_count = coord_count
+            self.geometry_bounds = bounds
+            
+            # Extract FIPS codes from properties if available
+            fips_codes = []
+            if self.properties:
+                # Look for FIPS codes in various property fields
+                geocode = self.properties.get('geocode', {})
+                if isinstance(geocode, dict):
+                    # FIPS codes may be in UGC (Universal Geographic Code) format
+                    ugc = geocode.get('UGC', [])
+                    if isinstance(ugc, list):
+                        for code in ugc:
+                            if isinstance(code, str) and len(code) >= 5:
+                                # Extract FIPS code (first 5 digits of UGC)
+                                fips = code[:5]
+                                if fips.isdigit():
+                                    fips_codes.append(fips)
+                
+                # Also check for direct FIPS references
+                fips_prop = self.properties.get('FIPS', [])
+                if isinstance(fips_prop, list):
+                    fips_codes.extend([str(f) for f in fips_prop if str(f).isdigit()])
+            
+            self.fips_codes = list(set(fips_codes)) if fips_codes else []
+            
+            # Enhanced county and state extraction
+            self._extract_enhanced_location_data()
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error processing geometry for alert {self.id}: {e}")
+    
+    def _analyze_coordinates(self, coordinates, geom_type):
+        """Analyze coordinate structure and calculate bounds"""
+        coord_count = 0
+        min_lat = min_lon = float('inf')
+        max_lat = max_lon = float('-inf')
+        
+        def process_coord_pair(coord_pair):
+            nonlocal coord_count, min_lat, max_lat, min_lon, max_lon
+            if isinstance(coord_pair, list) and len(coord_pair) >= 2:
+                lon, lat = coord_pair[0], coord_pair[1]
+                if isinstance(lon, (int, float)) and isinstance(lat, (int, float)):
+                    coord_count += 1
+                    min_lon = min(min_lon, lon)
+                    max_lon = max(max_lon, lon)
+                    min_lat = min(min_lat, lat)
+                    max_lat = max(max_lat, lat)
+        
+        def process_coordinates_recursive(coords):
+            if not isinstance(coords, list):
+                return
+            
+            # Check if this is a coordinate pair [lon, lat]
+            if len(coords) == 2 and all(isinstance(x, (int, float)) for x in coords):
+                process_coord_pair(coords)
+            else:
+                # Recursively process nested coordinate structures
+                for item in coords:
+                    if isinstance(item, list):
+                        process_coordinates_recursive(item)
+        
+        process_coordinates_recursive(coordinates)
+        
+        bounds = None
+        if coord_count > 0 and min_lat != float('inf'):
+            bounds = {
+                'min_lat': min_lat,
+                'max_lat': max_lat,
+                'min_lon': min_lon,
+                'max_lon': max_lon
+            }
+        
+        return coord_count, bounds
+    
+    def _extract_enhanced_location_data(self):
+        """Extract enhanced county and state information"""
+        # Extract from area description
+        states = self.extract_states()
+        counties = self.extract_counties()
+        
+        # Build county-state mapping
+        county_state_mapping = []
+        if self.area_desc:
+            # Parse format like "Barton, KS; Rice, KS"
+            parts = self.area_desc.split(';')
+            for part in parts:
+                part = part.strip()
+                if ',' in part:
+                    county_part, state_part = part.rsplit(',', 1)
+                    county_name = county_part.strip()
+                    state_code = state_part.strip()
+                    if len(state_code) == 2:  # Valid state abbreviation
+                        county_state_mapping.append({
+                            'county': county_name,
+                            'state': state_code
+                        })
+        
+        self.county_names = county_state_mapping
+        self.affected_states = states
+    
+    def get_enhanced_geometry_info(self):
+        """Get comprehensive geometry information for API responses"""
+        return {
+            'geometry_type': self.geometry_type,
+            'coordinate_count': self.coordinate_count,
+            'geometry_bounds': self.geometry_bounds,
+            'fips_codes': self.fips_codes or [],
+            'county_state_mapping': self.county_names or [],
+            'affected_states': self.affected_states or [],
+            'has_detailed_geometry': bool(self.geometry and self.coordinate_count),
+            'coverage_area_sq_degrees': self._calculate_coverage_area() if self.geometry_bounds else None
+        }
+    
+    def _calculate_coverage_area(self):
+        """Calculate approximate coverage area in square degrees"""
+        if not self.geometry_bounds:
+            return None
+        
+        try:
+            bounds = self.geometry_bounds
+            lat_diff = bounds['max_lat'] - bounds['min_lat']
+            lon_diff = bounds['max_lon'] - bounds['min_lon']
+            return round(lat_diff * lon_diff, 6)
+        except (KeyError, TypeError):
+            return None
 
 class IngestionLog(db.Model):
     """
