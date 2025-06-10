@@ -1197,7 +1197,15 @@ def generate_ai_summaries():
         
         return jsonify({
             'success': True,
-
+            'message': f'Generated {generated} AI summaries for verified matches',
+            'generated': generated,
+            'total_processed': len(alerts)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"AI summary generation failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/internal/missing-alerts-analysis')
 def missing_alerts_analysis():
