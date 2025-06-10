@@ -2327,6 +2327,175 @@ def get_hurricane_stats():
         logger.error(f"Error getting hurricane stats: {e}")
         return jsonify({'error': str(e)}), 500
 
+# Webhook Management API Endpoints
+
+@app.route('/internal/webhook-rules', methods=['GET'])
+def get_webhook_rules():
+    """List all registered webhook rules"""
+    try:
+        from models import WebhookRule
+        
+        rules = WebhookRule.query.order_by(WebhookRule.created_at.desc()).all()
+        
+        return jsonify({
+            'status': 'success',
+            'total': len(rules),
+            'webhook_rules': [rule.to_dict() for rule in rules]
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving webhook rules: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/internal/webhook-rules', methods=['POST'])
+def create_webhook_rule():
+    """Register a new webhook rule"""
+    try:
+        from models import WebhookRule
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Request body must be JSON'
+            }), 400
+        
+        # Validate required fields
+        required_fields = ['webhook_url', 'event_type', 'threshold_value']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Missing required field: {field}'
+                }), 400
+        
+        # Validate event_type
+        valid_event_types = ['hail', 'wind', 'damage_probability']
+        if data['event_type'] not in valid_event_types:
+            return jsonify({
+                'status': 'error',
+                'message': f'Invalid event_type. Must be one of: {valid_event_types}'
+            }), 400
+        
+        # Validate threshold_value
+        try:
+            threshold_value = float(data['threshold_value'])
+        except (ValueError, TypeError):
+            return jsonify({
+                'status': 'error',
+                'message': 'threshold_value must be a number'
+            }), 400
+        
+        # Create new webhook rule
+        rule = WebhookRule(
+            user_id=data.get('user_id'),
+            webhook_url=data['webhook_url'],
+            event_type=data['event_type'],
+            threshold_value=threshold_value,
+            location_filter=data.get('location_filter')
+        )
+        
+        db.session.add(rule)
+        db.session.commit()
+        
+        logger.info(f"Created webhook rule {rule.id}: {rule.event_type} >= {rule.threshold_value} -> {rule.webhook_url}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Webhook rule created successfully',
+            'webhook_rule': rule.to_dict()
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Error creating webhook rule: {e}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/internal/webhook-rules/<int:rule_id>', methods=['DELETE'])
+def delete_webhook_rule(rule_id):
+    """Delete a webhook rule"""
+    try:
+        from models import WebhookRule
+        
+        rule = WebhookRule.query.get_or_404(rule_id)
+        
+        logger.info(f"Deleting webhook rule {rule.id}: {rule.event_type} >= {rule.threshold_value}")
+        
+        db.session.delete(rule)
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Webhook rule {rule_id} deleted successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting webhook rule {rule_id}: {e}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/internal/webhook-rules/<int:rule_id>', methods=['GET'])
+def get_webhook_rule(rule_id):
+    """Get details of a specific webhook rule"""
+    try:
+        from models import WebhookRule
+        
+        rule = WebhookRule.query.get_or_404(rule_id)
+        
+        return jsonify({
+            'status': 'success',
+            'webhook_rule': rule.to_dict()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving webhook rule {rule_id}: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/test/webhook-evaluation', methods=['POST'])
+def test_webhook_evaluation():
+    """Test webhook evaluation and dispatch"""
+    try:
+        from webhook_service import WebhookService
+        
+        # Get optional alert_ids from request
+        data = request.get_json() or {}
+        alert_ids = data.get('alert_ids', [])
+        
+        webhook_service = WebhookService(db)
+        
+        if alert_ids:
+            # Test with specific alerts
+            from models import Alert
+            alerts = Alert.query.filter(Alert.id.in_(alert_ids)).all()
+            result = webhook_service.evaluate_and_dispatch_webhooks(alerts)
+        else:
+            # Test with all recent alerts
+            result = webhook_service.evaluate_and_dispatch_webhooks()
+        
+        return jsonify({
+            'status': 'success',
+            'test_results': result
+        })
+        
+    except Exception as e:
+        logger.error(f"Error testing webhook evaluation: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 if __name__ == '__main__':
     with app.app_context():
         init_scheduler()

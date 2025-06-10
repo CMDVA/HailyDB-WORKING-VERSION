@@ -39,6 +39,14 @@ class Alert(db.Model):
     
     # Radar Indicated Parsing (Feature 1)
     radar_indicated = Column(JSONB)        # {"hail_inches": float, "wind_mph": int}
+    
+    # Full Geometry & County Mapping (Feature 3)
+    fips_codes = Column(JSONB)             # List of FIPS county codes from geometry
+    county_names = Column(JSONB)           # Extracted county names with state mapping
+    geometry_type = Column(String(20))     # "Polygon", "MultiPolygon", "Point"
+    coordinate_count = Column(db.Integer)  # Number of coordinate pairs for complexity analysis
+    affected_states = Column(JSONB)        # List of state abbreviations
+    geometry_bounds = Column(JSONB)        # {"min_lat": float, "max_lat": float, "min_lon": float, "max_lon": float}
 
     # Metadata
     ingested_at = Column(DateTime, server_default=func.now())
