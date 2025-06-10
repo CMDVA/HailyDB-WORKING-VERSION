@@ -18,8 +18,14 @@ class Config:
     
     # Ingestion Settings
     POLLING_INTERVAL_MINUTES = 5
-    BATCH_SIZE = 100
     REQUEST_TIMEOUT = 30
+    
+    # Database Write Batch Configuration
+    DB_WRITE_BATCH_SIZE = int(os.environ.get("DB_WRITE_BATCH_SIZE", "500"))
+    
+    # Processing Batch Configuration (for enrichment, matching, etc.)
+    ENRICH_BATCH_SIZE = int(os.environ.get("ENRICH_BATCH_SIZE", "25"))
+    SPC_MATCH_BATCH_SIZE = int(os.environ.get("SPC_MATCH_BATCH_SIZE", "200"))
     
     # SPC Integration (Future)
     SPC_REPORTS_URL = "https://www.spc.noaa.gov/climo/reports/"

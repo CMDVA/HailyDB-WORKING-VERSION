@@ -1,12 +1,18 @@
 import logging
 import requests
 import re
+import os
 from datetime import datetime
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Iterator
 from models import Alert, IngestionLog
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+def chunks(data: List, chunk_size: int) -> Iterator[List]:
+    """Utility function to chunk data into batches"""
+    for i in range(0, len(data), chunk_size):
+        yield data[i:i + chunk_size]
 
 class IngestService:
     """
@@ -17,6 +23,7 @@ class IngestService:
     def __init__(self, db):
         self.db = db
         self.config = Config()
+        self.db_write_batch_size = int(os.getenv("DB_WRITE_BATCH_SIZE", "500"))
         
     def poll_nws_alerts(self) -> int:
         """

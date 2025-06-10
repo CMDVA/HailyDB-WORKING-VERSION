@@ -7,8 +7,9 @@ import csv
 import logging
 import requests
 import hashlib
+import os
 from datetime import datetime, date, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Iterator
 from io import StringIO
 import re
 
@@ -19,6 +20,11 @@ from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
 
+def chunks(data: List, chunk_size: int) -> Iterator[List]:
+    """Utility function to chunk data into batches"""
+    for i in range(0, len(data), chunk_size):
+        yield data[i:i + chunk_size]
+
 class SPCIngestService:
     """
     SPC Report Ingestion Service
@@ -28,6 +34,7 @@ class SPCIngestService:
     def __init__(self, db_session):
         self.db = db_session
         self.base_url = "https://www.spc.noaa.gov/climo/reports/"
+        self.db_write_batch_size = int(os.getenv("DB_WRITE_BATCH_SIZE", "500"))
         
     def get_polling_schedule(self, report_date: date) -> int:
         """
