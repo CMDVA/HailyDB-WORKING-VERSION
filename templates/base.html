@@ -60,6 +60,12 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'hurricane_tracks' %}active{% endif %}" 
+                           href="{{ url_for('hurricane_tracks') }}">
+                            <i class="fas fa-hurricane me-1"></i>Hurricanes
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'spc_matches' %}active{% endif %}" 
                            href="{{ url_for('spc_matches') }}">
                             <i class="fas fa-check-circle me-1"></i>Confirmed Warnings
