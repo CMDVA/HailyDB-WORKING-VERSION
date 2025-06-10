@@ -1293,17 +1293,6 @@ def missing_alerts_analysis():
         logger.error(f"Error in missing alerts analysis: {e}")
         return jsonify({'error': str(e)}), 500
 
-
-            'message': f'Generated {generated} AI summaries for verified matches',
-            'generated': generated,
-            'total_processed': len(alerts)
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"AI summary generation failed: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
 @app.route('/internal/spc-generate-summary/<alert_id>', methods=['POST'])
 def generate_single_ai_summary(alert_id):
     """Generate AI summary for a specific verified alert match"""
