@@ -229,7 +229,7 @@ class AutonomousScheduler:
             logger.error(f"SPC polling failed: {e}")
             if log_entry:
                 self.scheduler_service.log_operation_complete(
-                    log_entry, False, 0, 0, str(e)
+                    log_entry, False, records_processed=0, records_new=0, error_message=str(e)
                 )
         finally:
             self.spc_lock.release()
@@ -251,7 +251,7 @@ class AutonomousScheduler:
             matched = result.get('matched', 0)
             
             self.scheduler_service.log_operation_complete(
-                log_entry, True, processed, matched
+                log_entry, True, records_processed=processed, records_new=matched
             )
             
             self.last_matching = datetime.utcnow()
@@ -265,7 +265,7 @@ class AutonomousScheduler:
             logger.error(f"SPC matching failed: {e}")
             if log_entry:
                 self.scheduler_service.log_operation_complete(
-                    log_entry, False, 0, 0, str(e)
+                    log_entry, False, records_processed=0, records_new=0, error_message=str(e)
                 )
         finally:
             self.matching_lock.release()

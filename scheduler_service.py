@@ -54,28 +54,38 @@ class SchedulerService:
         Complete an operation log entry with simplified approach to avoid PostgreSQL issues
         """
         try:
-            # Update the log entry directly using SQLAlchemy ORM
-            log_entry.completed_at = datetime.utcnow()
-            log_entry.success = success
-            log_entry.records_processed = records_processed or 0
-            log_entry.records_new = records_new or 0
-            log_entry.error_message = error_message
-            log_entry.duplicate_count = duplicate_count or 0
-            log_entry.http_status_code = http_status_code
-            log_entry.api_response_size = api_response_size
-            log_entry.processing_duration = processing_duration
+            # Use raw SQL to avoid SQLAlchemy ORM type conversion issues entirely
+            update_sql = """
+                UPDATE scheduler_logs 
+                SET 
+                    completed_at = NOW(),
+                    success = %s,
+                    records_processed = %s,
+                    records_new = %s,
+                    error_message = %s,
+                    duplicate_count = %s,
+                    http_status_code = %s,
+                    api_response_size = %s,
+                    processing_duration = %s
+                WHERE id = %s
+            """
             
-            # Simplified metadata without complex nested structures
-            if error_details or failed_alert_ids:
-                detailed_status = self._determine_detailed_status(
-                    success, records_processed, records_new, error_message
+            # Execute with proper parameter binding
+            from sqlalchemy import text
+            result = self.db.session.execute(
+                text(update_sql),
+                (
+                    success,
+                    records_processed or 0,
+                    records_new or 0,
+                    error_message,
+                    duplicate_count or 0,
+                    http_status_code,
+                    api_response_size,
+                    processing_duration,
+                    log_entry.id
                 )
-                log_entry.operation_metadata = {
-                    'detailed_status': detailed_status,
-                    'has_error_details': bool(error_details),
-                    'failed_count': len(failed_alert_ids) if failed_alert_ids else 0
-                }
-            
+            )
             self.db.session.commit()
             
             status = "SUCCESS" if success else "FAILED"
@@ -89,35 +99,15 @@ class SchedulerService:
             logger.info(f"Completed operation {log_entry.operation_type}: {status} {details}")
             
         except Exception as e:
-            logger.error(f"Failed to complete operation log: {e}")
+            logger.error(f"Failed to complete operation log with raw SQL: {e}")
+            # Final fallback: mark as completed with minimal data
             try:
-                # Fallback: Simple direct update without complex fields
-                simple_update_sql = """
-                    UPDATE scheduler_logs 
-                    SET 
-                        completed_at = NOW(),
-                        success = :success,
-                        records_processed = :records_processed,
-                        records_new = :records_new,
-                        error_message = :error_message
-                    WHERE id = :log_id
-                """
-                
-                params = {
-                    'success': success,
-                    'records_processed': records_processed or 0,
-                    'records_new': records_new or 0,
-                    'error_message': error_message,
-                    'log_id': log_entry.id
-                }
-                
-                self.db.session.execute(self.db.text(simple_update_sql), params)
+                minimal_sql = "UPDATE scheduler_logs SET completed_at = NOW(), success = %s WHERE id = %s"
+                self.db.session.execute(text(minimal_sql), (success, log_entry.id))
                 self.db.session.commit()
-                
-                logger.info(f"Fallback completion successful for operation {log_entry.operation_type}")
-                
-            except Exception as fallback_error:
-                logger.error(f"Fallback completion also failed: {fallback_error}")
+                logger.info(f"Minimal completion successful for operation {log_entry.operation_type}")
+            except Exception as final_error:
+                logger.error(f"Even minimal completion failed: {final_error}")
                 self.db.session.rollback()
     
     def _determine_detailed_status(self, success: bool, records_processed: int, 
