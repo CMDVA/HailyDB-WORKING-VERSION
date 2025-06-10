@@ -1939,6 +1939,11 @@ def spc_matches():
     """View SPC verified matches page"""
     return render_template('spc_matches.html')
 
+@app.route('/hurricane-tracks')
+def hurricane_tracks():
+    """View hurricane tracks page"""
+    return render_template('hurricane_tracks.html')
+
 @app.route('/spc-matches/data')
 def spc_matches_data():
     """API endpoint for SPC verified matches data"""

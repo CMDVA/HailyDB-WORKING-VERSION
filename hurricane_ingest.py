@@ -78,7 +78,7 @@ class HurricaneIngestService:
                     stats['failed_records'] += 1
                     stats['errors'].append(str(e))
             
-            self.db.session.commit()
+            self.db.commit()
             logger.info(f"Hurricane ingestion complete: {stats['new_records']} new tracks, {stats['duplicate_records']} duplicates")
             
         except Exception as e:
@@ -187,7 +187,7 @@ class HurricaneIngestService:
                     row_hash=row_hash
                 )
                 
-                self.db.session.add(track)
+                self.db.add(track)
                 stats['new'] += 1
                 logger.debug(f"Added track point: {storm_id} at {timestamp}")
                 
