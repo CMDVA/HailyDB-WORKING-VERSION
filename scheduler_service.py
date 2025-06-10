@@ -91,8 +91,10 @@ class SchedulerService:
             
             # Try to at least mark it as completed
             try:
+                from sqlalchemy import text
                 self.db.session.execute(
-                    f"UPDATE scheduler_logs SET completed_at = CURRENT_TIMESTAMP WHERE operation_type = '{operation_type}' AND completed_at IS NULL"
+                    text("UPDATE scheduler_logs SET completed_at = CURRENT_TIMESTAMP WHERE operation_type = :operation_type AND completed_at IS NULL"),
+                    {"operation_type": operation_type}
                 )
                 self.db.session.commit()
             except:
