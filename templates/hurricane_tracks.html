@@ -178,11 +178,12 @@
                                         <th>Wind (mph)</th>
                                         <th>Pressure (mb)</th>
                                         <th>Status</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tracks-tbody">
                                     <tr>
-                                        <td colspan="8" class="text-center text-muted">
+                                        <td colspan="9" class="text-center text-muted">
                                             <i class="fas fa-spinner fa-spin me-2"></i>Loading hurricane tracks...
                                         </td>
                                     </tr>
@@ -248,7 +249,7 @@
             const tbody = document.getElementById('tracks-tbody');
 
             if (tracks.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No tracks found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No tracks found</td></tr>';
                 return;
             }
 
@@ -269,6 +270,11 @@
                         <td>${track.wind_mph || '-'}</td>
                         <td>${track.pressure_mb || '-'}</td>
                         <td>${statusBadge}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewStormDetails('${track.storm_id}')" title="View Storm Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
                     </tr>
                 `;
             }).join('');

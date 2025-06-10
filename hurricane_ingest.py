@@ -96,14 +96,42 @@ class HurricaneIngestService:
             List of storm dictionaries with track data
         """
         try:
-            # Use comprehensive hurricane data with complete storm tracks covering damage zones
-            logger.info("Using comprehensive hurricane track data with complete storm paths")
-            return self._get_comprehensive_hurricane_data()
+            import requests
+            
+            # Fetch official NOAA HURDAT2 Atlantic database
+            logger.info("Fetching NOAA HURDAT2 Atlantic hurricane database")
+            response = requests.get("https://www.nhc.noaa.gov/data/hurdat/hurdat2-1851-2023-051124.txt", timeout=30)
+            response.raise_for_status()
+            
+            # Parse HURDAT2 format
+            storms = self._parse_hurdat2_format(response.text)
+            
+            # Filter for our target years (2020-2025) and US-impacting storms
+            filtered_storms = []
+            for storm in storms:
+                if storm['year'] >= 2020 and storm['year'] <= 2025:
+                    # Check if storm impacted US (landfall or came close to US coast)
+                    if self._impacts_us_coast(storm['track_points']):
+                        filtered_storms.append(storm)
+                        logger.info(f"Including {storm['name']} {storm['year']} - {len(storm['track_points'])} track points")
+            
+            logger.info(f"Filtered to {len(filtered_storms)} US-impacting storms from HURDAT2")
+            return filtered_storms
             
         except Exception as e:
-            logger.error(f"Failed to load comprehensive hurricane data: {e}")
-            # Ultimate fallback
-            return []
+            logger.error(f"Failed to fetch HURDAT2 data: {e}")
+            # Fallback to comprehensive manual data
+            logger.info("Using comprehensive hurricane track data with complete storm paths")
+            return self._get_comprehensive_hurricane_data()
+    
+    def _impacts_us_coast(self, track_points: List[Dict[str, Any]]) -> bool:
+        """Check if storm track impacts US coast (landfall or close approach)"""
+        for point in track_points:
+            lat, lon = point['lat'], point['lon']
+            # US coastal zone: 20-50N, 100-65W (includes Gulf, Atlantic, and approach zones)
+            if 20 <= lat <= 50 and -100 <= lon <= -65:
+                return True
+        return False
     
     def _parse_hurdat2_format(self, hurdat2_text: str) -> List[Dict[str, Any]]:
         """Parse NOAA HURDAT2 format data"""
@@ -116,16 +144,15 @@ class HurricaneIngestService:
             if not line.strip():
                 continue
                 
-            # Storm header line
-            if line[0:2].isalpha():
-                if current_storm and current_storm['track_points']:
+            # Storm header line (contains storm ID and name)
+            if len(line) >= 50 and ',' in line and line.split(',')[0].strip().endswith(('2020', '2021', '2022', '2023', '2024', '2025')):
+                if current_storm and current_storm.get('track_points'):
                     storms.append(current_storm)
                 
-                # Parse storm header: AL092022,               IAN,     25,
                 parts = [p.strip() for p in line.split(',')]
                 storm_id = parts[0]
-                name = parts[1]
-                year = int(storm_id[4:8])
+                name = parts[1] if len(parts) > 1 else "UNKNOWN"
+                year = int(storm_id[-4:]) if len(storm_id) >= 4 else 0
                 
                 current_storm = {
                     'storm_id': storm_id,
@@ -133,15 +160,62 @@ class HurricaneIngestService:
                     'year': year,
                     'track_points': []
                 }
-            else:
-                # Track point line
-                if current_storm:
-                    track_point = self._parse_hurdat2_track_point(line)
-                    if track_point:
+            
+            # Track point line
+            elif current_storm and len(line) >= 50:
+                try:
+                    parts = [p.strip() for p in line.split(',')]
+                    if len(parts) >= 8:
+                        # Parse date/time
+                        date_str = parts[0]
+                        time_str = parts[1]
+                        
+                        # Parse coordinates
+                        lat_str = parts[4].rstrip('N').rstrip('S')
+                        lon_str = parts[5].rstrip('W').rstrip('E')
+                        
+                        lat = float(lat_str) if lat_str else 0.0
+                        if parts[4].endswith('S'):
+                            lat = -lat
+                            
+                        lon = float(lon_str) if lon_str else 0.0
+                        if parts[5].endswith('W'):
+                            lon = -lon
+                        
+                        # Parse wind speed and pressure
+                        wind_mph = int(parts[6]) if parts[6] and parts[6] != '-999' else 0
+                        pressure_mb = int(parts[7]) if parts[7] and parts[7] != '-999' else 1013
+                        
+                        # Parse status
+                        status = parts[3] if len(parts) > 3 else 'TD'
+                        
+                        # Create timestamp
+                        year = current_storm['year']
+                        month = int(date_str[:2])
+                        day = int(date_str[2:4])
+                        hour = int(time_str[:2]) if time_str else 0
+                        minute = int(time_str[2:4]) if len(time_str) >= 4 else 0
+                        
+                        timestamp = datetime(year, month, day, hour, minute, tzinfo=timezone.utc)
+                        
+                        track_point = {
+                            'timestamp': timestamp,
+                            'lat': lat,
+                            'lon': lon,
+                            'wind_mph': wind_mph,
+                            'pressure_mb': pressure_mb,
+                            'status': status,
+                            'category': self._determine_hurricane_category(status, wind_mph)
+                        }
+                        
                         current_storm['track_points'].append(track_point)
+                        
+                except (ValueError, IndexError) as e:
+                    logger.debug(f"Failed to parse track point: {line[:50]}... - {e}")
+                    continue
         
-        # Add the last storm
-        if current_storm and current_storm['track_points']:
+        # Add final storm
+        if current_storm and current_storm.get('track_points'):
             storms.append(current_storm)
             
         return storms
