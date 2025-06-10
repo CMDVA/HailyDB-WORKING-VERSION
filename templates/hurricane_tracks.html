@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Hurricane Tracks - HailyDB</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .track-entry { border-left: 4px solid #007bff; }
+        .track-category-5 { border-left-color: #8b0000; }
+        .track-category-4 { border-left-color: #dc3545; }
+        .track-category-3 { border-left-color: #fd7e14; }
+        .track-category-2 { border-left-color: #ffc107; }
+        .track-category-1 { border-left-color: #28a745; }
+        .track-tropical { border-left-color: #17a2b8; }
+        .table-sm th, .table-sm td { padding: 0.5rem; }
+        .badge-category { font-size: 0.75em; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-hurricane me-2"></i>Hurricane Tracks
+                    </h1>
+                    <a href="/" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+                    </a>
+                </div>
+
+                <!-- Filter Controls -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-2">
+                                <label class="form-label">Storm ID</label>
+                                <input type="text" class="form-control" id="storm-id-filter" placeholder="e.g., AL092022">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Name</label>
+                                <input type="text" class="form-control" id="name-filter" placeholder="e.g., Ian">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Year</label>
+                                <select class="form-select" id="year-filter">
+                                    <option value="">All Years</option>
+                                    <option value="2023">2023</option>
+                                    <option value="2022">2022</option>
+                                    <option value="2021">2021</option>
+                                    <option value="2020">2020</option>
+                                    <option value="2019">2019</option>
+                                    <option value="2018">2018</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Category</label>
+                                <select class="form-select" id="category-filter">
+                                    <option value="">All Categories</option>
+                                    <option value="CAT5">Category 5</option>
+                                    <option value="CAT4">Category 4</option>
+                                    <option value="CAT3">Category 3</option>
+                                    <option value="CAT2">Category 2</option>
+                                    <option value="CAT1">Category 1</option>
+                                    <option value="TS">Tropical Storm</option>
+                                    <option value="TD">Tropical Depression</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Limit</label>
+                                <select class="form-select" id="limit-filter">
+                                    <option value="50">50 tracks</option>
+                                    <option value="100" selected>100 tracks</option>
+                                    <option value="200">200 tracks</option>
+                                    <option value="500">500 tracks</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">&nbsp;</label>
+                                <button class="btn btn-primary d-block w-100" onclick="loadTracks()">
+                                    <i class="fas fa-search me-1"></i>Search
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Stats -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card border-left-primary">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                            Total Track Points
+                                        </div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="total-tracks">-</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-route fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-left-success">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                            Unique Storms
+                                        </div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="unique-storms">-</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-hurricane fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-left-info">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                            Year Range
+                                        </div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="year-range">-</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-left-warning">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                            Last Updated
+                                        </div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="last-updated">-</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-clock fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hurricane Tracks Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="m-0 font-weight-bold text-primary">Hurricane Track Points</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm" id="tracks-table">
+                                <thead>
+                                    <tr>
+                                        <th>Storm ID</th>
+                                        <th>Name</th>
+                                        <th>Timestamp</th>
+                                        <th>Location</th>
+                                        <th>Category</th>
+                                        <th>Wind (mph)</th>
+                                        <th>Pressure (mb)</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tracks-tbody">
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted">
+                                            <i class="fas fa-spinner fa-spin me-2"></i>Loading hurricane tracks...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function loadTracks() {
+            const stormId = document.getElementById('storm-id-filter').value;
+            const name = document.getElementById('name-filter').value;
+            const year = document.getElementById('year-filter').value;
+            const category = document.getElementById('category-filter').value;
+            const limit = document.getElementById('limit-filter').value;
+
+            const params = new URLSearchParams();
+            if (stormId) params.append('storm_id', stormId);
+            if (name) params.append('name', name);
+            if (year) params.append('year', year);
+            if (category) params.append('category', category);
+            if (limit) params.append('limit', limit);
+
+            fetch(`/api/hurricanes/tracks?${params}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateTracksTable(data);
+                })
+                .catch(error => {
+                    console.error('Error loading tracks:', error);
+                    document.getElementById('tracks-tbody').innerHTML = 
+                        '<tr><td colspan="8" class="text-center text-danger">Error loading tracks</td></tr>';
+                });
+        }
+
+        function loadStats() {
+            fetch('/internal/hurricane-stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('total-tracks').textContent = data.total_track_points.toLocaleString();
+                    document.getElementById('unique-storms').textContent = data.unique_storms.toLocaleString();
+                    
+                    if (data.year_range.min && data.year_range.max) {
+                        document.getElementById('year-range').textContent = `${data.year_range.min}-${data.year_range.max}`;
+                    }
+                    
+                    if (data.latest_ingestion) {
+                        const date = new Date(data.latest_ingestion);
+                        document.getElementById('last-updated').textContent = date.toLocaleDateString();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading stats:', error);
+                });
+        }
+
+        function updateTracksTable(tracks) {
+            const tbody = document.getElementById('tracks-tbody');
+
+            if (tracks.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No tracks found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = tracks.map(track => {
+                const categoryBadge = getCategoryBadge(track.category);
+                const statusBadge = getStatusBadge(track.status);
+                const location = `${track.lat.toFixed(2)}, ${track.lon.toFixed(2)}`;
+                const timestamp = formatTimestamp(track.timestamp);
+                const rowClass = getCategoryRowClass(track.category);
+
+                return `
+                    <tr class="track-entry ${rowClass}">
+                        <td><strong>${track.storm_id}</strong></td>
+                        <td>${track.name || '-'}</td>
+                        <td>${timestamp}</td>
+                        <td>${location}</td>
+                        <td>${categoryBadge}</td>
+                        <td>${track.wind_mph || '-'}</td>
+                        <td>${track.pressure_mb || '-'}</td>
+                        <td>${statusBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function getCategoryBadge(category) {
+            const badges = {
+                'CAT5': '<span class="badge bg-dark badge-category">CAT 5</span>',
+                'CAT4': '<span class="badge bg-danger badge-category">CAT 4</span>',
+                'CAT3': '<span class="badge bg-warning badge-category">CAT 3</span>',
+                'CAT2': '<span class="badge bg-info badge-category">CAT 2</span>',
+                'CAT1': '<span class="badge bg-success badge-category">CAT 1</span>',
+                'TS': '<span class="badge bg-primary badge-category">TS</span>',
+                'TD': '<span class="badge bg-secondary badge-category">TD</span>'
+            };
+            return badges[category] || `<span class="badge bg-light text-dark badge-category">${category || '-'}</span>`;
+        }
+
+        function getStatusBadge(status) {
+            const badges = {
+                'HU': '<span class="badge bg-danger">Hurricane</span>',
+                'TS': '<span class="badge bg-warning">Tropical Storm</span>',
+                'TD': '<span class="badge bg-info">Tropical Depression</span>',
+                'EX': '<span class="badge bg-secondary">Extratropical</span>'
+            };
+            return badges[status] || `<span class="badge bg-light text-dark">${status || '-'}</span>`;
+        }
+
+        function getCategoryRowClass(category) {
+            const classes = {
+                'CAT5': 'track-category-5',
+                'CAT4': 'track-category-4',
+                'CAT3': 'track-category-3',
+                'CAT2': 'track-category-2',
+                'CAT1': 'track-category-1',
+                'TS': 'track-tropical',
+                'TD': 'track-tropical'
+            };
+            return classes[category] || '';
+        }
+
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp);
+            return date.toLocaleString();
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadTracks();
+        });
+    </script>
+</body>
+</html>

@@ -143,12 +143,13 @@ def determine_enhanced_status(log_row):
             }
 
 # Import other modules after app initialization
-from models import Alert, SPCReport, SPCIngestionLog, SchedulerLog
+from models import Alert, SPCReport, SPCIngestionLog, SchedulerLog, HurricaneTrack
 from ingest import IngestService
 from enrich import EnrichmentService
 from spc_ingest import SPCIngestService
 from spc_matcher import SPCMatchingService
 from spc_verification import SPCVerificationService
+from hurricane_ingest import HurricaneIngestService
 from scheduler_service import SchedulerService
 from config import Config
 import atexit
@@ -172,6 +173,7 @@ with app.app_context():
     enrich_service = EnrichmentService(db)
     spc_ingest_service = SPCIngestService(db.session)
     spc_matching_service = SPCMatchingService(db.session)
+    hurricane_ingest_service = HurricaneIngestService(db.session)
     scheduler_service = SchedulerService(db)
     
     # Initialize autonomous scheduler
@@ -2048,6 +2050,166 @@ def spc_matches_data():
         })
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Hurricane Track API Endpoints
+
+@app.route("/api/hurricanes/tracks", methods=["GET"])
+def get_hurricane_tracks():
+    """
+    Get hurricane track data with filtering options
+    Query parameters:
+    - storm_id: Filter by NOAA storm identifier
+    - name: Filter by hurricane name
+    - year: Filter by year
+    - lat/lon: Bounding box (lat_min, lat_max, lon_min, lon_max)
+    - start_date/end_date: Date range filter
+    - limit/offset: Pagination
+    """
+    try:
+        # Parse query parameters
+        storm_id = request.args.get('storm_id')
+        name = request.args.get('name')
+        year = request.args.get('year', type=int)
+        lat_min = request.args.get('lat_min', type=float)
+        lat_max = request.args.get('lat_max', type=float)
+        lon_min = request.args.get('lon_min', type=float)
+        lon_max = request.args.get('lon_max', type=float)
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        limit = request.args.get('limit', default=100, type=int)
+        offset = request.args.get('offset', default=0, type=int)
+        
+        # Build query
+        query = HurricaneTrack.query
+        
+        if storm_id:
+            query = query.filter(HurricaneTrack.storm_id == storm_id)
+        if name:
+            query = query.filter(HurricaneTrack.name.ilike(f'%{name}%'))
+        if year:
+            query = query.filter(HurricaneTrack.year == year)
+        if lat_min is not None and lat_max is not None:
+            query = query.filter(HurricaneTrack.lat.between(lat_min, lat_max))
+        if lon_min is not None and lon_max is not None:
+            query = query.filter(HurricaneTrack.lon.between(lon_min, lon_max))
+        if start_date:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            query = query.filter(HurricaneTrack.timestamp >= start_dt)
+        if end_date:
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query = query.filter(HurricaneTrack.timestamp <= end_dt)
+        
+        # Execute query with pagination
+        tracks = query.order_by(HurricaneTrack.timestamp.desc()).offset(offset).limit(limit).all()
+        
+        # Format response
+        return jsonify([track.to_dict() for track in tracks])
+        
+    except Exception as e:
+        logger.error(f"Error retrieving hurricane tracks: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/hurricanes/storms/<storm_id>", methods=["GET"])
+def get_hurricane_storm(storm_id):
+    """Get complete track data for a specific storm"""
+    try:
+        summary = hurricane_ingest_service.get_storm_summary(storm_id)
+        if not summary:
+            return jsonify({'error': 'Storm not found'}), 404
+        
+        return jsonify(summary)
+        
+    except Exception as e:
+        logger.error(f"Error retrieving storm {storm_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/hurricanes/search", methods=["GET"])
+def search_hurricanes_by_location():
+    """
+    Search for hurricanes near a specific location
+    Query parameters:
+    - lat: Latitude
+    - lon: Longitude  
+    - radius: Search radius in miles (default: 50)
+    """
+    try:
+        lat = request.args.get('lat', type=float)
+        lon = request.args.get('lon', type=float)
+        radius = request.args.get('radius', default=50, type=float)
+        
+        if lat is None or lon is None:
+            return jsonify({'error': 'lat and lon parameters are required'}), 400
+        
+        tracks = hurricane_ingest_service.search_tracks_by_location(lat, lon, radius)
+        
+        # Calculate distance for each track
+        results = []
+        for track in tracks:
+            track_dict = track.to_dict()
+            # Approximate distance calculation
+            lat_diff = abs(track.lat - lat)
+            lon_diff = abs(track.lon - lon)
+            distance_miles = ((lat_diff**2 + lon_diff**2)**0.5) * 69
+            track_dict['distance_from_query'] = round(distance_miles, 1)
+            results.append(track_dict)
+        
+        # Sort by distance
+        results.sort(key=lambda x: x['distance_from_query'])
+        
+        return jsonify(results)
+        
+    except Exception as e:
+        logger.error(f"Error searching hurricanes by location: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/internal/hurricane-ingest", methods=["POST"])
+def trigger_hurricane_ingestion():
+    """Admin endpoint to trigger hurricane data ingestion"""
+    try:
+        log_entry = scheduler_service.log_operation_start(
+            "hurricane_ingest", "manual"
+        )
+        
+        result = hurricane_ingest_service.ingest_hurricane_data("manual_trigger")
+        
+        scheduler_service.log_operation_complete(
+            log_entry, 
+            True,
+            result['total_processed'],
+            result['new_records'],
+            None,
+            None,
+            None,
+            result['duplicate_records']
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f"Hurricane ingestion completed",
+            'total_processed': result['total_processed'],
+            'new_records': result['new_records'],
+            'duplicate_records': result['duplicate_records'],
+            'storms_processed': result['storms_processed']
+        })
+        
+    except Exception as e:
+        logger.error(f"Hurricane ingestion failed: {e}")
+        if 'log_entry' in locals():
+            scheduler_service.log_operation_complete(
+                log_entry, False, 0, 0, str(e)
+            )
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/internal/hurricane-stats", methods=["GET"])
+def get_hurricane_stats():
+    """Get hurricane ingestion statistics"""
+    try:
+        stats = hurricane_ingest_service.get_ingestion_stats()
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Error getting hurricane stats: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

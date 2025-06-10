@@ -1,0 +1,171 @@
+HailyDB — Integrate Historical Hurricane Track & Landfall Data
+✅ GOAL:
+Ingest and expose historical hurricane track data (NOAA source), aligned with HailyDB’s architecture. This dataset supports field intelligence for roof/property damage and must follow the same ingestion, deduplication, and API framework as existing SPC ingestion.
+
+📦 1. NEW TABLE: hurricane_tracks
+python
+Copy
+Edit
+class HurricaneTrack(db.Model):
+    __tablename__ = "hurricane_tracks"
+
+    id = Column(Integer, primary_key=True)
+    storm_id = Column(String, nullable=False, index=True)  # NOAA storm identifier (e.g., AL122022)
+    name = Column(String, index=True)  # "Ian"
+    year = Column(Integer, index=True)
+    track_point_index = Column(Integer)  # Sequence of point along track
+    timestamp = Column(DateTime, index=True)
+    lat = Column(Float, index=True)
+    lon = Column(Float, index=True)
+    category = Column(String)  # TS, TD, CAT1–5
+    wind_mph = Column(Integer)
+    pressure_mb = Column(Integer)
+    status = Column(String)  # e.g., 'HU', 'TS', 'EX'
+    raw_data = Column(JSONB)  # Preserve full NOAA JSON
+    row_hash = Column(String(64), unique=True)  # SHA256 of storm_id + timestamp + lat + lon
+    ingested_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_storm_id", "storm_id"),
+        Index("idx_hurricane_coords", "lat", "lon"),
+        Index("idx_hurricane_timestamp", "timestamp"),
+        UniqueConstraint("row_hash", name="uq_hurricane_track_hash"),
+    )
+🔄 2. INGESTION SERVICE: hurricane_ingest.py
+Source: NOAA Historical Hurricane Tracks
+
+Parse shapefiles or GeoJSON via geopandas
+
+For each storm:
+
+Extract track points with lat/lon, timestamp, wind speed, pressure, status
+
+Normalize into model schema
+
+Calculate row_hash for deduplication
+
+Insert one record at a time
+
+python
+Copy
+Edit
+def hash_track_row(storm_id, timestamp, lat, lon):
+    row_string = f"{storm_id}-{timestamp.isoformat()}-{lat}-{lon}"
+    return hashlib.sha256(row_string.encode()).hexdigest()
+🕹️ 3. ADMIN ENDPOINTS
+python
+Copy
+Edit
+@app.route("/internal/hurricane-ingest", methods=["POST"])
+def trigger_hurricane_ingestion():
+    result = hurricane_ingest.run()
+    return jsonify(result)
+🗓️ 4. SCHEDULER INTEGRATION
+Add poll_hurricane_data() to autonomous_scheduler.py
+
+Run ingestion weekly, or manually trigger after dataset updates
+
+python
+Copy
+Edit
+def poll_hurricane_data(self):
+    try:
+        result = self.hurricane_service.poll_data_source()
+        self.scheduler_service.log_operation_complete(
+            log_entry, True, result['processed'], result['new']
+        )
+    except Exception as e:
+        self.scheduler_service.log_operation_complete(
+            log_entry, False, 0, 0, str(e)
+        )
+🌐 5. PUBLIC API ENDPOINTS
+python
+Copy
+Edit
+@app.route("/api/hurricanes/tracks", methods=["GET"])
+def get_hurricane_tracks():
+    # Query params:
+    # - storm_id
+    # - name
+    # - year
+    # - lat/lon bounding box
+    # - date range
+    # - limit / offset
+Sample call:
+
+sql
+Copy
+Edit
+GET /api/hurricanes/tracks?year=2022&name=Ian
+Response:
+
+json
+Copy
+Edit
+[
+  {
+    "storm_id": "AL092022",
+    "name": "Ian",
+    "timestamp": "2022-09-28T19:00:00Z",
+    "lat": 26.0,
+    "lon": -82.0,
+    "category": "CAT4",
+    "wind_mph": 130,
+    "distance_from_query": 4.2
+  }
+]
+🧠 6. OPTIONAL: AI SUMMARIZATION
+Future optional:
+
+Cluster significant landfall locations
+
+Summarize per storm using openai.ChatCompletion.create
+
+Could generate summaries like:
+
+arduino
+Copy
+Edit
+"Hurricane Ian (2022) made landfall near Fort Myers, FL as a Category 4 hurricane with peak winds of 130 mph. Significant structural damage reported within 30-mile radius. Track moved NE across Orlando and exited via the Atlantic."
+Store in ai_summary column if added.
+
+✅ 7. POSTGRES INDEX STRATEGY
+idx_hurricane_coords(lat, lon)
+
+idx_hurricane_timestamp(timestamp)
+
+idx_storm_id
+
+uq_hurricane_track_hash
+
+These enable efficient spatial and temporal queries.
+
+🔐 8. SECURITY & API QUOTAS
+Rate-limit API endpoint to 100 req/min
+
+Require User-Agent header for API analytics
+
+Optional: cache responses for 24h
+
+📋 9. OPERATION LOGGING
+Log every ingestion in scheduler_logs with:
+
+json
+Copy
+Edit
+{
+  "operation_type": "hurricane_ingest",
+  "trigger_method": "manual",
+  "records_processed": 1128,
+  "records_new": 1120,
+  "error_message": null,
+  "processing_duration": 18.4
+}
+🔚 SUMMARY
+✔ Fully normalized table
+✔ Deduplication with hash
+✔ Manual + scheduled ingestion
+✔ REST API for all clients (including IDOLCheck)
+✔ Stored in HailyDB, not IDOLCheck
+
+END PROMPT

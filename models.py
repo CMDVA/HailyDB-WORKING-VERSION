@@ -257,3 +257,61 @@ class SchedulerLog(db.Model):
     
     def __repr__(self):
         return f'<SchedulerLog {self.id}: {self.operation_type} - {self.success}>'
+
+class HurricaneTrack(db.Model):
+    """
+    Historical hurricane track data from NOAA sources
+    Supports field intelligence for roof/property damage assessment
+    """
+    __tablename__ = "hurricane_tracks"
+
+    id = Column(db.Integer, primary_key=True)
+    storm_id = Column(String, nullable=False, index=True)  # NOAA storm identifier (e.g., AL122022)
+    name = Column(String, index=True)  # "Ian"
+    year = Column(db.Integer, index=True)
+    track_point_index = Column(db.Integer)  # Sequence of point along track
+    timestamp = Column(DateTime, index=True)
+    lat = Column(db.Float, index=True)
+    lon = Column(db.Float, index=True)
+    category = Column(String)  # TS, TD, CAT1–5
+    wind_mph = Column(db.Integer)
+    pressure_mb = Column(db.Integer)
+    status = Column(String)  # e.g., 'HU', 'TS', 'EX'
+    raw_data = Column(JSONB)  # Preserve full NOAA JSON
+    row_hash = Column(String(64), unique=True)  # SHA256 of storm_id + timestamp + lat + lon
+    ingested_at = Column(DateTime, server_default=func.now())
+    
+    # Optional AI summarization field
+    ai_summary = Column(Text)
+
+    __table_args__ = (
+        Index("idx_storm_id", "storm_id"),
+        Index("idx_hurricane_coords", "lat", "lon"),
+        Index("idx_hurricane_timestamp", "timestamp"),
+        Index("idx_hurricane_year", "year"),
+        Index("idx_hurricane_name", "name"),
+        UniqueConstraint("row_hash", name="uq_hurricane_track_hash"),
+    )
+    
+    def __repr__(self):
+        return f'<HurricaneTrack {self.storm_id}: {self.name} - {self.timestamp}>'
+    
+    def to_dict(self):
+        """Convert hurricane track to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'storm_id': self.storm_id,
+            'name': self.name,
+            'year': self.year,
+            'track_point_index': self.track_point_index,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'lat': self.lat,
+            'lon': self.lon,
+            'category': self.category,
+            'wind_mph': self.wind_mph,
+            'pressure_mb': self.pressure_mb,
+            'status': self.status,
+            'raw_data': self.raw_data,
+            'ingested_at': self.ingested_at.isoformat() if self.ingested_at else None,
+            'ai_summary': self.ai_summary
+        }
