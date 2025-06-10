@@ -54,61 +54,50 @@ class SchedulerService:
         Complete an operation log entry with simplified approach to avoid PostgreSQL issues
         """
         try:
-            # Use raw SQL to avoid SQLAlchemy ORM type conversion issues entirely
-            update_sql = """
-                UPDATE scheduler_logs 
-                SET 
-                    completed_at = NOW(),
-                    success = %s,
-                    records_processed = %s,
-                    records_new = %s,
-                    error_message = %s,
-                    duplicate_count = %s,
-                    http_status_code = %s,
-                    api_response_size = %s,
-                    processing_duration = %s
-                WHERE id = %s
-            """
+            # Use direct database connection to bypass SQLAlchemy entirely
+            import psycopg2
+            import os
             
-            # Execute with proper parameter binding
-            from sqlalchemy import text
-            result = self.db.session.execute(
-                text(update_sql),
-                (
-                    success,
-                    records_processed or 0,
-                    records_new or 0,
-                    error_message,
-                    duplicate_count or 0,
-                    http_status_code,
-                    api_response_size,
-                    processing_duration,
-                    log_entry.id
-                )
-            )
-            self.db.session.commit()
+            # Get database URL and parse it
+            database_url = os.environ.get('DATABASE_URL')
+            
+            # Direct PostgreSQL connection
+            conn = psycopg2.connect(database_url)
+            cursor = conn.cursor()
+            
+            # Simple parameterized update
+            cursor.execute("""
+                UPDATE scheduler_logs 
+                SET completed_at = NOW(), success = %s, records_processed = %s, records_new = %s, error_message = %s
+                WHERE id = %s
+            """, (success, records_processed or 0, records_new or 0, error_message, log_entry.id))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
             
             status = "SUCCESS" if success else "FAILED"
-            details = f"(processed: {records_processed}, new: {records_new}"
-            if duplicate_count:
-                details += f", duplicates: {duplicate_count}"
-            if failed_alert_ids:
-                details += f", failed: {len(failed_alert_ids)}"
-            details += ")"
+            details = f"(processed: {records_processed or 0}, new: {records_new or 0})"
             
             logger.info(f"Completed operation {log_entry.operation_type}: {status} {details}")
             
         except Exception as e:
-            logger.error(f"Failed to complete operation log with raw SQL: {e}")
-            # Final fallback: mark as completed with minimal data
+            logger.error(f"Direct PostgreSQL completion failed: {e}")
+            # Ultimate fallback: mark as completed without details
             try:
-                minimal_sql = "UPDATE scheduler_logs SET completed_at = NOW(), success = %s WHERE id = %s"
-                self.db.session.execute(text(minimal_sql), (success, log_entry.id))
-                self.db.session.commit()
-                logger.info(f"Minimal completion successful for operation {log_entry.operation_type}")
+                import psycopg2
+                import os
+                database_url = os.environ.get('DATABASE_URL')
+                conn = psycopg2.connect(database_url)
+                cursor = conn.cursor()
+                cursor.execute("UPDATE scheduler_logs SET completed_at = NOW(), success = %s WHERE id = %s", 
+                             (success, log_entry.id))
+                conn.commit()
+                cursor.close()
+                conn.close()
+                logger.info(f"Fallback completion successful for {log_entry.operation_type}")
             except Exception as final_error:
-                logger.error(f"Even minimal completion failed: {final_error}")
-                self.db.session.rollback()
+                logger.error(f"All completion methods failed: {final_error}")
     
     def _determine_detailed_status(self, success: bool, records_processed: int, 
                                  records_new: int, error_message: str = None) -> str:
