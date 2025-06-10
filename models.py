@@ -83,10 +83,23 @@ class Alert(db.Model):
             'ai_tags': self.ai_tags,
             'spc_verified': self.spc_verified,
             'spc_reports': self.spc_reports,
+            'spc_confidence_score': self.spc_confidence_score,
+            'spc_match_method': self.spc_match_method,
+            'spc_report_count': self.spc_report_count,
+            'spc_ai_summary': self.spc_ai_summary,
+            'radar_indicated': self.radar_indicated,  # Feature 1: Radar-indicated parsing
+            'fips_codes': self.fips_codes,            # Feature 3: FIPS county codes
+            'county_names': self.county_names,        # Feature 3: County-state mapping
+            'geometry_type': self.geometry_type,      # Feature 3: Geometry classification
+            'coordinate_count': self.coordinate_count, # Feature 3: Complexity analysis
+            'affected_states': self.affected_states,  # Feature 3: State list
+            'geometry_bounds': self.geometry_bounds,  # Feature 3: Coordinate bounds
             'ingested_at': self.ingested_at.isoformat() if self.ingested_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'is_active': self.is_active,
             'duration_minutes': self.duration_minutes,
-            'location': self.get_location_info()
+            'location_info': self.get_location_info(),
+            'enhanced_geometry': self.get_enhanced_geometry_info()  # Feature 3: Comprehensive geometry data
         }
     
     @property
