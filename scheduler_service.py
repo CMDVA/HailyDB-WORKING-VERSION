@@ -62,10 +62,11 @@ class SchedulerService:
             operation_type = log_entry.operation_type if hasattr(log_entry, 'operation_type') else 'unknown'
             
             # Use direct SQL execution to bypass type conversion issues
+            from sqlalchemy import text
             self.db.session.execute(
-                "UPDATE scheduler_logs SET completed_at = CURRENT_TIMESTAMP, success = :success, "
-                "records_processed = :processed, records_new = :new_records, error_message = :error "
-                "WHERE started_at = (SELECT MAX(started_at) FROM scheduler_logs WHERE operation_type = :op_type AND completed_at IS NULL)",
+                text("UPDATE scheduler_logs SET completed_at = CURRENT_TIMESTAMP, success = :success, "
+                     "records_processed = :processed, records_new = :new_records, error_message = :error "
+                     "WHERE started_at = (SELECT MAX(started_at) FROM scheduler_logs WHERE operation_type = :op_type AND completed_at IS NULL)"),
                 {
                     'success': success,
                     'processed': records_processed or 0,
