@@ -105,7 +105,13 @@ class IngestService:
             self.db.session.commit()
             
             logger.info(f"Ingestion complete: {new_alerts} new, {updated_alerts} updated, {total_processed} total, {duplicate_count} duplicates, {len(self._failed_alerts)} failed")
-            return new_alerts
+            return {
+                'new_alerts': new_alerts,
+                'updated_alerts': updated_alerts,
+                'total_processed': total_processed,
+                'duplicate_count': duplicate_count,
+                'failed_count': len(self._failed_alerts)
+            }
             
         except Exception as e:
             logger.error(f"Fatal error during ingestion: {e}")

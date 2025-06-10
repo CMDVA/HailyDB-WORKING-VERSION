@@ -147,20 +147,31 @@ class AutonomousScheduler:
                 "nws_poll", "internal_timer"
             )
             
-            new_alerts = self.ingest_service.poll_nws_alerts()
+            result = self.ingest_service.poll_nws_alerts()
+            
+            # Handle both old (int) and new (dict) return formats
+            if isinstance(result, dict):
+                new_alerts = result['new_alerts']
+                total_processed = result['total_processed']
+                updated_alerts = result['updated_alerts']
+            else:
+                # Backward compatibility with old int return
+                new_alerts = result
+                total_processed = result
+                updated_alerts = 0
             
             self.scheduler_service.log_operation_complete(
-                log_entry, True, records_processed=new_alerts, records_new=new_alerts
+                log_entry, True, records_processed=total_processed, records_new=new_alerts
             )
             
             self.last_nws_poll = datetime.utcnow()
             self.last_operation_result = {
                 'operation': 'nws',
                 'success': True,
-                'message': f'{new_alerts} new alerts ingested',
+                'message': f'{new_alerts} new / {total_processed} total alerts processed',
                 'timestamp': self.last_nws_poll.isoformat()
             }
-            logger.info(f"NWS polling completed: {new_alerts} new alerts")
+            logger.info(f"NWS polling completed: {new_alerts} new, {updated_alerts} updated, {total_processed} total alerts")
             
         except Exception as e:
             logger.error(f"NWS polling failed: {e}")

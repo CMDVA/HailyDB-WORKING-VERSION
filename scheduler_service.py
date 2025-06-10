@@ -51,53 +51,51 @@ class SchedulerService:
                              http_status_code: int = None, api_response_size: int = None,
                              processing_duration: float = None):
         """
-        Complete an operation log entry with simplified approach to avoid PostgreSQL issues
+        Complete an operation log entry with PostgreSQL workaround
         """
+        # Extract operation type before accessing log_entry object
+        operation_type = None
+        log_id = None
+        
         try:
-            # Use direct database connection to bypass SQLAlchemy entirely
-            import psycopg2
-            import os
+            # Get basic info we need before potential SQLAlchemy issues
+            operation_type = log_entry.operation_type if hasattr(log_entry, 'operation_type') else 'unknown'
             
-            # Get database URL and parse it
-            database_url = os.environ.get('DATABASE_URL')
-            
-            # Direct PostgreSQL connection
-            conn = psycopg2.connect(database_url)
-            cursor = conn.cursor()
-            
-            # Simple parameterized update
-            cursor.execute("""
-                UPDATE scheduler_logs 
-                SET completed_at = NOW(), success = %s, records_processed = %s, records_new = %s, error_message = %s
-                WHERE id = %s
-            """, (success, records_processed or 0, records_new or 0, error_message, log_entry.id))
-            
-            conn.commit()
-            cursor.close()
-            conn.close()
+            # Use direct SQL execution to bypass type conversion issues
+            self.db.session.execute(
+                "UPDATE scheduler_logs SET completed_at = CURRENT_TIMESTAMP, success = :success, "
+                "records_processed = :processed, records_new = :new_records, error_message = :error "
+                "WHERE started_at = (SELECT MAX(started_at) FROM scheduler_logs WHERE operation_type = :op_type AND completed_at IS NULL)",
+                {
+                    'success': success,
+                    'processed': records_processed or 0,
+                    'new_records': records_new or 0,
+                    'error': error_message,
+                    'op_type': operation_type
+                }
+            )
+            self.db.session.commit()
             
             status = "SUCCESS" if success else "FAILED"
             details = f"(processed: {records_processed or 0}, new: {records_new or 0})"
             
-            logger.info(f"Completed operation {log_entry.operation_type}: {status} {details}")
+            logger.info(f"Completed operation {operation_type}: {status} {details}")
             
         except Exception as e:
-            logger.error(f"Direct PostgreSQL completion failed: {e}")
-            # Ultimate fallback: mark as completed without details
+            logger.error(f"Operation completion failed: {e}")
+            # Final fallback - just log the completion without database update
+            status = "SUCCESS" if success else "FAILED"
+            details = f"(processed: {records_processed or 0}, new: {records_new or 0})"
+            logger.info(f"Operation {operation_type or 'unknown'} completed in memory: {status} {details}")
+            
+            # Try to at least mark it as completed
             try:
-                import psycopg2
-                import os
-                database_url = os.environ.get('DATABASE_URL')
-                conn = psycopg2.connect(database_url)
-                cursor = conn.cursor()
-                cursor.execute("UPDATE scheduler_logs SET completed_at = NOW(), success = %s WHERE id = %s", 
-                             (success, log_entry.id))
-                conn.commit()
-                cursor.close()
-                conn.close()
-                logger.info(f"Fallback completion successful for {log_entry.operation_type}")
-            except Exception as final_error:
-                logger.error(f"All completion methods failed: {final_error}")
+                self.db.session.execute(
+                    f"UPDATE scheduler_logs SET completed_at = CURRENT_TIMESTAMP WHERE operation_type = '{operation_type}' AND completed_at IS NULL"
+                )
+                self.db.session.commit()
+            except:
+                pass  # Ignore final fallback errors
     
     def _determine_detailed_status(self, success: bool, records_processed: int, 
                                  records_new: int, error_message: str = None) -> str:
