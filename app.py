@@ -1160,10 +1160,12 @@ def spc_match():
         
     except Exception as e:
         logger.error(f"SPC matching failed: {e}")
-        if 'log_entry' in locals():
+        try:
             scheduler_service.log_operation_complete(
                 log_entry, False, 0, 0, str(e)
             )
+        except:
+            pass  # log_entry may not exist if error occurred early
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/internal/spc-generate-summaries', methods=['POST'])
@@ -1292,7 +1294,7 @@ def missing_alerts_analysis():
             analysis['recommendations'].append(f"Fix duplicate key handling - {error_breakdown.get('Duplicate Key Violation', 0)} failures")
         if uptime_percentage < 95:
             analysis['recommendations'].append(f"Improve system reliability - {100-uptime_percentage:.1f}% downtime")
-        if total_duplicates > successful_operations:
+        if total_duplicates > len(successful_operations):
             analysis['recommendations'].append("Optimize duplicate detection logic")
         
         return jsonify(analysis)

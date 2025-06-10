@@ -141,13 +141,17 @@ class SchedulerService:
         
         # Last successful operation for each type
         for op_type in ['nws_poll', 'spc_poll', 'spc_match', 'ai_enrich']:
-            last_success = SchedulerLog.query.filter(
-                SchedulerLog.operation_type == op_type,
-                SchedulerLog.success == True
-            ).order_by(SchedulerLog.completed_at.desc()).first()
-            
-            if last_success:
-                stats['last_successful_operations'][op_type] = last_success.completed_at.isoformat()
+            try:
+                last_success = SchedulerLog.query.filter(
+                    SchedulerLog.operation_type == op_type,
+                    SchedulerLog.success == True
+                ).order_by(SchedulerLog.completed_at.desc()).first()
+                
+                if last_success and last_success.completed_at:
+                    stats['last_successful_operations'][op_type] = last_success.completed_at.isoformat()
+            except Exception as e:
+                logger.warning(f"Could not fetch last operation for {op_type}: {e}")
+                continue
         
         return stats
     
