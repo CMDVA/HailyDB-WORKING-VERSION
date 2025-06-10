@@ -1985,11 +1985,10 @@ def ingestion_logs_data():
             if not row.completed_at:
                 # Check if operation has been running too long (likely stuck due to DB completion error)
                 if row.started_at:
-                    from datetime import datetime, timedelta
                     time_since_start = datetime.utcnow() - row.started_at
                     
                     # Operations should complete within 5 minutes - if longer, assume success but stuck
-                    if time_since_start > timedelta(minutes=5):
+                    if time_since_start.total_seconds() > 300:  # 5 minutes = 300 seconds
                         # Look at operation type to determine likely outcome
                         if row.operation_type in ['nws_poll', 'spc_poll', 'spc_match']:
                             # These operations usually succeed, show as technical success
