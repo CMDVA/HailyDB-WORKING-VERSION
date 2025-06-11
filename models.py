@@ -43,6 +43,7 @@ class Alert(db.Model):
     # Full Geometry & County Mapping (Feature 3)
     fips_codes = Column(JSONB)             # List of FIPS county codes from geometry
     county_names = Column(JSONB)           # Extracted county names with state mapping
+    city_names = Column(JSONB)             # Extracted city names from area_desc for enhanced targeting
     geometry_type = Column(String(20))     # "Polygon", "MultiPolygon", "Point"
     coordinate_count = Column(db.Integer)  # Number of coordinate pairs for complexity analysis
     affected_states = Column(JSONB)        # List of state abbreviations
@@ -90,6 +91,7 @@ class Alert(db.Model):
             'radar_indicated': self.radar_indicated,  # Feature 1: Radar-indicated parsing
             'fips_codes': self.fips_codes,            # Feature 3: FIPS county codes
             'county_names': self.county_names,        # Feature 3: County-state mapping
+            'city_names': self.city_names,            # City names extracted from area_desc
             'geometry_type': self.geometry_type,      # Feature 3: Geometry classification
             'coordinate_count': self.coordinate_count, # Feature 3: Complexity analysis
             'affected_states': self.affected_states,  # Feature 3: State list
