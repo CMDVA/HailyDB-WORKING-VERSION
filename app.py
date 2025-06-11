@@ -7,6 +7,9 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 import atexit
+import requests
+import json
+from sqlalchemy import text
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -2826,6 +2829,162 @@ def test_webhook_evaluation():
             'status': 'error',
             'message': str(e)
         }), 500
+
+# City Names and Point-in-Polygon API Endpoints
+@app.route('/api/radar-alerts/contains-address')
+def contains_address():
+    """
+    Point-in-polygon API endpoint for address-specific radar alert verification
+    Geocodes address and returns all radar-detected events containing that point
+    """
+    try:
+        address = request.args.get('address')
+        if not address:
+            return jsonify({'error': 'Address parameter is required'}), 400
+        
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        # Geocode address to lat/lon
+        lat, lon = geocode_address(address)
+        if lat is None or lon is None:
+            return jsonify({'error': 'Unable to geocode address'}), 400
+        
+        # Query for radar-detected events containing this point
+        from models import Alert
+        
+        # Base query for radar-detected events
+        query = db.session.query(Alert).filter(
+            Alert.radar_indicated.isnot(None),
+            db.text("(radar_indicated->>'hail_inches')::float >= 0.00 OR (radar_indicated->>'wind_mph')::float >= 50")
+        )
+        
+        # Add date filters if provided
+        if start_date:
+            query = query.filter(Alert.effective >= start_date)
+        if end_date:
+            query = query.filter(Alert.effective <= end_date)
+        
+        # Use PostGIS ST_Contains for point-in-polygon test
+        point_wkt = f"POINT({lon} {lat})"
+        query = query.filter(
+            db.text("ST_Contains(ST_GeomFromGeoJSON(geometry), ST_GeomFromText(:point, 4326))").params(point=point_wkt)
+        )
+        
+        alerts = query.order_by(Alert.effective.desc()).all()
+        
+        # Format results
+        results = []
+        for alert in alerts:
+            radar_data = alert.radar_indicated or {}
+            
+            result = {
+                'alert_id': alert.id,
+                'event_type': alert.event,
+                'effective': alert.effective.isoformat() if alert.effective else None,
+                'area_desc': alert.area_desc,
+                'city_names': alert.city_names or [],
+                'county_names': alert.county_names or [],
+                'geometry_bounds': alert.geometry_bounds,
+                'radar_indicated': {
+                    'hail_inches': radar_data.get('hail_inches'),
+                    'wind_mph': radar_data.get('wind_mph')
+                },
+                'ai_summary': alert.ai_summary,
+                'spc_verified': alert.spc_verified,
+                'spc_report_count': alert.spc_report_count
+            }
+            results.append(result)
+        
+        return jsonify({
+            'address': address,
+            'coordinates': {'lat': lat, 'lon': lon},
+            'total_events': len(results),
+            'events': results
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in contains-address API: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/internal/backfill-city-names', methods=['POST'])
+def backfill_city_names():
+    """Backfill city_names for all radar-detected alerts"""
+    try:
+        from city_parser import backfill_all_city_names
+        
+        data = request.get_json() or {}
+        batch_size = data.get('batch_size', 500)
+        
+        stats = backfill_all_city_names(db.session, batch_size=batch_size)
+        
+        return jsonify({
+            'success': True,
+            'message': 'City names backfill completed',
+            'stats': stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error backfilling city names: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/internal/parse-city-names/<alert_id>', methods=['POST'])
+def parse_single_alert_city_names(alert_id):
+    """Parse city names for a specific alert"""
+    try:
+        from city_parser import parse_and_update_city_names
+        
+        stats = parse_and_update_city_names(db.session, alert_id=alert_id)
+        
+        return jsonify({
+            'success': True,
+            'message': f'City names parsed for alert {alert_id}',
+            'stats': stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error parsing city names for alert {alert_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+def geocode_address(address):
+    """
+    Geocode an address to lat/lon coordinates
+    Uses Nominatim (OpenStreetMap) for free geocoding
+    """
+    try:
+        # Use Nominatim geocoding service
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {
+            'q': address,
+            'format': 'json',
+            'limit': 1,
+            'countrycodes': 'us'  # Limit to US addresses
+        }
+        headers = {
+            'User-Agent': 'HailyDB-Geocoding/1.0 (contact@hailydb.com)'
+        }
+        
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        if data and len(data) > 0:
+            result = data[0]
+            lat = float(result['lat'])
+            lon = float(result['lon'])
+            return lat, lon
+        else:
+            return None, None
+            
+    except Exception as e:
+        logger.error(f"Geocoding error for address '{address}': {e}")
+        return None, None
 
 if __name__ == '__main__':
     with app.app_context():

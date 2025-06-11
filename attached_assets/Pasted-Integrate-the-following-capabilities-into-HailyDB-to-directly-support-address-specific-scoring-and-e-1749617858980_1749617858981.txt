@@ -1,0 +1,77 @@
+Integrate the following capabilities into HailyDB to directly support address-specific scoring and event verification for IDOLCheck. We are currently backfilling radar-detected events — this functionality must apply to both historical backfilled data and new incoming events moving forward.
+
+Requirements:
+
+1️⃣ city_names extraction and storage:
+
+Parse area_desc field on all relevant alerts (radar_indicated IS NOT NULL)
+
+Extract city names from standard NWS patterns: "City, ST", "City", "County, ST", "County" → store as array field city_names (TEXT[]).
+
+Maintain separate county_names and city_names fields.
+
+Support multi-city parsing (e.g. "Dallas, TX; Collin County, TX") → ["Dallas", "Collin County"].
+
+2️⃣ Point-in-Polygon API endpoint:
+
+Add new API endpoint:
+GET /api/radar-alerts/contains-address?address=...
+
+On request:
+a) Geocode address to lat/lon.
+b) Run ST_Contains(alert.geometry, point) for all radar_indicated alerts where:
+
+Hail size ≥ 0.00 inches (any radar-detected hail)
+
+Wind speed ≥ 50 mph (radar-indicated)
+
+Alert effective window covers current or provided date range.
+c) Return for each match:
+
+alert_id
+
+event_type
+
+radar_indicated.hail_inches, radar_indicated.wind_mph
+
+area_desc
+
+city_names
+
+county_names
+
+geometry_bounds
+
+ai_summary
+
+spc_verified and spc_reports if present
+
+3️⃣ Webhook Format Update:
+
+When dispatching webhooks for radar-detected hail or wind events (existing radar-alerts webhook):
+
+Include city_names array in webhook payload alongside county_names, fips_codes, geometry_bounds.
+
+This enables IDOLCheck to display city-level alerts for SEO and app UX.
+
+Do not replace county_names — both arrays must be provided.
+
+4️⃣ Backfill Process:
+
+As part of current radar-detected backfill:
+
+Populate city_names on all matching alerts historically.
+
+Use consistent parsing logic so historical and new alerts match structure.
+
+Test and validate city extraction on known patterns (multi-city strings, county-only strings, etc).
+
+5️⃣ Notes:
+
+The polygon is not an exact radar-detected hail core — treat as warning envelope.
+
+Address-based matching must rely on polygon point-in-polygon tests only.
+
+city_names is for display and UX, not for address verification scoring.
+
+This architecture is explicitly designed to power IDOLCheck’s future "property-specific damage probability scoring" and "city-wide event views."
