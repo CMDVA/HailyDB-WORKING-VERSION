@@ -654,6 +654,18 @@ def search_alerts():
             Alert.expires > now
         )
     
+    # Radar-detected filters
+    has_radar_data = request.args.get('has_radar_data', 'false').lower() == 'true'
+    min_hail = request.args.get('min_hail', type=float)
+    min_wind = request.args.get('min_wind', type=int)
+    
+    if has_radar_data:
+        query = query.filter(Alert.radar_indicated.isnot(None))
+    if min_hail:
+        query = query.filter(Alert.radar_indicated['hail_inches'].astext.cast(db.Float) >= min_hail)
+    if min_wind:
+        query = query.filter(Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= min_wind)
+    
     # Execute query with pagination
     total = query.count()
     alerts = query.order_by(Alert.ingested_at.desc()).offset((page - 1) * limit).limit(limit).all()
@@ -2147,6 +2159,11 @@ def hurricane_tracks():
 def view_radar_alerts():
     """View radar-detected alerts interface"""
     return render_template('radar_alerts.html')
+
+@app.route('/webhook-management')
+def webhook_management():
+    """View webhook management interface"""
+    return render_template('webhook_management.html')
 
 @app.route('/spc-matches/data')
 def spc_matches_data():

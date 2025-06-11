@@ -9,15 +9,95 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1 class="h3 mb-0">
                 <i class="fas fa-satellite-dish me-2"></i>
-                Radar-Detected Alerts
+                Radar-Detected Severe Weather
             </h1>
             <div class="btn-group" role="group">
-                <a href="{{ url_for('get_alerts') }}" class="btn btn-outline-secondary">
-                    <i class="fas fa-list me-1"></i>All Alerts
-                </a>
-                <button type="button" class="btn btn-outline-primary" onclick="refreshRadarAlerts()">
+                <button type="button" class="btn btn-outline-primary" onclick="refreshAlerts()">
                     <i class="fas fa-sync-alt me-1"></i>Refresh
                 </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="exportData()">
+                    <i class="fas fa-download me-1"></i>Export
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Info Banner -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-info border-0 shadow-sm">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-info-circle fa-2x me-3 text-info"></i>
+                <div>
+                    <h5 class="alert-heading mb-1">Real-Time Radar Analysis</h5>
+                    <p class="mb-0">
+                        Display severe weather alerts with confirmed radar-indicated hail sizes and wind speeds. 
+                        This data provides actionable intelligence for insurance adjusters, restoration contractors, 
+                        and emergency management teams requiring precise damage assessment capabilities.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Controls -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-filter me-1"></i>Filter Controls
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="minHailSize" class="form-label">Minimum Hail Size</label>
+                        <select class="form-select" id="minHailSize">
+                            <option value="">All Sizes</option>
+                            <option value="0.75">0.75" (Penny)</option>
+                            <option value="1.0">1.0" (Quarter)</option>
+                            <option value="1.25">1.25" (Half Dollar)</option>
+                            <option value="1.5">1.5" (Ping Pong)</option>
+                            <option value="1.75">1.75" (Golf Ball)</option>
+                            <option value="2.0">2.0"+ (Softball)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="minWindSpeed" class="form-label">Minimum Wind Speed</label>
+                        <select class="form-select" id="minWindSpeed">
+                            <option value="">All Speeds</option>
+                            <option value="58">58+ mph (Severe Criteria)</option>
+                            <option value="70">70+ mph (Significant)</option>
+                            <option value="80">80+ mph (Extreme)</option>
+                            <option value="90">90+ mph (Tornado-level)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="stateFilter" class="form-label">State</label>
+                        <input type="text" class="form-control" id="stateFilter" placeholder="TX, OK, etc.">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="timeRange" class="form-label">Time Range</label>
+                        <select class="form-select" id="timeRange">
+                            <option value="24">Last 24 Hours</option>
+                            <option value="48">Last 48 Hours</option>
+                            <option value="168">Last Week</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <button type="button" class="btn btn-primary" onclick="applyFilters()">
+                            <i class="fas fa-search me-1"></i>Apply Filters
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
+                            <i class="fas fa-times me-1"></i>Clear
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -30,7 +110,7 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h4 class="card-title" id="hail-count">0</h4>
+                        <h4 class="card-title" id="total-hail-alerts">0</h4>
                         <p class="card-text">Hail Alerts</p>
                     </div>
                     <div class="align-self-center">
@@ -41,12 +121,12 @@
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-warning text-white">
+        <div class="card bg-warning text-dark">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h4 class="card-title" id="wind-count">0</h4>
-                        <p class="card-text">High Wind Alerts</p>
+                        <h4 class="card-title" id="total-wind-alerts">0</h4>
+                        <p class="card-text">Wind Alerts</p>
                     </div>
                     <div class="align-self-center">
                         <i class="fas fa-wind fa-2x"></i>
@@ -56,11 +136,11 @@
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-info text-white">
+        <div class="card bg-primary text-white">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h4 class="card-title" id="max-hail">0"</h4>
+                        <h4 class="card-title" id="max-hail-size">0.0"</h4>
                         <p class="card-text">Max Hail Size</p>
                     </div>
                     <div class="align-self-center">
@@ -71,11 +151,11 @@
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-success text-white">
+        <div class="card bg-info text-white">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h4 class="card-title" id="max-wind">0 mph</h4>
+                        <h4 class="card-title" id="max-wind-speed">0 mph</h4>
                         <p class="card-text">Max Wind Speed</p>
                     </div>
                     <div class="align-self-center">
@@ -87,75 +167,14 @@
     </div>
 </div>
 
-<!-- Filters -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <form method="GET" id="radarFilterForm" class="row g-3">
-                    <div class="col-md-6 col-lg-3">
-                        <label for="detection_type" class="form-label">Detection Type</label>
-                        <select class="form-select" id="detection_type" name="detection_type">
-                            <option value="">All Types</option>
-                            <option value="hail" {{ 'selected' if request.args.get('detection_type') == 'hail' }}>Hail Only</option>
-                            <option value="wind" {{ 'selected' if request.args.get('detection_type') == 'wind' }}>Wind Only</option>
-                            <option value="both" {{ 'selected' if request.args.get('detection_type') == 'both' }}>Both Hail & Wind</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6 col-lg-3">
-                        <label for="min_hail" class="form-label">Min Hail Size (inches)</label>
-                        <select class="form-select" id="min_hail" name="min_hail">
-                            <option value="">Any Size</option>
-                            <option value="0.75" {{ 'selected' if request.args.get('min_hail') == '0.75' }}>0.75" (Penny)</option>
-                            <option value="1.0" {{ 'selected' if request.args.get('min_hail') == '1.0' }}>1.0" (Quarter)</option>
-                            <option value="1.25" {{ 'selected' if request.args.get('min_hail') == '1.25' }}>1.25" (Half Dollar)</option>
-                            <option value="1.5" {{ 'selected' if request.args.get('min_hail') == '1.5' }}>1.5" (Ping Pong)</option>
-                            <option value="1.75" {{ 'selected' if request.args.get('min_hail') == '1.75' }}>1.75" (Golf Ball)</option>
-                            <option value="2.0" {{ 'selected' if request.args.get('min_hail') == '2.0' }}>2.0"+ (Large)</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6 col-lg-3">
-                        <label for="min_wind" class="form-label">Min Wind Speed (mph)</label>
-                        <select class="form-select" id="min_wind" name="min_wind">
-                            <option value="">Any Speed</option>
-                            <option value="58" {{ 'selected' if request.args.get('min_wind') == '58' }}>58+ mph (Severe)</option>
-                            <option value="70" {{ 'selected' if request.args.get('min_wind') == '70' }}>70+ mph (Significant)</option>
-                            <option value="80" {{ 'selected' if request.args.get('min_wind') == '80' }}>80+ mph (Extreme)</option>
-                            <option value="90" {{ 'selected' if request.args.get('min_wind') == '90' }}>90+ mph (Tornado-level)</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6 col-lg-3">
-                        <label for="time_filter" class="form-label">Time Range</label>
-                        <select class="form-select" id="time_filter" name="time_filter">
-                            <option value="24" {{ 'selected' if request.args.get('time_filter') == '24' }}>Last 24 Hours</option>
-                            <option value="72" {{ 'selected' if request.args.get('time_filter') == '72' }}>Last 3 Days</option>
-                            <option value="168" {{ 'selected' if request.args.get('time_filter') == '168' }}>Last Week</option>
-                            <option value="720" {{ 'selected' if request.args.get('time_filter') == '720' }}>Last Month</option>
-                        </select>
-                    </div>
-                    <div class="col-12">
-                        <button class="btn btn-primary" type="submit">
-                            <i class="fas fa-filter me-1"></i>Apply Filters
-                        </button>
-                        <a href="{{ url_for('view_radar_alerts') }}" class="btn btn-outline-secondary">
-                            <i class="fas fa-times me-1"></i>Clear Filters
-                        </a>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Alerts Table -->
 <div class="row">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">
-                    <i class="fas fa-table me-1"></i>
-                    Radar-Detected Weather Alerts
-                    <span class="badge bg-secondary ms-2" id="total-alerts">0</span>
+                    <i class="fas fa-list me-1"></i>
+                    Radar-Indicated Severe Weather Events
                 </h5>
             </div>
             <div class="card-body p-0">
@@ -166,16 +185,15 @@
                                 <th>Time</th>
                                 <th>Event Type</th>
                                 <th>Location</th>
-                                <th>Radar Hail</th>
-                                <th>Radar Wind</th>
+                                <th>Hail Size</th>
+                                <th>Wind Speed</th>
                                 <th>Severity</th>
-                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="alertsTableBody">
+                        <tbody id="radarAlertsTableBody">
                             <tr>
-                                <td colspan="8" class="text-center py-4">
+                                <td colspan="7" class="text-center py-4">
                                     <div class="spinner-border text-primary" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
@@ -190,100 +208,126 @@
     </div>
 </div>
 
+<!-- Pagination -->
+<div class="row mt-3">
+    <div class="col-12">
+        <nav id="paginationContainer" style="display: none;">
+            <ul class="pagination justify-content-center" id="pagination">
+                <!-- Pagination will be dynamically generated -->
+            </ul>
+        </nav>
+    </div>
+</div>
+
 <script>
+let currentPage = 1;
+let currentFilters = {};
+
 document.addEventListener('DOMContentLoaded', function() {
     loadRadarAlerts();
-    
-    // Auto-refresh every 5 minutes
-    setInterval(loadRadarAlerts, 300000);
 });
 
-function loadRadarAlerts() {
-    // Get current filter parameters
-    const params = new URLSearchParams(window.location.search);
-    const apiUrl = '/api/alerts/search?' + params.toString() + '&has_radar_data=true&limit=100';
+function loadRadarAlerts(page = 1) {
+    currentPage = page;
     
-    fetch(apiUrl)
+    // Build query parameters
+    const params = new URLSearchParams({
+        has_radar_data: 'true',
+        page: page,
+        limit: 25
+    });
+    
+    // Add filters
+    Object.entries(currentFilters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+    });
+    
+    // Show loading state
+    document.getElementById('radarAlertsTableBody').innerHTML = 
+        '<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0 text-muted">Loading radar-detected alerts...</p></td></tr>';
+    
+    fetch(`/alerts/search?${params.toString()}`)
         .then(response => response.json())
         .then(data => {
             updateStatistics(data.alerts || []);
             updateAlertsTable(data.alerts || []);
-            document.getElementById('total-alerts').textContent = (data.alerts || []).length;
+            updatePagination(data);
         })
         .catch(error => {
-            console.error('Error loading radar alerts:', error);
-            document.getElementById('alertsTableBody').innerHTML = 
-                '<tr><td colspan="8" class="text-center text-danger py-4">Error loading alerts. Please try again.</td></tr>';
+            console.error('Error loading alerts:', error);
+            document.getElementById('radarAlertsTableBody').innerHTML = 
+                '<tr><td colspan="7" class="text-center text-danger py-4">Error loading alerts. Please try again.</td></tr>';
         });
 }
 
 function updateStatistics(alerts) {
-    let hailCount = 0;
-    let windCount = 0;
+    let hailAlerts = 0;
+    let windAlerts = 0;
     let maxHail = 0;
     let maxWind = 0;
     
     alerts.forEach(alert => {
         if (alert.radar_indicated) {
-            if (alert.radar_indicated.hail_inches) {
-                hailCount++;
+            if (alert.radar_indicated.hail_inches > 0) {
+                hailAlerts++;
                 maxHail = Math.max(maxHail, alert.radar_indicated.hail_inches);
             }
-            if (alert.radar_indicated.wind_mph) {
-                windCount++;
+            if (alert.radar_indicated.wind_mph > 0) {
+                windAlerts++;
                 maxWind = Math.max(maxWind, alert.radar_indicated.wind_mph);
             }
         }
     });
     
-    document.getElementById('hail-count').textContent = hailCount;
-    document.getElementById('wind-count').textContent = windCount;
-    document.getElementById('max-hail').textContent = maxHail > 0 ? maxHail.toFixed(2) + '"' : '0"';
-    document.getElementById('max-wind').textContent = maxWind > 0 ? maxWind + ' mph' : '0 mph';
+    document.getElementById('total-hail-alerts').textContent = hailAlerts;
+    document.getElementById('total-wind-alerts').textContent = windAlerts;
+    document.getElementById('max-hail-size').textContent = maxHail.toFixed(2) + '"';
+    document.getElementById('max-wind-speed').textContent = maxWind + ' mph';
 }
 
 function updateAlertsTable(alerts) {
-    const tbody = document.getElementById('alertsTableBody');
+    const tbody = document.getElementById('radarAlertsTableBody');
     
     if (alerts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No radar-detected alerts found for the selected criteria.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No radar-detected alerts found for the current filters.</td></tr>';
         return;
     }
     
     tbody.innerHTML = alerts.map(alert => {
-        const hailSize = alert.radar_indicated?.hail_inches;
-        const windSpeed = alert.radar_indicated?.wind_mph;
-        const effectiveTime = new Date(alert.effective).toLocaleString();
-        const isActive = new Date(alert.expires) > new Date();
+        const radarData = alert.radar_indicated || {};
+        const hailSize = radarData.hail_inches || 0;
+        const windSpeed = radarData.wind_mph || 0;
         
-        const hailBadge = hailSize ? 
-            `<span class="badge ${getHailSeverityClass(hailSize)}">${hailSize}" Hail</span>` : 
+        const hailDisplay = hailSize > 0 ? 
+            `<span class="badge bg-danger">${hailSize.toFixed(2)}"</span><br><small>${getHailDescription(hailSize)}</small>` :
             '<span class="text-muted">-</span>';
             
-        const windBadge = windSpeed ? 
-            `<span class="badge ${getWindSeverityClass(windSpeed)}">${windSpeed} mph</span>` : 
+        const windDisplay = windSpeed > 0 ? 
+            `<span class="badge bg-warning text-dark">${windSpeed} mph</span><br><small>${getWindDescription(windSpeed)}</small>` :
             '<span class="text-muted">-</span>';
-            
-        const statusBadge = isActive ? 
-            '<span class="badge bg-danger">Active</span>' : 
-            '<span class="badge bg-secondary">Expired</span>';
-            
+        
+        const severityBadge = getSeverityBadge(hailSize, windSpeed);
+        const effectiveTime = new Date(alert.effective).toLocaleString();
+        
         return `
             <tr>
-                <td>${effectiveTime}</td>
                 <td>
-                    <span class="badge bg-primary">${alert.event}</span>
+                    <div>${effectiveTime}</div>
+                    <small class="text-muted">${alert.id.substring(0, 8)}...</small>
                 </td>
-                <td>${alert.area_desc || 'Unknown'}</td>
-                <td>${hailBadge}</td>
-                <td>${windBadge}</td>
                 <td>
-                    <span class="badge severity-${(alert.severity || 'unknown').toLowerCase()}">${alert.severity || 'Unknown'}</span>
+                    <span class="badge bg-secondary">${alert.event}</span>
                 </td>
-                <td>${statusBadge}</td>
                 <td>
-                    <a href="/alerts/${alert.id}" class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-eye"></i> View
+                    <div><strong>${alert.areaDesc}</strong></div>
+                    <small class="text-muted">${alert.state || ''}</small>
+                </td>
+                <td>${hailDisplay}</td>
+                <td>${windDisplay}</td>
+                <td>${severityBadge}</td>
+                <td>
+                    <a href="/alerts/${alert.id}" class="btn btn-sm btn-outline-primary" title="View Details">
+                        <i class="fas fa-eye"></i>
                     </a>
                 </td>
             </tr>
@@ -291,30 +335,131 @@ function updateAlertsTable(alerts) {
     }).join('');
 }
 
-function getHailSeverityClass(size) {
-    if (size >= 2.0) return 'bg-danger';
-    if (size >= 1.5) return 'bg-warning';
-    if (size >= 1.0) return 'bg-info';
-    return 'bg-secondary';
+function getHailDescription(size) {
+    if (size >= 2.0) return 'Softball+';
+    if (size >= 1.75) return 'Golf Ball';
+    if (size >= 1.5) return 'Ping Pong';
+    if (size >= 1.25) return 'Half Dollar';
+    if (size >= 1.0) return 'Quarter';
+    if (size >= 0.75) return 'Penny';
+    return 'Small';
 }
 
-function getWindSeverityClass(speed) {
-    if (speed >= 90) return 'bg-danger';
-    if (speed >= 80) return 'bg-warning';
-    if (speed >= 70) return 'bg-info';
-    return 'bg-secondary';
+function getWindDescription(speed) {
+    if (speed >= 90) return 'Tornado-level';
+    if (speed >= 80) return 'Extreme';
+    if (speed >= 70) return 'Significant';
+    if (speed >= 58) return 'Severe Criteria';
+    return 'Strong';
 }
 
-function refreshRadarAlerts() {
-    loadRadarAlerts();
+function getSeverityBadge(hailSize, windSpeed) {
+    let severity = 'low';
+    let label = 'Moderate';
+    
+    if (hailSize >= 2.0 || windSpeed >= 90) {
+        severity = 'high';
+        label = 'Extreme';
+    } else if (hailSize >= 1.5 || windSpeed >= 80) {
+        severity = 'high';
+        label = 'High';
+    } else if (hailSize >= 1.0 || windSpeed >= 70) {
+        severity = 'medium';
+        label = 'Significant';
+    }
+    
+    const badgeClass = severity === 'high' ? 'bg-danger' : 
+                      severity === 'medium' ? 'bg-warning text-dark' : 'bg-info';
+    
+    return `<span class="badge ${badgeClass}">${label}</span>`;
+}
+
+function updatePagination(data) {
+    const container = document.getElementById('paginationContainer');
+    const pagination = document.getElementById('pagination');
+    
+    if (data.pages <= 1) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    container.style.display = 'block';
+    
+    let paginationHTML = '';
+    
+    // Previous button
+    paginationHTML += `
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadRadarAlerts(${currentPage - 1}); return false;">Previous</a>
+        </li>
+    `;
+    
+    // Page numbers
+    for (let i = 1; i <= Math.min(data.pages, 10); i++) {
+        paginationHTML += `
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="loadRadarAlerts(${i}); return false;">${i}</a>
+            </li>
+        `;
+    }
+    
+    // Next button
+    paginationHTML += `
+        <li class="page-item ${currentPage === data.pages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadRadarAlerts(${currentPage + 1}); return false;">Next</a>
+        </li>
+    `;
+    
+    pagination.innerHTML = paginationHTML;
+}
+
+function applyFilters() {
+    currentFilters = {};
+    
+    const minHail = document.getElementById('minHailSize').value;
+    const minWind = document.getElementById('minWindSpeed').value;
+    const state = document.getElementById('stateFilter').value.trim();
+    const timeRange = document.getElementById('timeRange').value;
+    
+    if (minHail) currentFilters.min_hail = minHail;
+    if (minWind) currentFilters.min_wind = minWind;
+    if (state) currentFilters.state = state;
+    
+    // Calculate start time based on time range
+    if (timeRange) {
+        const hoursAgo = parseInt(timeRange);
+        const startTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+        currentFilters.start_time = startTime.toISOString();
+    }
+    
+    loadRadarAlerts(1);
+}
+
+function clearFilters() {
+    document.getElementById('minHailSize').value = '';
+    document.getElementById('minWindSpeed').value = '';
+    document.getElementById('stateFilter').value = '';
+    document.getElementById('timeRange').value = '24';
+    currentFilters = {};
+    loadRadarAlerts(1);
+}
+
+function refreshAlerts() {
+    loadRadarAlerts(currentPage);
+}
+
+function exportData() {
+    const params = new URLSearchParams({
+        has_radar_data: 'true',
+        limit: 1000,
+        format: 'csv'
+    });
+    
+    Object.entries(currentFilters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+    });
+    
+    window.open(`/alerts/search?${params.toString()}`, '_blank');
 }
 </script>
-
-<style>
-.severity-extreme { background-color: #dc3545 !important; }
-.severity-severe { background-color: #fd7e14 !important; }
-.severity-moderate { background-color: #ffc107 !important; color: #000 !important; }
-.severity-minor { background-color: #20c997 !important; }
-.severity-unknown { background-color: #6c757d !important; }
-</style>
 {% endblock %}

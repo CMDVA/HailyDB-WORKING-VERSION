@@ -48,6 +48,12 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'view_radar_alerts' %}active{% endif %}" 
+                           href="{{ url_for('view_radar_alerts') }}">
+                            <i class="fas fa-satellite-dish me-1"></i>Radar Alerts
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'get_alerts_summary' %}active{% endif %}" 
                            href="{{ url_for('get_alerts_summary') }}">
                             <i class="fas fa-list me-1"></i>Summaries
@@ -75,6 +81,12 @@
                         <a class="nav-link {% if request.endpoint == 'ingestion_logs' %}active{% endif %}" 
                            href="{{ url_for('ingestion_logs') }}">
                             <i class="fas fa-file-alt me-1"></i>Logs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'webhook_management' %}active{% endif %}" 
+                           href="{{ url_for('webhook_management') }}">
+                            <i class="fas fa-webhook me-1"></i>Webhooks
                         </a>
                     </li>
                     <li class="nav-item">
