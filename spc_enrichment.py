@@ -155,19 +155,22 @@ class SPCEnrichmentService:
             List of nearby places with name and approximate coordinates
         """
         try:
-            # Improved prompt for better accuracy with real places
+            # Enhanced prompt with better geographic context for rural areas
             prompt = f"""
-            You are a local geography expert for {county} County, {state}. Find real places within 5 miles of coordinates {lat:.4f}, {lon:.4f}.
+            You are a local geography expert for {county} County, {state}. Find real places within 10 miles of coordinates {lat:.4f}, {lon:.4f}.
             
-            Research what actually exists near these coordinates and include:
+            Research what actually exists near these coordinates, prioritizing closer locations but expanding to 10 miles for rural areas:
             - Cities, towns, villages, unincorporated communities
-            - Neighborhoods, subdivisions, or local areas
-            - Geographic features (lakes, rivers, mountains, creeks, parks)
-            - Major roads, highways, intersections
-            - Schools, churches, post offices, or community centers
-            - Rural crossroads or local landmarks
+            - Neighborhoods, subdivisions, or local areas  
+            - Geographic features (lakes, rivers, mountains, creeks, parks, valleys)
+            - Major roads, highways, intersections, farm-to-market roads
+            - Schools, churches, post offices, community centers, fire stations
+            - Rural crossroads, local landmarks, historic sites
+            - Ranches, farms, or other notable rural features
+            - State or county parks, wildlife management areas
             
-            For the location {lat:.4f}, {lon:.4f} in {county} County, {state}, identify real places that exist.
+            For coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}, identify real places that exist.
+            Include the approximate distance from the coordinates when known.
             
             Return JSON in this exact format:
             {{
@@ -178,7 +181,8 @@ class SPCEnrichmentService:
             }}
             
             Only include places that actually exist. If uncertain about a place, don't include it.
-            If no real places exist within 5 miles, return: {{"places": []}}
+            For very remote locations, expand search radius but prioritize accuracy.
+            If truly no real places exist within 10 miles, return: {{"places": []}}
             """
             
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
