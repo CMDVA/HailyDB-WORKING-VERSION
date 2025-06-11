@@ -4,6 +4,7 @@ Processes historical NWS radar-detected events into structured radar_alerts tabl
 """
 
 import logging
+import json
 from datetime import datetime, date
 from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
@@ -46,7 +47,7 @@ class RadarBackfillProcessor:
             'processing_errors': []
         }
         
-        with db.session.begin():
+        try:
             # Find all radar-detected alerts in date range
             query = db.session.query(Alert).filter(
                 Alert.radar_indicated.isnot(None),
@@ -81,7 +82,18 @@ class RadarBackfillProcessor:
                         logger.error(error_msg)
                         
                 # Commit batch
-                db.session.commit()
+                try:
+                    db.session.commit()
+                except Exception as e:
+                    logger.error(f"Failed to commit batch: {e}")
+                    db.session.rollback()
+                    
+        except Exception as e:
+            logger.error(f"Error in backfill process: {e}")
+            db.session.rollback()
+            stats['processing_errors'].append(f"Backfill error: {str(e)}")
+        finally:
+            db.session.close()
                 
         logger.info(f"Backfill complete. Created {stats['hail_events_created']} hail events, {stats['wind_events_created']} wind events")
         return stats
