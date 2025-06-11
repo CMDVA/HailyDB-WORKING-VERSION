@@ -70,6 +70,18 @@ class Alert(db.Model):
     
     def to_dict(self):
         """Convert alert to dictionary for JSON serialization"""
+        # Process county_names to create a proper state-to-counties mapping
+        county_mapping = {}
+        if self.county_names and isinstance(self.county_names, list):
+            for item in self.county_names:
+                if isinstance(item, dict) and 'state' in item and 'county' in item:
+                    state = item['state']
+                    county = item['county']
+                    if state not in county_mapping:
+                        county_mapping[state] = []
+                    if county not in county_mapping[state]:
+                        county_mapping[state].append(county)
+        
         return {
             'id': self.id,
             'event': self.event,
@@ -90,7 +102,7 @@ class Alert(db.Model):
             'spc_ai_summary': self.spc_ai_summary,
             'radar_indicated': self.radar_indicated,  # Feature 1: Radar-indicated parsing
             'fips_codes': self.fips_codes,            # Feature 3: FIPS county codes
-            'county_names': self.county_names,        # Feature 3: County-state mapping
+            'county_names': county_mapping,           # Feature 3: County-state mapping (processed)
             'city_names': self.city_names,            # City names extracted from area_desc
             'geometry_type': self.geometry_type,      # Feature 3: Geometry classification
             'coordinate_count': self.coordinate_count, # Feature 3: Complexity analysis
@@ -101,7 +113,8 @@ class Alert(db.Model):
             'is_active': self.is_active,
             'duration_minutes': self.duration_minutes,
             'location_info': self.get_location_info(),
-            'enhanced_geometry': self.get_enhanced_geometry_info()  # Feature 3: Comprehensive geometry data
+            'enhanced_geometry': self.get_enhanced_geometry_info(),  # Feature 3: Comprehensive geometry data
+            'geocode': self.properties.get('geocode') if self.properties else None  # Add geocode for fallback parsing
         }
     
     @property

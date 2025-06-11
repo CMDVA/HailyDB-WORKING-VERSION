@@ -361,8 +361,11 @@ class IngestService:
                 return float(match.group(1))
             
             # Pattern 3: Named sizes (quarter size hail, golf ball hail, etc.)
+            # Use word boundaries to avoid partial matches
             for size_name, inches in size_map.items():
-                if size_name in text and 'hail' in text:
+                # Create pattern with word boundaries for exact matches
+                pattern = r'\b' + re.escape(size_name) + r'\b.*hail|\bhail.*\b' + re.escape(size_name) + r'\b'
+                if re.search(pattern, text, re.IGNORECASE):
                     return inches
             
             # Pattern 4: "X inch diameter hail"
