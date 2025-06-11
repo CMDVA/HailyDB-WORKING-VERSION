@@ -171,7 +171,7 @@ class SPCEnhancedContextService:
         
         return enhanced_context
     
-    def _extract_nws_office(self, verified_alerts: List[Alert]) -> str:
+    def _extract_nws_office(self, verified_alerts: List) -> str:
         """Extract NWS office information from alerts"""
         for alert in verified_alerts:
             if alert.properties and isinstance(alert.properties, dict):
@@ -186,7 +186,7 @@ class SPCEnhancedContextService:
                     return sender.replace("NWS ", "").strip()
         return "Unknown"
     
-    def _generate_multi_alert_summary(self, report: SPCReport, verified_alerts: List[Alert], 
+    def _generate_multi_alert_summary(self, report, verified_alerts: List, 
                                     duration_minutes: int, counties_affected: set, nws_office: str) -> str:
         """Generate AI-powered enhanced summary with location context"""
         try:
@@ -299,7 +299,7 @@ CRITICAL:
             # Fallback summary
             return f"This {report.report_type} report in {report.county} County, {report.state} was validated by {len(verified_alerts)} NWS alerts spanning {duration_minutes} minutes across {len(counties_affected)} counties."
     
-    def _generate_location_only_summary(self, report: SPCReport, location_context: Dict[str, Any]) -> str:
+    def _generate_location_only_summary(self, report, location_context: Dict[str, Any]) -> str:
         """Generate location-enriched summary for reports without verified alerts"""
         try:
             # Extract key location references for better context
@@ -360,7 +360,7 @@ CRITICAL: Use the provided location data exactly as given. Do not add historical
             location_ref = location_context.get('primary_location', f"{report.location}, {report.county}, {report.state}")
             return f"This {report.report_type} report occurred at {location_ref} at {report.time_utc}."
     
-    def _get_location_context(self, report: SPCReport) -> Dict[str, Any]:
+    def _get_location_context(self, report) -> Dict[str, Any]:
         """Get location context from existing enrichment data"""
         
         # Check if we have existing SPC enrichment data
@@ -414,7 +414,7 @@ CRITICAL: Use the provided location data exactly as given. Do not add historical
             'nearest_major_city': 'Unknown'
         }
     
-    def _generate_location_context(self, report: SPCReport) -> Dict[str, Any]:
+    def _generate_location_context(self, report) -> Dict[str, Any]:
         """Generate location context using AI"""
         try:
             prompt = f"""Provide geographic context for this storm report location:
@@ -453,7 +453,7 @@ Focus on locations that would be relevant for insurance, restoration, or emergen
                 "geographic_features": []
             }
     
-    def _generate_polygon_match_status(self, verified_alerts: List[Alert], report: SPCReport) -> List[Dict[str, Any]]:
+    def _generate_polygon_match_status(self, verified_alerts: List, report) -> List[Dict[str, Any]]:
         """Generate polygon match status for each verified alert"""
         polygon_status = []
         
@@ -474,7 +474,7 @@ Focus on locations that would be relevant for insurance, restoration, or emergen
         
         return polygon_status
     
-    def _check_radar_confirmation(self, alert: Alert, report: SPCReport) -> bool:
+    def _check_radar_confirmation(self, alert, report) -> bool:
         """Check if alert has radar confirmation from polygon match status"""
         # Check if this alert has radar-indicated data (wind/hail measurements)
         if hasattr(alert, 'radar_indicated') and alert.radar_indicated:
