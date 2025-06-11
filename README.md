@@ -240,4 +240,368 @@ Database indexes are optimized for common query patterns. Monitor query performa
 
 ---
 
+## 🔌 API Integration Guide
+
+A comprehensive guide for integrating external applications with HailyDB's enhanced weather alert intelligence platform.
+
+### Overview
+
+HailyDB provides real-time National Weather Service (NWS) alert data enriched with AI analysis, radar-indicated measurements, SPC verification, and comprehensive geometry processing. This guide demonstrates how to leverage HailyDB's API for insurance claims, field operations, emergency management, and partner integrations.
+
+### Core API Endpoints
+
+#### Get Recent Alerts
+```bash
+curl "https://your-hailydb.com/api/alerts/search?limit=50&active_only=true"
+```
+
+#### Search by Location
+```bash
+curl "https://your-hailydb.com/api/alerts/search?state=TX&county=Harris&limit=25"
+```
+
+#### Filter by Event Type and Severity
+```bash
+curl "https://your-hailydb.com/api/alerts/search?event_type=Tornado%20Warning&severity=Extreme&limit=10"
+```
+
+#### Get Specific Alert Details
+```bash
+curl "https://your-hailydb.com/api/alerts/{alert_id}"
+```
+
+### Real-Time Webhook Integration
+
+#### Register Webhook for Hail Events
+```bash
+curl -X POST "https://your-hailydb.com/internal/webhook-rules" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "webhook_url": "https://your-app.com/webhooks/hail-alerts",
+    "event_type": "hail",
+    "threshold_value": 1.0,
+    "location_filter": "TX",
+    "user_id": "your_user_id"
+  }'
+```
+
+### Enhanced Data Structure
+
+#### Alert Response Format
+
+```json
+{
+  "id": "urn:oid:2.49.0.1.840.0...",
+  "event": "Severe Thunderstorm Warning",
+  "severity": "Moderate",
+  "area_desc": "Harris, TX; Montgomery, TX",
+  "effective": "2025-06-10T20:15:00Z",
+  "expires": "2025-06-10T21:00:00Z",
+  "sent": "2025-06-10T20:14:32Z",
+  
+  "radar_indicated": {
+    "hail_inches": 1.25,
+    "wind_mph": 70
+  },
+  
+  "fips_codes": ["48201", "48339"],
+  "county_names": [
+    {"county": "Harris", "state": "TX"},
+    {"county": "Montgomery", "state": "TX"}
+  ],
+  "geometry_type": "Polygon",
+  "coordinate_count": 156,
+  "affected_states": ["TX"],
+  "geometry_bounds": {
+    "min_lat": 30.1234,
+    "max_lat": 30.5678,
+    "min_lon": -95.9876,
+    "max_lon": -95.5432
+  },
+  
+  "spc_verified": true,
+  "spc_reports": [
+    {
+      "type": "hail",
+      "size": 1.25,
+      "location": "Spring, TX",
+      "time": "20:22Z"
+    }
+  ],
+  "spc_confidence_score": 0.89,
+  
+  "enhanced_geometry": {
+    "has_detailed_geometry": true,
+    "coverage_area_sq_degrees": 0.125,
+    "county_state_mapping": [...],
+    "affected_states": ["TX"]
+  },
+  
+  "ai_summary": "Severe thunderstorm with quarter-size hail and 70 mph winds affecting northwestern Harris County and southern Montgomery County.",
+  "ai_tags": ["hail", "damaging_winds", "property_damage_risk"]
+}
+```
+
+### Integration Examples
+
+#### Insurance Claims Processing
+
+```python
+import requests
+import json
+from datetime import datetime, timedelta
+
+class InsuranceClaimsBot:
+    def __init__(self, hailydb_base_url, webhook_url):
+        self.base_url = hailydb_base_url
+        self.webhook_url = webhook_url
+        self.setup_hail_monitoring()
+    
+    def setup_hail_monitoring(self):
+        """Register webhook for hail events affecting coverage areas"""
+        webhook_config = {
+            "webhook_url": f"{self.webhook_url}/hail-events",
+            "event_type": "hail", 
+            "threshold_value": 0.75,  # 3/4 inch or larger
+            "user_id": "insurance_bot"
+        }
+        
+        response = requests.post(
+            f"{self.base_url}/internal/webhook-rules",
+            json=webhook_config
+        )
+        print(f"Hail monitoring active: {response.status_code}")
+    
+    def process_hail_alert(self, alert_data):
+        """Process incoming hail alert for claims preparation"""
+        radar_indicated = alert_data.get('radar_indicated', {})
+        hail_size = radar_indicated.get('hail_inches', 0)
+        
+        if hail_size >= 1.0:  # Quarter size or larger
+            self.create_potential_claim_area(alert_data)
+            self.notify_field_adjusters(alert_data)
+```
+
+## 📋 Complete API Documentation
+
+### Overview
+
+HailyDB provides comprehensive RESTful API access to National Weather Service alerts with advanced features including radar-indicated measurements, real-time webhooks, full geometry processing, Storm Prediction Center verification, and AI-enriched summaries. Perfect for insurance claims, field operations, emergency management, and partner integrations.
+
+**Base URL**: `https://your-hailydb.replit.app`
+
+### 🚀 New Enhanced Features
+
+#### Feature 1: Radar-Indicated Parsing
+- **Hail Size Detection**: Automatically extracts hail measurements (0.75" - 2.0"+) from Severe Thunderstorm Warnings
+- **Wind Speed Analysis**: Parses radar-indicated wind speeds (58-80+ mph) from NWS text
+- **Immediate Intelligence**: Provides actionable data before SPC verification
+- **API Fields**: `radar_indicated.hail_inches`, `radar_indicated.wind_mph`
+
+#### Feature 2: Real-Time Webhooks System  
+- **Event Triggers**: Hail size, wind speed, and damage probability thresholds
+- **HTTP POST Delivery**: Reliable webhook dispatch with retry logic
+- **Geographic Filtering**: State, county, and FIPS-based location targeting
+- **Admin API**: Complete webhook rule management endpoints
+
+#### Feature 3: Full Geometry & County Mapping
+- **FIPS Code Extraction**: Precise county-level geographic identifiers
+- **Coordinate Analysis**: Geometry bounds, coverage area calculation
+- **Enhanced Location Data**: County-state mapping for insurance claims
+- **Spatial Intelligence**: Comprehensive geographic processing for field operations
+
+### Authentication
+
+No authentication required for public endpoints. Internal endpoints are for administrative use.
+
+---
+
+### 🚨 Alert Endpoints
+
+#### Get All Alerts
+```
+GET /alerts
+```
+**Description**: Retrieve alerts with optional filtering and pagination
+
+**Query Parameters**:
+- `page` (int, default: 1) - Page number for pagination
+- `per_page` (int, default: 50, max: 1000) - Results per page
+- `severity` (string) - Filter by severity: "Minor", "Moderate", "Severe", "Extreme"
+- `event` (string) - Filter by event type (partial match)
+- `category` (string) - Filter by predefined category
+- `state` (string) - Filter by state name or abbreviation
+- `county` (string) - Filter by county name
+- `area` (string) - Filter by area description
+- `effective_date` (string, YYYY-MM-DD) - Filter by effective date
+- `ingested_date` (string, YYYY-MM-DD) - Filter by ingestion date (database completeness)
+- `active_only` (boolean, default: false) - Show only currently active alerts
+- `format` (string) - Set to "json" for JSON response
+
+**Categories Available**:
+- Severe Weather Alert
+- Winter Weather Alert
+- Flood Alert
+- Coastal Alert
+- Wind & Fog Alert
+- Fire Weather Alert
+- Air Quality & Dust Alert
+- Marine Alert
+- Tropical Weather Alert
+- Tsunami Alert
+- General Weather Info
+
+#### Get SPC Reports
+```
+GET /api/spc/reports
+```
+**Description**: Retrieve Storm Prediction Center storm reports with filtering
+
+**Query Parameters**:
+- `type` (string) - Report type: "tornado", "wind", "hail"
+- `state` (string) - State abbreviation (e.g., "TX")
+- `county` (string) - County name (partial match)
+- `date` (string, YYYY-MM-DD) - Specific report date
+- `limit` (int, max: 500, default: 100) - Results limit
+- `offset` (int, default: 0) - Results offset for pagination
+
+### System Health Status
+```
+GET /internal/status
+```
+**Description**: Comprehensive system health and diagnostics
+
+**Response**:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-06-03T16:00:00Z",
+  "database": "healthy",
+  "alerts": {
+    "total": 1250,
+    "recent_24h": 89,
+    "active_now": 15
+  },
+  "spc_verification": {
+    "verified_count": 156,
+    "unverified_count": 1094,
+    "coverage_percentage": 12.5,
+    "oldest_unverified": "2025-05-15T10:00:00Z"
+  }
+}
+```
+
+### Real-Time Webhook System
+
+#### Register Webhook Rule
+```
+POST /internal/webhook-rules
+```
+**Description**: Create a new webhook rule for real-time alert notifications
+
+**Request Body**:
+```json
+{
+  "webhook_url": "https://your-app.com/webhooks/weather-alerts",
+  "event_type": "hail",
+  "threshold_value": 1.0,
+  "location_filter": "TX",
+  "user_id": "your_application_id"
+}
+```
+
+**Event Types**:
+- `"hail"` - Triggers on radar-indicated hail size (inches)
+- `"wind"` - Triggers on radar-indicated wind speed (mph)
+- `"damage_probability"` - Triggers on calculated damage probability (0.0-1.0)
+
+### Hurricane Track Endpoints
+
+#### Get Hurricane Tracks
+```
+GET /api/hurricane-tracks
+```
+**Description**: Retrieve historical hurricane track data with filtering options
+
+**Query Parameters**:
+- `storm_id` (string) - Filter by NOAA storm identifier (e.g., "AL012020")
+- `name` (string) - Filter by hurricane name (e.g., "Laura")
+- `year` (int) - Filter by year (e.g., 2020)
+- `lat_min`, `lat_max`, `lon_min`, `lon_max` (float) - Bounding box filter
+- `start_date`, `end_date` (string, YYYY-MM-DD) - Date range filter
+- `landfall_only` (boolean) - Only storms that made US landfall
+- `category_min` (int, 1-5) - Minimum hurricane category
+
+## 📊 SPC Storm Report Ingestion - Data Organization and Timezone Handling
+
+### SPC Report Organization
+
+The Storm Prediction Center organizes storm reports based on **meteorological days**, not calendar days:
+
+- **Report Period**: 1200 UTC to 1159 UTC the next day
+- **Example**: The report file `240603_rpts_filtered.csv` covers:
+  - From: 2024-06-03 at 12:00 UTC
+  - To: 2024-06-04 at 11:59 UTC
+
+### Timezone Considerations
+
+#### US Time Zones vs UTC
+- **Florida (UTC-4)**: A storm at 0010 UTC (12:10 AM) is actually 8:10 PM the previous day
+- **Central Time (UTC-5)**: Same storm would be 7:10 PM the previous day  
+- **Hawaii (UTC-10)**: Same storm would be 2:10 PM the previous day
+
+#### Current HailyDB Approach
+- **Storage**: All times stored in UTC (no timezone conversion)
+- **Date Assignment**: Events are assigned to the SPC meteorological day
+- **User Requirement**: Last 3 days (Today-4) synced for Florida user wake-up
+
+### Data Integrity Issue
+
+**Problem**: Events occurring between 00:00-11:59 UTC are meteorologically correct but may appear on the "wrong" calendar day for US users.
+
+**Example from 250603_rpts_filtered.csv**:
+```
+0010,UNK,1 SW Coyne Center,Rock Island,IL,41.39,-90.59,Tornado tracked from southwest...
+```
+This tornado at 00:10 UTC is:
+- **SPC Date**: 2024-06-03 (correct meteorologically)
+- **Local Time**: 2024-06-02 at 8:10 PM Eastern (previous calendar day)
+
+### Current Implementation Status ✓
+
+**VERIFIED**: HailyDB correctly implements SPC meteorological day assignment.
+
+#### Confirmed Behavior
+- Events at 00:01-11:59 UTC are correctly assigned to the SPC meteorological day
+- Example: Storm at 00:10 UTC on June 4th is properly stored as `report_date = '2025-06-04'`
+- All reports from `YYMMDD_rpts_filtered.csv` are assigned to that date regardless of UTC time
+- This matches SPC's 12:00 UTC to 11:59 UTC next day reporting period
+
+#### US-Focused Implementation
+- **Geographic Scope**: United States only
+- **Time Storage**: All times remain in UTC (no conversion needed)
+- **Date Assignment**: Follows SPC meteorological day convention
+- **User Experience**: Florida user (UTC-4) sees meteorologically correct storm dates
+
+#### Systematic Polling Schedule
+
+**Implemented Schedule**:
+- **T-0 (Today)**: Every 5 minutes - Real-time current day updates
+- **T-1 through T-4**: Hourly updates on the hour - Recent critical period  
+- **T-5 through T-7**: Every 3 hours - Recent historical period
+- **T-8 through T-15**: Daily updates - Stabilizing historical period
+- **T-16+**: Data protected - No automatic polling (backfill only)
+
+**Florida User Optimization**:
+- Morning wake-up guaranteed fresh T-1 through T-4 data
+- Hourly updates ensure data completeness for critical recent period
+- Systematic coverage eliminates polling gaps
+
+**Data Protection**:
+- T-16+ dates protected from automatic updates
+- Backfill processing available for missing data recovery
+- Manual override capability for data corrections
+
+---
+
 **HailyDB v2.0** - Production-ready weather data ingestion platform with comprehensive monitoring and data integrity verification.
