@@ -240,47 +240,39 @@ class SPCEnhancedContextService:
                 self._check_radar_confirmation(alert, report) for alert in verified_alerts
             )
 
-            prompt = f"""Generate a professional 2-3 sentence enhanced summary for this SPC storm report.
+            prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable property damage intelligence.
+
+You are generating an Enhanced Summary for an SPC storm report. Your goal is to clearly communicate the event location, its geographic context, and the strength of radar and NWS verification — in clean, professional layman terms.
+
+Inputs:
 
 SPC Report Details:
 - Type: {report.report_type}
 - Location: {report.location}, {report.county}, {report.state}
 - Time: {report.time_utc}
 - Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
-- Verified Alerts Radar Confirmation: {'Yes' if verified_alerts_radar_confirmed else 'No'}
 
 Location Context:
+- Event Location: {event_location}
+- Radar Detection Status: {'Detected' if radar_polygon_match else 'Not Detected'}
 - Nearest Major City: {major_city} ({major_city_distance} away)
-- Nearby Places: {nearby_context if nearby_context else 'None found nearby'}
+- Nearby Places: {nearby_context if nearby_context else 'This location lies in a remote area with no notable nearby communities'}
 
-Radar Detection:
-- Radar Detection at this Location: {'Yes' if radar_polygon_match else 'No'}
-- Radar Event Type (if matched): {radar_event_type if radar_polygon_match else 'N/A'}
-
-Verified Alerts Summary:
-- Total Verified NWS Alerts: {len(verified_alerts)} spanning {duration_minutes} minutes
+Verification Context:
+- Verified Alerts: {len(verified_alerts)} alerts across {duration_minutes} minutes
 - Counties Affected: {', '.join(sorted(counties_affected))}
-- NWS Office(s): {nws_office}
 
-Instructions:
-Write a clear and professional summary that:
-1. Begins with the SPC Report Location: "{report.location}, {report.county}, {report.state}".
-2. References the Nearest Major City and distance.
-3. Mentions notable Nearby Places if available.
-4. Clearly states whether the location was confirmed as within a Radar-detected storm area. 
-   - If Radar Detection = Yes, use layman terms like "Radar-confirmed storm area was present".
-   - If Radar Detection = No, say "No Radar-confirmed storm area was detected at this location".
-5. Emphasizes the number of Verified NWS Alerts, duration, and geographic coverage.
-6. Optionally includes the NWS Office name to provide source credibility.
-7. Write for a broad audience — use plain language, avoid technical jargon like 'polygon', 'lat/lon', or 'point-in-polygon'.
-8. If ANY Verified Alerts were Radar Confirmed (Verified Alerts Radar Confirmation == Yes), clearly state that radar-confirmed storm activity was present in this area, even if the SPC point itself was not inside a radar polygon.
-9. If Verified Alerts Radar Confirmation == No, do not mention radar in the summary.
+Your Enhanced Summary MUST follow these principles:
 
-CRITICAL:
-- Follow the above instructions strictly.
-- Do not hallucinate additional historical data.
-- Use only the provided inputs — do not speculate.
-- Be consistent — users will compare multiple SPC Reports and expect uniform structure."""
+1️⃣ Lead with Event Location and Event Type in the first sentence.
+2️⃣ Include Nearest Major City in the first or second sentence.
+3️⃣ Reference Radar Detection Status in a clear factual sentence ("Radar-confirmed storm activity was detected in this area." or "No radar-confirmed polygon was present at this location.").
+4️⃣ Include 2–4 of the Nearby Places inline, to help human users understand location.
+5️⃣ Always positively frame verification — highlight that the event was supported by {len(verified_alerts)} NWS alerts over {duration_minutes} minutes.
+6️⃣ Do not include the name of the NWS Office or overly technical phrases.
+7️⃣ Avoid defensive or hedging language — focus on presenting a clean, confident, factual geographic summary.
+
+Do NOT omit the Nearby Places section. This is a critical feature and differentiator of our product."""
 
             response = client.chat.completions.create(
                 model="gpt-4o",
