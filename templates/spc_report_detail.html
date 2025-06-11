@@ -107,10 +107,88 @@
                 </div>
             </div>
 
+            {% if report.enhanced_context and report.enhanced_context.multi_alert_summary %}
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-success">
+                        <i class="fas fa-check-circle me-2"></i>Enhanced Multi-Alert Context
+                    </h6>
+                    <span class="badge bg-success">{{ report.enhanced_context.alert_count }} Verified Alerts</span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <h6 class="text-muted mb-2">Multi-Alert Summary</h6>
+                            <p class="mb-0">{{ report.enhanced_context.multi_alert_summary }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">Event Details</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Duration:</strong> {{ report.enhanced_context.event_duration_minutes }} minutes</li>
+                                <li><strong>Average Confidence:</strong> {{ (report.enhanced_context.avg_match_confidence * 100)|round(1) }}%</li>
+                                <li><strong>NWS Office:</strong> {{ report.enhanced_context.nws_office }}</li>
+                                {% if report.enhanced_context.counties_affected %}
+                                <li><strong>Counties:</strong> {{ report.enhanced_context.counties_affected|join(', ') }}</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">Polygon & Radar Status</h6>
+                            <div class="small">
+                                {% for status in report.enhanced_context.polygon_match_status %}
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-truncate me-2" style="max-width: 200px;">
+                                        {{ status.effective_time[:16].replace('T', ' ') }}
+                                    </span>
+                                    <div>
+                                        {% if status.polygon_present %}
+                                            <span class="badge bg-success me-1">Polygon</span>
+                                        {% endif %}
+                                        {% if status.radar_confirmed %}
+                                            <span class="badge bg-info">Radar</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if report.enhanced_context.location_context and report.enhanced_context.location_context.primary_location %}
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-2">Location Context</h6>
+                            <p class="mb-0">{{ report.enhanced_context.location_context.primary_location }}</p>
+                            {% if report.enhanced_context.location_context.nearby_places %}
+                            <small class="text-muted">
+                                Nearby: {{ report.enhanced_context.location_context.nearby_places|map(attribute='name')|join(', ') }}
+                            </small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mt-3 pt-2 border-top">
+                        <small class="text-muted">
+                            Enhanced context generated {{ report.enhanced_context.generated_at[:10] }}
+                            <button class="btn btn-sm btn-outline-primary ms-2" onclick="regenerateContext({{ report.id }})">
+                                <i class="fas fa-sync me-1"></i>Regenerate
+                            </button>
+                        </small>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             {% if report.comments %}
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Comments</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-comment me-2"></i>SPC Comments
+                    </h6>
                 </div>
                 <div class="card-body">
                     <p class="mb-0">{{ report.comments }}</p>
@@ -438,6 +516,54 @@ async function reEnrichReport(reportId, buttonElement) {
         setTimeout(() => {
             button.innerHTML = originalText;
             button.className = 'btn btn-sm btn-outline-primary me-2';
+            button.disabled = false;
+        }, 3000);
+    }
+}
+
+async function regenerateContext(reportId) {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Generating...';
+    button.disabled = true;
+    
+    try {
+        const response = await fetch('/api/spc-reports/enhanced-context/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                'report_id': reportId
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            // Show success message and reload page to show updated data
+            button.innerHTML = '<i class="fas fa-check me-1"></i>Generated!';
+            button.className = 'btn btn-sm btn-success ms-2';
+            
+            // Reload page after 1 second to show updated enhanced context
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            throw new Error(result.error || 'Enhanced context generation failed');
+        }
+        
+    } catch (error) {
+        console.error('Enhanced context generation failed:', error);
+        button.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Failed';
+        button.className = 'btn btn-sm btn-danger ms-2';
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.className = 'btn btn-sm btn-outline-primary ms-2';
             button.disabled = false;
         }, 3000);
     }

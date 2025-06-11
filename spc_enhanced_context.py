@@ -162,10 +162,16 @@ class SPCEnhancedContextService:
     def _extract_nws_office(self, verified_alerts: List[Alert]) -> str:
         """Extract NWS office information from alerts"""
         for alert in verified_alerts:
-            if alert.sender_name:
-                # Extract office code from sender name like "NWS Austin/San Antonio TX"
-                if "NWS" in alert.sender_name:
-                    return alert.sender_name.replace("NWS ", "").strip()
+            if alert.properties and isinstance(alert.properties, dict):
+                # Try to extract from senderName in properties
+                sender_name = alert.properties.get('senderName', '')
+                if sender_name and "NWS" in sender_name:
+                    return sender_name.replace("NWS ", "").strip()
+                
+                # Try to extract from sender
+                sender = alert.properties.get('sender', '')
+                if sender and "NWS" in sender:
+                    return sender.replace("NWS ", "").strip()
         return "Unknown"
     
     def _generate_multi_alert_summary(self, report: SPCReport, verified_alerts: List[Alert], 
