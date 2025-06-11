@@ -365,37 +365,48 @@ CRITICAL: Use the provided location data exactly as given. Do not add historical
     def _get_location_context(self, report: SPCReport) -> Dict[str, Any]:
         """Get location context from existing enrichment data"""
         
-        # First check if we have existing location enrichment data
-        if hasattr(report, 'location_enrichment') and report.location_enrichment:
+        # Check if we have existing SPC enrichment data
+        if hasattr(report, 'spc_enrichment') and report.spc_enrichment:
             try:
-                existing_enrichment = json.loads(report.location_enrichment) if isinstance(report.location_enrichment, str) else report.location_enrichment
+                existing_enrichment = json.loads(report.spc_enrichment) if isinstance(report.spc_enrichment, str) else report.spc_enrichment
                 
-                # Extract location data from enrichment with distance validation
-                event_location = existing_enrichment.get('event_location', '')
-                event_location_distance = existing_enrichment.get('event_location_distance_miles', float('inf'))
+                # Extract nearby places data
+                nearby_places = existing_enrichment.get('nearby_places', [])
                 
-                # Only use event location if it's within 2 miles, otherwise use original location
-                if event_location_distance <= 2.0:
-                    primary_location = event_location
-                else:
-                    primary_location = f"{report.location}, {report.county}"
+                # Find primary location (distance = 0.0) and nearest city
+                primary_location = f"{report.location}, {report.county}"
+                nearest_major_city = ""
+                major_city_distance = ""
+                nearby_place_names = []
+                
+                for place in nearby_places:
+                    place_type = place.get('type', '')
+                    place_name = place.get('name', '')
+                    distance_miles = place.get('distance_miles', 0)
+                    
+                    if place_type == 'primary_location' and distance_miles == 0.0:
+                        primary_location = place_name
+                    elif place_type == 'nearest_city':
+                        nearest_major_city = place_name
+                        major_city_distance = f"{distance_miles:.1f} miles"
+                    elif place_type == 'nearby_place' and distance_miles <= 10.0:
+                        nearby_place_names.append({
+                            'name': place_name,
+                            'distance_miles': distance_miles
+                        })
                 
                 location_context = {
                     'primary_location': primary_location,
-                    'nearest_major_city': existing_enrichment.get('nearest_major_city', {}).get('name', ''),
-                    'nearby_places': existing_enrichment.get('nearby_places', []),
+                    'nearest_major_city': nearest_major_city,
+                    'major_city_distance': major_city_distance,
+                    'nearby_places': nearby_place_names,
                     'geographic_features': []
                 }
-                
-                # Add distance context for major city
-                if existing_enrichment.get('nearest_major_city', {}).get('distance_miles'):
-                    distance = existing_enrichment['nearest_major_city']['distance_miles']
-                    location_context['major_city_distance'] = f"{distance:.1f} miles"
                 
                 return location_context
                 
             except (json.JSONDecodeError, KeyError, AttributeError) as e:
-                logger.warning(f"Error parsing location enrichment for report {report.id}: {e}")
+                logger.warning(f"Error parsing SPC enrichment for report {report.id}: {e}")
         
         # Fallback to basic location
         return {
