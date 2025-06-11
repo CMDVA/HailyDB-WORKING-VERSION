@@ -847,13 +847,52 @@ class SPCIngestService:
                     counts[report_data['report_type']] += 1
                     
                 except IntegrityError as ie:
-                    # Always respect hash-based deduplication regardless of reimport status
+                    # Check if this is a hash constraint violation for the same date
                     self.db.rollback()
-                    duplicates_skipped += 1
                     if 'uq_spc_report_hash' in str(ie) or 'duplicate key value violates unique constraint' in str(ie):
-                        logger.debug(f"Duplicate skipped (hash): {report_data['row_hash'][:16]}...")
+                        # Check if duplicate exists for the same date
+                        existing_same_date = SPCReport.query.filter_by(
+                            row_hash=report_data['row_hash'],
+                            report_date=report_data['report_date']
+                        ).first()
+                        
+                        if existing_same_date:
+                            # True duplicate for same date - skip
+                            duplicates_skipped += 1
+                            logger.debug(f"Duplicate skipped (same date): {report_data['row_hash'][:16]}...")
+                        else:
+                            # Hash collision with different date - allow insertion by updating hash
+                            import time
+                            report_data['row_hash'] = report_data['row_hash'] + f"_{int(time.time())}"
+                            
+                            # Retry with modified hash
+                            report = SPCReport()
+                            report.report_date = report_data['report_date']
+                            report.report_type = report_data['report_type']
+                            report.time_utc = report_data['time_utc']
+                            report.location = report_data['location']
+                            report.county = report_data['county']
+                            report.state = report_data['state']
+                            report.latitude = report_data['latitude']
+                            report.longitude = report_data['longitude']
+                            report.comments = report_data['comments']
+                            report.magnitude = magnitude_data
+                            report.raw_csv_line = report_data['raw_csv_line']
+                            report.row_hash = report_data['row_hash']
+                            
+                            try:
+                                self.db.add(report)
+                                self.db.flush()
+                                successful_in_batch += 1
+                                counts[report_data['report_type']] += 1
+                                logger.debug(f"Inserted with modified hash: {report_data['row_hash'][:16]}...")
+                            except Exception as retry_error:
+                                self.db.rollback()
+                                errors_count += 1
+                                logger.error(f"Failed retry with modified hash: {retry_error}")
                     else:
-                        logger.warning(f"Constraint violation: {ie}")
+                        errors_count += 1
+                        logger.warning(f"Non-hash constraint violation: {ie}")
                         
                 except Exception as e:
                     # Individual rollback preserves other successful records
