@@ -1,0 +1,389 @@
+"""
+Enhanced Context System for SPC Reports
+Implements multi-alert, multi-source enrichment for comprehensive SPC report intelligence
+"""
+
+import json
+import logging
+from datetime import datetime, timezone
+from typing import Dict, List, Optional, Any
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+import openai
+import os
+
+from models import SPCReport, Alert, RadarAlert, db
+from config import Config
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+# do not change this unless explicitly requested by the user
+client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+class SPCEnhancedContextService:
+    """Service for generating enhanced context for SPC reports"""
+    
+    def __init__(self, db_session: Session):
+        self.db = db_session
+    
+    def enrich_spc_report(self, report_id: int) -> Dict[str, Any]:
+        """
+        Generate enhanced context for a specific SPC report
+        
+        Args:
+            report_id: SPC report ID
+            
+        Returns:
+            Enhanced context dictionary
+        """
+        try:
+            # Get the SPC report
+            report = self.db.query(SPCReport).filter_by(id=report_id).first()
+            if not report:
+                raise ValueError(f"SPC report {report_id} not found")
+            
+            if not report.spc_verified:
+                logger.info(f"SPC report {report_id} is not verified, skipping enrichment")
+                return {}
+            
+            # Get verified alerts that match this report
+            verified_alerts = self._get_verified_alerts_for_report(report_id)
+            
+            if not verified_alerts:
+                logger.info(f"No verified alerts found for SPC report {report_id}")
+                return {}
+            
+            # Generate enhanced context
+            enhanced_context = self._build_enhanced_context(report, verified_alerts)
+            
+            # Update the report with enhanced context
+            report.enhanced_context = enhanced_context
+            self.db.commit()
+            
+            logger.info(f"Enhanced context generated for SPC report {report_id}")
+            return enhanced_context
+            
+        except Exception as e:
+            logger.error(f"Error enriching SPC report {report_id}: {e}")
+            self.db.rollback()
+            raise
+    
+    def _get_verified_alerts_for_report(self, report_id: int) -> List[Alert]:
+        """Get all verified alerts that match a specific SPC report"""
+        
+        # Query alerts that contain the report_id in their spc_reports JSONB field
+        query = text("""
+            SELECT DISTINCT a.id
+            FROM alerts a, jsonb_array_elements(a.spc_reports) AS report_element
+            WHERE a.spc_reports IS NOT NULL
+            AND (report_element->>'id')::int = :report_id
+            AND a.spc_confidence_score >= 0.8
+        """)
+        
+        result = self.db.execute(query, {"report_id": report_id})
+        alert_ids = [row[0] for row in result.fetchall()]
+        
+        if not alert_ids:
+            return []
+        
+        # Get full alert objects
+        alerts = self.db.query(Alert).filter(Alert.id.in_(alert_ids)).order_by(Alert.effective).all()
+        return alerts
+    
+    def _build_enhanced_context(self, report: SPCReport, verified_alerts: List[Alert]) -> Dict[str, Any]:
+        """Build the enhanced context structure"""
+        
+        # Calculate event duration
+        if len(verified_alerts) > 1:
+            start_time = min(alert.effective for alert in verified_alerts if alert.effective)
+            end_time = max(alert.expires for alert in verified_alerts if alert.expires)
+            if start_time and end_time:
+                duration_minutes = int((end_time - start_time).total_seconds() / 60)
+            else:
+                duration_minutes = 0
+        else:
+            duration_minutes = 0
+        
+        # Extract counties affected
+        counties_affected = set()
+        for alert in verified_alerts:
+            if alert.county_names:
+                counties_affected.update(alert.county_names)
+        
+        # Calculate average match confidence
+        confidences = [alert.spc_confidence_score for alert in verified_alerts if alert.spc_confidence_score]
+        avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+        
+        # Extract NWS office
+        nws_office = self._extract_nws_office(verified_alerts)
+        
+        # Generate multi-alert summary
+        multi_alert_summary = self._generate_multi_alert_summary(
+            report, verified_alerts, duration_minutes, counties_affected, nws_office
+        )
+        
+        # Get location context
+        location_context = self._get_location_context(report)
+        
+        # Generate polygon match status
+        polygon_match_status = self._generate_polygon_match_status(verified_alerts, report)
+        
+        enhanced_context = {
+            "multi_alert_summary": multi_alert_summary,
+            "verified_alert_ids": [alert.id for alert in verified_alerts],
+            "event_duration_minutes": duration_minutes,
+            "counties_affected": sorted(list(counties_affected)),
+            "avg_match_confidence": round(avg_confidence, 2),
+            "nws_office": nws_office,
+            "location_context": location_context,
+            "polygon_match_status": polygon_match_status,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "alert_count": len(verified_alerts)
+        }
+        
+        return enhanced_context
+    
+    def _extract_nws_office(self, verified_alerts: List[Alert]) -> str:
+        """Extract NWS office information from alerts"""
+        for alert in verified_alerts:
+            if alert.sender_name:
+                # Extract office code from sender name like "NWS Austin/San Antonio TX"
+                if "NWS" in alert.sender_name:
+                    return alert.sender_name.replace("NWS ", "").strip()
+        return "Unknown"
+    
+    def _generate_multi_alert_summary(self, report: SPCReport, verified_alerts: List[Alert], 
+                                    duration_minutes: int, counties_affected: set, nws_office: str) -> str:
+        """Generate AI-powered multi-alert summary"""
+        try:
+            # Prepare context for AI
+            alert_details = []
+            for alert in verified_alerts:
+                alert_details.append({
+                    "event": alert.event,
+                    "effective": alert.effective.isoformat() if alert.effective else None,
+                    "area": alert.area_desc,
+                    "counties": alert.county_names
+                })
+            
+            prompt = f"""Generate a concise 1-2 sentence summary for this SPC storm report that was validated by multiple NWS alerts:
+
+SPC Report Details:
+- Type: {report.report_type}
+- Location: {report.location}
+- State/County: {report.state}, {report.county}
+- Time: {report.time_utc}
+- Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
+
+Verified Alerts ({len(verified_alerts)} total):
+{json.dumps(alert_details, indent=2)}
+
+Event Duration: {duration_minutes} minutes
+Counties Affected: {', '.join(sorted(counties_affected))}
+NWS Office: {nws_office}
+
+Create a professional summary that emphasizes:
+1. The SPC report type and measurement
+2. Number of verified NWS alerts that confirmed it
+3. Geographic and temporal scope
+4. Authoritative validation
+
+Keep it factual and focused on the multi-source verification."""
+
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a meteorological data analyst. Create concise, professional summaries of verified storm reports."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=200,
+                temperature=0.3
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            logger.error(f"Error generating AI summary: {e}")
+            # Fallback summary
+            return f"This {report.report_type} report in {report.county} County, {report.state} was validated by {len(verified_alerts)} NWS alerts spanning {duration_minutes} minutes across {len(counties_affected)} counties."
+    
+    def _get_location_context(self, report: SPCReport) -> Dict[str, Any]:
+        """Get or generate location context for the report"""
+        
+        # Check if we have existing enrichment data
+        if hasattr(report, 'location_enrichment') and report.location_enrichment:
+            try:
+                existing_enrichment = json.loads(report.location_enrichment) if isinstance(report.location_enrichment, str) else report.location_enrichment
+                if existing_enrichment.get('location_context'):
+                    return existing_enrichment['location_context']
+            except (json.JSONDecodeError, KeyError, AttributeError):
+                pass
+        
+        # Generate new location context
+        return self._generate_location_context(report)
+    
+    def _generate_location_context(self, report: SPCReport) -> Dict[str, Any]:
+        """Generate location context using AI"""
+        try:
+            prompt = f"""Provide geographic context for this storm report location:
+
+Location: {report.location}
+County: {report.county}
+State: {report.state}
+Coordinates: {report.lat}, {report.lon}
+
+Provide a JSON response with:
+1. primary_location: Main location description
+2. nearby_places: Array of nearby towns/cities with approximate coordinates
+3. geographic_features: Array of notable geographic features (rivers, mountains, etc.)
+
+Focus on locations that would be relevant for insurance, restoration, or emergency management."""
+
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a geographic analyst. Provide location context in JSON format."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=300,
+                temperature=0.3
+            )
+            
+            context = json.loads(response.choices[0].message.content)
+            return context
+            
+        except Exception as e:
+            logger.error(f"Error generating location context: {e}")
+            return {
+                "primary_location": f"{report.location}, {report.county} County, {report.state}",
+                "nearby_places": [],
+                "geographic_features": []
+            }
+    
+    def _generate_polygon_match_status(self, verified_alerts: List[Alert], report: SPCReport) -> List[Dict[str, Any]]:
+        """Generate polygon match status for each verified alert"""
+        polygon_status = []
+        
+        for alert in verified_alerts:
+            # Check if polygon is present
+            polygon_present = bool(alert.geometry)
+            
+            # Check radar confirmation
+            radar_confirmed = self._check_radar_confirmation(alert, report)
+            
+            polygon_status.append({
+                "alert_id": alert.id,
+                "polygon_present": polygon_present,
+                "radar_confirmed": radar_confirmed,
+                "event_type": alert.event,
+                "effective_time": alert.effective.isoformat() if alert.effective else None
+            })
+        
+        return polygon_status
+    
+    def _check_radar_confirmation(self, alert: Alert, report: SPCReport) -> bool:
+        """Check if alert has radar confirmation at report location"""
+        try:
+            # Check if alert has radar_indicated data
+            if alert.radar_indicated:
+                return True
+            
+            # Check radar_alerts table for polygon match
+            if alert.geometry and report.lat and report.lon:
+                query = text("""
+                    SELECT COUNT(*) > 0 as has_radar
+                    FROM radar_alerts ra
+                    WHERE ST_Contains(
+                        ST_GeomFromGeoJSON(:geometry),
+                        ST_Point(:lon, :lat)
+                    )
+                    AND ra.event_date BETWEEN :start_date AND :end_date
+                """)
+                
+                start_date = alert.effective.date() if alert.effective else report.date_obj
+                end_date = alert.expires.date() if alert.expires else report.date_obj
+                
+                result = self.db.execute(query, {
+                    "geometry": alert.geometry,
+                    "lon": report.lon,
+                    "lat": report.lat,
+                    "start_date": start_date,
+                    "end_date": end_date
+                })
+                
+                return bool(result.scalar())
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error checking radar confirmation: {e}")
+            return False
+    
+    def enrich_all_verified_reports(self, batch_size: int = 50) -> Dict[str, int]:
+        """Enrich all verified SPC reports with enhanced context"""
+        try:
+            # Get all verified SPC reports
+            verified_reports = self.db.query(SPCReport).filter_by(spc_verified=True).all()
+            
+            total_reports = len(verified_reports)
+            processed = 0
+            successful = 0
+            failed = 0
+            
+            logger.info(f"Starting enrichment of {total_reports} verified SPC reports")
+            
+            for i in range(0, total_reports, batch_size):
+                batch = verified_reports[i:i+batch_size]
+                
+                for report in batch:
+                    try:
+                        enhanced_context = self.enrich_spc_report(report.id)
+                        if enhanced_context:
+                            successful += 1
+                        processed += 1
+                        
+                        if processed % 10 == 0:
+                            logger.info(f"Processed {processed}/{total_reports} reports")
+                            
+                    except Exception as e:
+                        logger.error(f"Failed to enrich report {report.id}: {e}")
+                        failed += 1
+                        processed += 1
+                
+                # Commit batch
+                try:
+                    self.db.commit()
+                except Exception as e:
+                    logger.error(f"Error committing batch: {e}")
+                    self.db.rollback()
+            
+            results = {
+                "total_reports": total_reports,
+                "processed": processed,
+                "successful": successful,
+                "failed": failed
+            }
+            
+            logger.info(f"Enrichment complete: {results}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error in bulk enrichment: {e}")
+            self.db.rollback()
+            raise
+
+def enrich_spc_report_context(report_id: int) -> Dict[str, Any]:
+    """Standalone function to enrich a single SPC report"""
+    with db.session as session:
+        service = SPCEnhancedContextService(session)
+        return service.enrich_spc_report(report_id)
+
+def enrich_all_spc_reports() -> Dict[str, int]:
+    """Standalone function to enrich all verified SPC reports"""
+    with db.session as session:
+        service = SPCEnhancedContextService(session)
+        return service.enrich_all_verified_reports()

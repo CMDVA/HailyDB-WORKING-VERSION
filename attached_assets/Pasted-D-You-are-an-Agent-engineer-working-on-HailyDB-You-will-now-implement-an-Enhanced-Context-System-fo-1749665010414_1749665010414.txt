@@ -1,0 +1,127 @@
+D
+You are an Agent engineer working on HailyDB. You will now implement an Enhanced Context System for SPC Reports. Your goal is to enable HailyDB to match, outpace, and enrich SPC Live and HailTrace by surfacing the true cross-confirmation between SPC Reports, NWS Radar Alerts, and geospatial context — with clean API delivery.
+
+PURPOSE:
+Enhance /spc/reports/{id} to expose:
+✅ Multi-hour, multi-warning context for verified SPC reports ✅ Enriched geographic + location context ✅ Polygon match status per related alert ✅ Standardized data for consumption by front-end apps (HailyAI, IDOLCheck)
+
+CONSTRAINTS:
+* Do not touch or overwrite the comments field of spc_reports — this is the raw SPC comment and must remain pure.
+* All new data must go into a new enhanced_context JSONB field on spc_reports.
+* The system must be re-runnable (non-destructive). Enhanced context can be regenerated and overwritten as SPC matches are updated.
+
+REQUIRED STEPS:
+
+1️⃣ Schema Update
+ALTER the spc_reports table:
+sql
+CopyEdit
+ALTER TABLE spc_reports ADD COLUMN enhanced_context JSONB DEFAULT '{}'::jsonb;
+
+2️⃣ Data Population for enhanced_context
+You will populate the following object structure in spc_reports.enhanced_context:
+json
+CopyEdit
+{
+  "multi_alert_summary": "string",
+  "verified_alert_ids": [ alert_id_1, alert_id_2, ... ],
+  "event_duration_minutes": integer,
+  "counties_affected": [ "County1", "County2", ... ],
+  "avg_match_confidence": float (0.0-1.0),
+  "nws_office": "string",
+  "location_context": {
+    "primary_location": "string",
+    "nearby_places": [
+      { "name": "Nearby Town", "approx_lat": float, "approx_lon": float },
+      ...
+    ],
+    "geographic_features": [ "Feature1", "Feature2", ... ]
+  },
+  "polygon_match_status": [
+    {
+      "alert_id": integer,
+      "polygon_present": true/false,
+      "radar_confirmed": true/false
+    },
+    ...
+  ]
+}
+
+3️⃣ Data Sources:
+You will source this data from:
+* The existing spc_matches data (stored in alerts.spc_reports JSONB).
+* The related NWS alerts in alerts table.
+* The radar_alerts table → use geometry field to confirm polygon presence at SPC report location.
+* The existing spc_enrichment (location enrichment) if present → reuse it. If not present → regenerate.
+
+4️⃣ Logic Details:
+Multi-Alert Summary:
+Generate a 1-2 sentence AI-generated summary that captures:
+* SPC report type and magnitude.
+* Number of verified alerts.
+* Event duration.
+* Counties affected.
+* NWS office.
+Example:
+"This 60 mph wind report in Val Verde County, TX was validated by 8 consecutive Severe Thunderstorm Warnings spanning a 3-hour period, affecting 5 counties. Issued by Austin/San Antonio NWS office (EWX)."
+
+Verified Alert IDs:
+Populate verified_alert_ids with the id values of matched alerts.
+
+Event Duration:
+Compute min(effective) → max(expires) of verified alerts.
+
+Counties Affected:
+Union of all alerts.county_names for the verified alerts.
+
+Avg Match Confidence:
+Average of alerts.spc_confidence_score for matched alerts.
+
+NWS Office:
+Extract from alerts.sender_name or equivalent.
+
+Location Context:
+Use existing spc_enrichment.location_context if present.
+If not present:
+* Regenerate location_context using OpenAI.
+* Include:
+    * Primary Location
+    * Nearby Places (approx_lat/lon)
+    * Geographic Features (river, canyon, park, etc)
+
+Polygon Match Status:
+For each verified alert:
+* polygon_present: true if alert.geometry exists.
+* radar_confirmed: true if alert.radar_indicated is not null or indicates a match (hail/wind per HailyDB thresholds).
+
+5️⃣ Display Guidelines:
+DO NOT hardcode text like "No polygon detected" inside the enriched summary.
+* If polygon matched → say so.
+* If not → omit language about absence of warning, unless we are explicitly confirming the match.
+You are building actionable evidence FOR damage, not defense AGAINST.
+
+6️⃣ API and UI:
+* DO NOT change the existing /spc/reports/{id} endpoint.
+* Simply expose enhanced_context in API response → allow front-end to decide how to present.
+* You MAY update the Location Enrichment section on /spc/reports UI to pull from enhanced_context.
+
+7️⃣ Operational:
+* Implement full backfill → process all existing spc_reports with spc_verified = true.
+* Implement routine enrichment → enrich spc_reports when spc_matches run.
+* Safe to rerun multiple times.
+
+8️⃣ Final Notes:
+
+1️⃣ Should we also allow /spc-matches API to include enhanced_context for matched reports? → YES. 2️⃣ Should we expose enhanced_context by default in /spc/reports API or gated by param? → YES by default. 3️⃣ Should we trigger re-enrich if related alert polygon data changes? → YES → via spc_matches update hook.
+
+Summary:
+You are NOT just enriching SPC comments. You are providing the industry’s first multi-source enriched SPC report intelligence, delivering polygon-backed evidence to support:
+✅ Restoration contractors ✅ Public adjusters ✅ Insurance claims ✅ Legal case building
+
+Final Output:
+After successful run, verify by inspecting:
+sql
+CopyEdit
+SELECT id, enhanced_context FROM spc_reports WHERE spc_verified = true LIMIT 10;
+
+If any of this is unclear, ask clarifying questions in chat BEFORE execution. We will gameplan each enhancement phase and test /spc/reports/82489 as primary example.

@@ -371,6 +371,10 @@ class SPCReport(db.Model):
     
     # SPC Report Enrichment
     spc_enrichment = Column(JSONB, default=lambda: {})  # Contextual enrichment data
+    enhanced_context = Column(JSONB, default=lambda: {})  # Enhanced multi-alert context
+    
+    # SPC Verification Status  
+    spc_verified = Column(Boolean, default=False, index=True)  # Whether this report has verified alerts
     
     __table_args__ = (
         Index('idx_spc_date_type', 'report_date', 'report_type'),

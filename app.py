@@ -3661,6 +3661,62 @@ def api_spc_enrichment_stats():
         logger.error(f"Error getting enrichment stats: {e}")
         return jsonify({'error': 'Failed to get enrichment statistics'}), 500
 
+@app.route('/api/spc-reports/<int:report_id>/enhanced-context')
+def api_get_spc_enhanced_context(report_id):
+    """
+    API endpoint to retrieve enhanced context for a specific SPC report
+    """
+    try:
+        from spc_enhanced_context import enrich_spc_report_context
+        
+        # Get the SPC report
+        report = db.session.query(SPCReport).filter_by(id=report_id).first()
+        if not report:
+            return jsonify({"error": "SPC report not found"}), 404
+        
+        # Generate enhanced context if not present
+        if not report.enhanced_context or report.enhanced_context == {}:
+            enhanced_context = enrich_spc_report_context(report_id)
+        else:
+            enhanced_context = report.enhanced_context
+        
+        return jsonify(enhanced_context)
+        
+    except Exception as e:
+        logger.error(f"Error retrieving enhanced context: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/spc-reports/enhanced-context/generate', methods=['POST'])
+def api_generate_enhanced_context():
+    """
+    API endpoint to trigger enhanced context generation for SPC reports
+    """
+    try:
+        from spc_enhanced_context import enrich_spc_report_context, enrich_all_spc_reports
+        
+        data = request.get_json() or {}
+        report_id = data.get('report_id')
+        
+        if report_id:
+            # Generate for specific report
+            result = enrich_spc_report_context(report_id)
+            return jsonify({
+                "success": True,
+                "report_id": report_id,
+                "enhanced_context": result
+            })
+        else:
+            # Generate for all verified reports
+            result = enrich_all_spc_reports()
+            return jsonify({
+                "success": True,
+                "batch_results": result
+            })
+        
+    except Exception as e:
+        logger.error(f"Error generating enhanced context: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     with app.app_context():
         init_scheduler()
