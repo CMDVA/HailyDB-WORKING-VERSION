@@ -325,7 +325,7 @@
                                     <i class="fas fa-map-marker-alt text-primary me-2"></i>
                                     <span class="fw-bold text-primary">Event Location:</span>
                                     <span class="ms-2 fw-bold">{{ primary_location.name }}</span>
-                                    {% if primary_location.distance_miles is not none %}
+                                    {% if primary_location.distance_miles is defined and primary_location.distance_miles is not none %}
                                         {% if primary_location.distance_miles == 0.0 %}
                                     <span class="badge bg-primary ms-2">at coordinates</span>
                                         {% else %}
