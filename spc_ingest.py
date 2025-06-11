@@ -80,8 +80,8 @@ class SPCIngestService:
             SPCReport.report_date == report_date
         ).count()
         
-        # For T-0 (current SPC Day), always poll if interval has passed (active reporting window)
-        if days_ago == 0:
+        # For T-0, T-1, T-2 (most current SPC Days), use 5-minute polling for real-time updates
+        if days_ago <= 2:
             last_log = SPCIngestionLog.query.filter(
                 SPCIngestionLog.report_date == report_date,
                 SPCIngestionLog.success == True
@@ -90,9 +90,9 @@ class SPCIngestService:
             if not last_log:
                 return True  # Never polled before
                 
-            # For T-0, poll every 60 minutes during active SPC Day
+            # For T-0 through T-2, poll every 5 minutes for real-time updates
             time_since_last = datetime.utcnow() - last_log.completed_at
-            return time_since_last.total_seconds() >= (60 * 60)  # 60 minutes for T-0
+            return time_since_last.total_seconds() >= (5 * 60)  # 5 minutes for T-0, T-1, T-2
         
         # For dates older than 7 days, skip if we have any data (likely complete)
         if days_ago >= 7 and existing_count > 0:
