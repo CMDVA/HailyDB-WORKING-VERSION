@@ -2747,6 +2747,53 @@ def get_webhook_rule(rule_id):
             'message': str(e)
         }), 500
 
+@app.route('/internal/webhook-events', methods=['GET'])
+def get_webhook_events():
+    """List all webhook events with filtering options"""
+    try:
+        from models import WebhookEvent
+        
+        # Get query parameters for filtering
+        limit = int(request.args.get('limit', 100))
+        offset = int(request.args.get('offset', 0))
+        success_filter = request.args.get('success')  # 'true', 'false', or None
+        event_type = request.args.get('event_type')  # 'hail', 'wind', 'damage_probability'
+        rule_id = request.args.get('rule_id')
+        
+        # Build query
+        query = WebhookEvent.query
+        
+        if success_filter is not None:
+            success_bool = success_filter.lower() == 'true'
+            query = query.filter(WebhookEvent.success == success_bool)
+            
+        if event_type:
+            query = query.filter(WebhookEvent.event_type == event_type)
+            
+        if rule_id:
+            query = query.filter(WebhookEvent.webhook_rule_id == int(rule_id))
+        
+        # Get total count for pagination
+        total_count = query.count()
+        
+        # Apply pagination and ordering
+        events = query.order_by(WebhookEvent.dispatched_at.desc()).offset(offset).limit(limit).all()
+        
+        return jsonify({
+            'status': 'success',
+            'total': total_count,
+            'offset': offset,
+            'limit': limit,
+            'webhook_events': [event.to_dict() for event in events]
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving webhook events: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 @app.route('/api/test/webhook-evaluation', methods=['POST'])
 def test_webhook_evaluation():
     """Test webhook evaluation and dispatch"""

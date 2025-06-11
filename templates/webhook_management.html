@@ -174,6 +174,76 @@
     </div>
 </div>
 
+<!-- Webhook Events Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-history me-2"></i>
+                    Webhook Events
+                    <small class="text-muted ms-2">(Recent Dispatches)</small>
+                </h5>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshWebhookEvents()">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="fas fa-filter me-1"></i>Filter
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="filterWebhookEvents('all')">All Events</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="filterWebhookEvents('success')">Successful Only</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="filterWebhookEvents('failed')">Failed Only</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" onclick="filterWebhookEvents('hail')">Hail Events</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="filterWebhookEvents('wind')">Wind Events</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Time</th>
+                                <th>Event Type</th>
+                                <th>Threshold</th>
+                                <th>Actual Value</th>
+                                <th>Alert ID</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                                <th>Response Time</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="webhookEventsTableBody">
+                            <tr>
+                                <td colspan="9" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2 mb-0 text-muted">Loading webhook events...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div class="text-muted">
+                        <small id="webhookEventsCount">Loading...</small>
+                    </div>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0" id="webhookEventsPagination">
+                            <!-- Pagination will be populated by JavaScript -->
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Create Webhook Modal -->
 <div class="modal fade" id="createWebhookModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -253,6 +323,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     loadWebhooks();
+    loadWebhookEvents();
     
     // Update threshold unit and help text based on event type
     document.getElementById('eventType').addEventListener('change', function() {
@@ -476,6 +547,168 @@ function testWebhookEvaluation() {
 
 function refreshWebhooks() {
     loadWebhooks();
+}
+
+// Webhook Events Management Functions
+let currentWebhookEventsFilter = 'all';
+let currentWebhookEventsPage = 0;
+const webhookEventsPageSize = 50;
+
+function loadWebhookEvents() {
+    const params = new URLSearchParams({
+        limit: webhookEventsPageSize,
+        offset: currentWebhookEventsPage * webhookEventsPageSize
+    });
+    
+    if (currentWebhookEventsFilter !== 'all') {
+        if (currentWebhookEventsFilter === 'success' || currentWebhookEventsFilter === 'failed') {
+            params.append('success', currentWebhookEventsFilter === 'success' ? 'true' : 'false');
+        } else if (currentWebhookEventsFilter === 'hail' || currentWebhookEventsFilter === 'wind') {
+            params.append('event_type', currentWebhookEventsFilter);
+        }
+    }
+    
+    fetch(`/internal/webhook-events?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                updateWebhookEventsTable(data.webhook_events || []);
+                updateWebhookEventsCount(data.total, data.offset, data.limit);
+                updateWebhookEventsPagination(data.total, data.offset, data.limit);
+            } else {
+                throw new Error(data.message || 'Failed to load webhook events');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading webhook events:', error);
+            document.getElementById('webhookEventsTableBody').innerHTML = 
+                '<tr><td colspan="9" class="text-center text-danger py-4">Error loading webhook events. Please try again.</td></tr>';
+        });
+}
+
+function updateWebhookEventsTable(events) {
+    const tbody = document.getElementById('webhookEventsTableBody');
+    
+    if (events.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No webhook events found for current filter.</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = events.map(event => {
+        const dispatchedTime = new Date(event.dispatched_at).toLocaleString();
+        const statusBadge = event.success ? 
+            '<span class="badge bg-success">Success</span>' : 
+            '<span class="badge bg-danger">Failed</span>';
+        
+        const eventTypeBadge = getEventBadge(event.event_type, event.threshold_value);
+        const responseTime = event.response_time_ms ? `${event.response_time_ms}ms` : '-';
+        const actualValue = event.actual_value ? event.actual_value.toFixed(2) : '-';
+        const alertIdShort = event.alert_id ? event.alert_id.substring(event.alert_id.lastIndexOf('.') + 1, event.alert_id.lastIndexOf('.') + 9) : '-';
+        
+        // Extract location from location_data
+        let locationDisplay = '-';
+        if (event.location_data) {
+            const counties = event.location_data.county_names || [];
+            const states = event.location_data.affected_states || [];
+            if (counties.length > 0 && states.length > 0) {
+                locationDisplay = `${counties.slice(0, 2).join(', ')} (${states.join(', ')})`;
+                if (counties.length > 2) locationDisplay += ` +${counties.length - 2} more`;
+            } else if (event.location_data.area_description) {
+                locationDisplay = event.location_data.area_description.substring(0, 30) + '...';
+            }
+        }
+        
+        return `
+            <tr>
+                <td><small>${dispatchedTime}</small></td>
+                <td>${eventTypeBadge}</td>
+                <td><small>${event.threshold_value}</small></td>
+                <td><strong>${actualValue}</strong></td>
+                <td><small><code>${alertIdShort}</code></small></td>
+                <td><small>${locationDisplay}</small></td>
+                <td>${statusBadge}</td>
+                <td><small>${responseTime}</small></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewWebhookEventDetails(${event.id})" title="View Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateWebhookEventsCount(total, offset, limit) {
+    const start = offset + 1;
+    const end = Math.min(offset + limit, total);
+    document.getElementById('webhookEventsCount').textContent = 
+        `Showing ${start}-${end} of ${total} webhook events`;
+}
+
+function updateWebhookEventsPagination(total, offset, limit) {
+    const pagination = document.getElementById('webhookEventsPagination');
+    const totalPages = Math.ceil(total / limit);
+    const currentPage = Math.floor(offset / limit);
+    
+    if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+    }
+    
+    let paginationHtml = '';
+    
+    // Previous button
+    if (currentPage > 0) {
+        paginationHtml += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="changeWebhookEventsPage(${currentPage - 1})">Previous</a>
+            </li>
+        `;
+    }
+    
+    // Page numbers (show max 5 pages around current)
+    const startPage = Math.max(0, currentPage - 2);
+    const endPage = Math.min(totalPages - 1, currentPage + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const activeClass = i === currentPage ? 'active' : '';
+        paginationHtml += `
+            <li class="page-item ${activeClass}">
+                <a class="page-link" href="#" onclick="changeWebhookEventsPage(${i})">${i + 1}</a>
+            </li>
+        `;
+    }
+    
+    // Next button
+    if (currentPage < totalPages - 1) {
+        paginationHtml += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="changeWebhookEventsPage(${currentPage + 1})">Next</a>
+            </li>
+        `;
+    }
+    
+    pagination.innerHTML = paginationHtml;
+}
+
+function changeWebhookEventsPage(page) {
+    currentWebhookEventsPage = page;
+    loadWebhookEvents();
+}
+
+function filterWebhookEvents(filter) {
+    currentWebhookEventsFilter = filter;
+    currentWebhookEventsPage = 0; // Reset to first page
+    loadWebhookEvents();
+}
+
+function refreshWebhookEvents() {
+    loadWebhookEvents();
+}
+
+function viewWebhookEventDetails(eventId) {
+    // This would open a modal with detailed webhook event information
+    alert(`Webhook Event Details for ID: ${eventId}\n\nThis feature will show detailed payload, response headers, and full location data.`);
 }
 </script>
 {% endblock %}
