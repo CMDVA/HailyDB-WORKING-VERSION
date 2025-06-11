@@ -16,19 +16,19 @@
                     <button id="refreshAlerts" class="btn btn-primary">
                         <i class="fas fa-sync-alt me-1"></i>Refresh
                     </button>
-                    <button id="toggleService" class="btn btn-success">
-                        <i class="fas fa-play me-1"></i>Start Service
-                    </button>
+                    <span class="badge bg-success">
+                        <i class="fas fa-broadcast-tower me-1"></i>Live Feed
+                    </span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Service Status Banner -->
-    <div id="serviceStatusBanner" class="alert alert-info" role="alert">
+    <!-- Live Feed Status Banner -->
+    <div id="liveFeedStatus" class="alert alert-success" role="alert">
         <div class="d-flex align-items-center">
-            <i class="fas fa-info-circle me-2"></i>
-            <span id="serviceStatusText">Checking service status...</span>
+            <i class="fas fa-broadcast-tower me-2"></i>
+            <span>Real-time NWS Alert Feed with Radar Detection Enhancement</span>
             <div class="ms-auto">
                 <small id="lastUpdateTime" class="text-muted"></small>
             </div>
@@ -233,21 +233,11 @@ let serviceRunning = false;
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', function() {
     initializeDashboard();
-    checkServiceStatus();
     loadLiveAlerts();
     
     // Set up auto-refresh
     if (document.getElementById('autoRefresh').checked) {
         startAutoRefresh();
-    }
-});
-
-// Service management
-document.getElementById('toggleService').addEventListener('click', function() {
-    if (serviceRunning) {
-        stopLiveService();
-    } else {
-        startLiveService();
     }
 });
 

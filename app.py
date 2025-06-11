@@ -3736,51 +3736,202 @@ def api_generate_enhanced_context():
 @app.route('/api/live-radar-alerts', methods=['GET'])
 def api_live_radar_alerts():
     """
-    API endpoint for real-time live radar alerts
-    Returns currently active wind/hail alerts with pre-formatted message templates
+    Live pass-through API for NWS Active Alerts with radar detection enrichment
+    Fetches current alerts from NWS API and enriches with radar indication analysis
     """
     try:
-        from live_radar_service import get_live_radar_service
+        import requests
+        from config import Config
+        from historical_radar_parser import RadarIndicatedParser
+        from city_parser import CityNameParser
+        import re
         
-        service = get_live_radar_service()
-        if not service:
-            return jsonify({"error": "Live radar service not initialized"}), 503
+        # Fetch current alerts directly from NWS
+        response = requests.get(
+            Config.NWS_ALERT_URL,
+            headers=Config.NWS_HEADERS,
+            timeout=Config.REQUEST_TIMEOUT
+        )
+        response.raise_for_status()
+        
+        nws_data = response.json()
+        raw_alerts = nws_data.get('features', [])
+        
+        # Initialize parsers
+        radar_parser = RadarIndicatedParser()
+        city_parser = CityNameParser()
+        
+        # Process and enrich alerts
+        enriched_alerts = []
+        stats = {
+            'total_alerts': len(raw_alerts),
+            'radar_detected': 0,
+            'wind_hail_alerts': 0,
+            'states_affected': set(),
+            'urgency_counts': {'Immediate': 0, 'Expected': 0, 'Future': 0}
+        }
+        
+        for feature in raw_alerts:
+            props = feature.get('properties', {})
             
-        # Get active alerts
-        alerts = service.get_active_alerts()
+            # Filter for wind/hail alerts
+            event = props.get('event', '').lower()
+            description = props.get('description', '').lower()
+            headline = props.get('headline', '').lower()
+            
+            # Check if this is a wind/hail related alert
+            is_wind_hail = any(keyword in event or keyword in description or keyword in headline 
+                             for keyword in ['severe', 'tornado', 'wind', 'hail', 'storm'])
+            
+            if not is_wind_hail:
+                continue
+                
+            stats['wind_hail_alerts'] += 1
+            
+            # Extract radar indication
+            radar_data = radar_parser.parse_radar_indicated(props)
+            is_radar_detected = bool(radar_data)
+            
+            if is_radar_detected:
+                stats['radar_detected'] += 1
+            
+            # Parse city names from area description
+            area_desc = props.get('areaDesc', '')
+            city_names = city_parser.parse_area_desc(area_desc) if area_desc else []
+            
+            # Extract states from area description
+            states = []
+            state_pattern = r'\b([A-Z]{2})\b'
+            state_matches = re.findall(state_pattern, area_desc)
+            states = list(set(state_matches))
+            stats['states_affected'].update(states)
+            
+            # Count urgency levels
+            urgency = props.get('urgency', 'Unknown')
+            if urgency in stats['urgency_counts']:
+                stats['urgency_counts'][urgency] += 1
+            
+            # Generate message template
+            message_template = generate_alert_message_template(props, radar_data, city_names)
+            
+            # Create enriched alert object
+            enriched_alert = {
+                'id': props.get('id'),
+                'event': props.get('event'),
+                'urgency': props.get('urgency'),
+                'severity': props.get('severity'),
+                'certainty': props.get('certainty'),
+                'area_desc': area_desc,
+                'headline': props.get('headline'),
+                'description': props.get('description'),
+                'effective': props.get('effective'),
+                'expires': props.get('expires'),
+                'sent': props.get('sent'),
+                'sender_name': props.get('senderName'),
+                'radar_indicated': is_radar_detected,
+                'radar_data': radar_data,
+                'city_names': city_names,
+                'states': states,
+                'message_template': message_template,
+                'geometry': feature.get('geometry'),
+                'nws_id': props.get('id'),
+                'web_url': f"https://alerts.weather.gov/cap/{props.get('id', '').split('.')[-1]}.html" if props.get('id') else None
+            }
+            
+            enriched_alerts.append(enriched_alert)
+        
+        # Sort by urgency and effective time
+        urgency_priority = {'Immediate': 0, 'Expected': 1, 'Future': 2}
+        enriched_alerts.sort(key=lambda x: (
+            urgency_priority.get(x.get('urgency', 'Future'), 3),
+            x.get('effective', '') or ''
+        ))
+        
+        # Update stats
+        stats['states_affected'] = list(stats['states_affected'])
+        stats['states_count'] = len(stats['states_affected'])
         
         return jsonify({
-            "alerts": alerts,
-            "count": len(alerts),
-            "timestamp": datetime.utcnow().isoformat(),
-            "service_status": "active" if service.running else "inactive"
+            'success': True,
+            'alerts': enriched_alerts,
+            'statistics': stats,
+            'last_updated': datetime.utcnow().isoformat(),
+            'source': 'live_nws_api_enriched',
+            'nws_source_url': Config.NWS_ALERT_URL
         })
         
+    except requests.RequestException as e:
+        logger.error(f"Error fetching NWS alerts: {e}")
+        return jsonify({
+            'error': 'Failed to fetch alerts from NWS API',
+            'details': str(e)
+        }), 503
+        
     except Exception as e:
-        logger.error(f"Error retrieving live radar alerts: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error processing live radar alerts: {e}")
+        return jsonify({
+            'error': 'Failed to process live alerts',
+            'details': str(e)
+        }), 500
 
-@app.route('/api/live-radar-alerts/start', methods=['POST'])
-def start_live_radar_alerts():
-    """Start the live radar alerts polling service"""
+def generate_alert_message_template(props, radar_data, city_names):
+    """Generate a pre-formatted message template for the alert"""
     try:
-        from live_radar_service import start_live_radar_service
-        start_live_radar_service()
-        return jsonify({"success": True, "message": "Live radar alerts service started"})
-    except Exception as e:
-        logger.error(f"Error starting live radar service: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/live-radar-alerts/stop', methods=['POST'])
-def stop_live_radar_alerts():
-    """Stop the live radar alerts polling service"""
-    try:
-        from live_radar_service import stop_live_radar_service
-        stop_live_radar_service()
-        return jsonify({"success": True, "message": "Live radar alerts service stopped"})
-    except Exception as e:
-        logger.error(f"Error stopping live radar service: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        import re
+        
+        event = props.get('event', 'Weather Alert')
+        urgency = props.get('urgency', '')
+        area_desc = props.get('areaDesc', 'your area')
+        
+        # Extract wind/hail information from description
+        description = props.get('description', '').lower()
+        headline = props.get('headline', '').lower()
+        
+        # Look for specific measurements
+        wind_match = re.search(r'(\d+)\s*mph', description + ' ' + headline)
+        hail_match = re.search(r'(\d+(?:\.\d+)?)\s*inch', description + ' ' + headline)
+        
+        wind_speed = wind_match.group(1) if wind_match else None
+        hail_size = hail_match.group(1) if hail_match else None
+        
+        # Build message parts
+        urgency_emoji = {
+            'Immediate': '🚨',
+            'Expected': '⚠️',
+            'Future': '📢'
+        }.get(urgency, '📢')
+        
+        radar_text = " detected by radar" if radar_data else ""
+        
+        # Create location text (prefer city names over area description)
+        if city_names:
+            location_text = f"near {', '.join(city_names[:3])}"  # Limit to first 3 cities
+            if len(city_names) > 3:
+                location_text += " and surrounding areas"
+        else:
+            # Clean up area description for better readability
+            location_text = area_desc.replace(';', ',').strip()
+            if len(location_text) > 50:
+                location_text = location_text[:47] + "..."
+        
+        # Generate specific message based on event type and measurements
+        if 'tornado' in event.lower():
+            template = f"{urgency_emoji} TORNADO WARNING{radar_text} for {location_text}!"
+        elif wind_speed and hail_size:
+            template = f"{urgency_emoji} {wind_speed} mph winds and {hail_size}\" hail{radar_text} near {location_text}!"
+        elif wind_speed:
+            template = f"{urgency_emoji} {wind_speed} mph winds{radar_text} near {location_text}!"
+        elif hail_size:
+            template = f"{urgency_emoji} {hail_size}\" hail{radar_text} near {location_text}!"
+        elif 'severe' in event.lower():
+            template = f"{urgency_emoji} Severe weather{radar_text} affecting {location_text}"
+        else:
+            template = f"{urgency_emoji} {event}{radar_text} for {location_text}"
+        
+        return template
+        
+    except Exception:
+        return f"Weather alert for {props.get('areaDesc', 'your area')}"
 
 if __name__ == '__main__':
     with app.app_context():
