@@ -183,47 +183,45 @@ class SPCEnrichmentService:
         try:
             # Enhanced prompt with distance-aware geographic search and nearest city identification
             prompt = f"""
-            You are a local geography expert for {county} County, {state}. Find real places near coordinates {lat:.4f}, {lon:.4f}.
+            You are a precise geographic locator for {county} County, {state}. Find the CLOSEST real places to coordinates {lat:.4f}, {lon:.4f}.
             
-            PRIORITY SEARCH (within 5 miles):
-            - Cities, towns, villages, unincorporated communities
-            - Neighborhoods, subdivisions, or local areas  
-            - Geographic features (lakes, rivers, mountains, creeks, parks, valleys)
-            - Major roads, highways, intersections, farm-to-market roads
-            - Schools, churches, post offices, community centers, fire stations
-            - Rural crossroads, local landmarks, historic sites
+            CRITICAL REQUIREMENT: Search by proximity starting from the exact coordinates outward.
             
-            EXTENDED SEARCH (if no places within 5 miles, expand to 25 miles):
-            - Nearest cities or towns regardless of distance
-            - Major geographic features or landmarks
-            - State/county boundaries or significant infrastructure
+            IMMEDIATE VICINITY (0-3 miles) - HIGHEST PRIORITY:
+            - Small towns, villages, communities (like Mt Pleasant, Millingport)
+            - Unincorporated places, crossroads, settlements
+            - Local neighborhoods, subdivisions, districts
+            - Post offices, fire stations, schools, churches
             
-            NEAREST MAJOR CITY:
-            - Identify the nearest major city (population 10,000+) within reasonable distance
-            - Include county seats, regional centers, or well-known cities
-            - Calculate distance in miles from the coordinates
+            NEAR VICINITY (3-8 miles) - SECONDARY:
+            - Larger towns and cities  
+            - County seats, regional centers
+            - Major landmarks or geographic features
             
-            For coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}:
-            1. First try to find places within 5 miles
-            2. If none found, identify the CLOSEST real places within 25 miles
-            3. Identify the nearest major city regardless of distance
-            4. Estimate distances in miles from the coordinates
+            DISTANT REFERENCE (8+ miles) - ONLY if nothing closer found:
+            - Major cities for regional context
             
-            Return JSON in this exact format:
+            SPECIFIC INSTRUCTIONS for {lat:.4f}, {lon:.4f}:
+            1. Start by identifying the absolutely CLOSEST places within 3 miles
+            2. Look specifically for Mt Pleasant, Millingport, and other nearby communities
+            3. Only include distant places if nothing is found closer
+            4. Nearest city should be the closest significant city (population 5,000+)
+            5. Provide precise latitude/longitude coordinates for each place
+            
+            Return JSON format:
             {{
-                "nearest_city": {{"name": "Major City Name", "distance_miles": 8.5, "approx_lat": 29.6516, "approx_lon": -82.3248}},
+                "nearest_city": {{"name": "Closest Major City", "distance_miles": 5.2, "approx_lat": 35.1234, "approx_lon": -80.5678}},
                 "places": [
-                    {{"name": "Real Place Name", "distance_miles": 2.3, "approx_lat": {lat:.4f}, "approx_lon": {lon:.4f}}},
-                    {{"name": "Another Real Place", "distance_miles": 8.7, "approx_lat": {lat:.4f}, "approx_lon": {lon:.4f}}}
+                    {{"name": "Closest Real Place", "distance_miles": 1.5, "approx_lat": 35.3800, "approx_lon": -80.3700}},
+                    {{"name": "Next Closest Place", "distance_miles": 2.8, "approx_lat": 35.3600, "approx_lon": -80.3500}}
                 ]
             }}
             
             REQUIREMENTS:
-            - Only include places that actually exist
-            - Always include estimated distance_miles for each place and nearest_city
-            - For remote areas, find at least 1-3 closest places even if far away
-            - Prioritize closer places but ensure at least one result when possible
-            - nearest_city should be a major city or regional center, not a small town
+            - Focus on the CLOSEST places first - proximity is most important
+            - Include Mt Pleasant and Millingport if they are near these coordinates
+            - Only include places that actually exist with real coordinates
+            - Always provide distance_miles and coordinates for each place
             """
             
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
