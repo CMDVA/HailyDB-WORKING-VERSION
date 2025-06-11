@@ -335,8 +335,8 @@ function loadRadarAlerts(page = 1) {
     });
     
     // Show loading state
-    document.getElementById('radarAlertsTableBody').innerHTML = 
-        '<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0 text-muted">Loading radar-detected alerts...</p></td></tr>';
+    document.getElementById('directRadarTableBody').innerHTML = 
+        '<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0 text-muted">Loading radar-detected alerts...</p></td></tr>';
     
     fetch(`/api/radar-alerts/direct?${params.toString()}`)
         .then(response => response.json())
@@ -347,8 +347,8 @@ function loadRadarAlerts(page = 1) {
         })
         .catch(error => {
             console.error('Error loading alerts:', error);
-            document.getElementById('radarAlertsTableBody').innerHTML = 
-                '<tr><td colspan="7" class="text-center text-danger py-4">Error loading alerts. Please try again.</td></tr>';
+            document.getElementById('directRadarTableBody').innerHTML = 
+                '<tr><td colspan="8" class="text-center text-danger py-4">Error loading alerts. Please try again.</td></tr>';
         });
 }
 
@@ -378,10 +378,10 @@ function updateStatistics(alerts) {
 }
 
 function updateAlertsTable(alerts) {
-    const tbody = document.getElementById('radarAlertsTableBody');
+    const tbody = document.getElementById('directRadarTableBody');
     
     if (alerts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No radar-detected alerts found for the current filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No radar-detected alerts found for the current filters.</td></tr>';
         return;
     }
     
