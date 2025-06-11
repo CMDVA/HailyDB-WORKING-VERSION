@@ -288,47 +288,61 @@ class IngestService:
     
     def _parse_radar_indicated(self, properties: Dict) -> Optional[Dict]:
         """
-        Parse radar-indicated hail and wind data from Severe Thunderstorm Warning
-        Returns {"hail_inches": float, "wind_mph": int} or None if not a STW or no data found
+        Parse radar-indicated hail and wind data from NWS alerts
+        Returns {"hail_inches": float, "wind_mph": int} or None if no qualifying radar data found
+        Qualifies if: wind >= 50 MPH OR any hail size present
         """
-        event = properties.get('event', '')
+        # Check NWS API parameters first (most reliable)
+        parameters = properties.get('parameters', {})
         
-        # Only process Severe Thunderstorm Warnings
-        if 'Severe Thunderstorm Warning' not in event:
+        radar_hail = None
+        radar_wind = None
+        
+        # Extract hail from maxHailSize parameter
+        max_hail_size = parameters.get('maxHailSize')
+        if max_hail_size and isinstance(max_hail_size, list) and len(max_hail_size) > 0:
+            try:
+                radar_hail = float(max_hail_size[0])
+            except (ValueError, TypeError):
+                pass
+        
+        # Extract wind from maxWindGust parameter
+        max_wind_gust = parameters.get('maxWindGust')
+        if max_wind_gust and isinstance(max_wind_gust, list) and len(max_wind_gust) > 0:
+            wind_str = max_wind_gust[0]
+            if isinstance(wind_str, str):
+                # Extract numeric value from "50 MPH" format
+                import re
+                match = re.search(r'(\d+)', wind_str)
+                if match:
+                    try:
+                        radar_wind = int(match.group(1))
+                    except (ValueError, TypeError):
+                        pass
+        
+        # Fall back to description parsing if parameters not available
+        if radar_hail is None or radar_wind is None:
+            description = properties.get('description', '')
+            if radar_hail is None:
+                radar_hail = self._extract_hail_size(description)
+            if radar_wind is None:
+                radar_wind = self._extract_wind_speed(description)
+        
+        # Filter by criteria: any hail OR wind >= 50 MPH
+        qualifies_hail = radar_hail is not None and radar_hail > 0
+        qualifies_wind = radar_wind is not None and radar_wind >= 50
+        
+        if not (qualifies_hail or qualifies_wind):
             return None
         
-        try:
-            # Get text fields to search
-            text_fields = []
-            if properties.get('headline'):
-                text_fields.append(properties['headline'])
-            if properties.get('description'):
-                text_fields.append(properties['description'])
-            if properties.get('instruction'):
-                text_fields.append(properties['instruction'])
+        # Return the extracted radar data
+        radar_data = {}
+        if radar_hail is not None:
+            radar_data['hail_inches'] = radar_hail
+        if radar_wind is not None:
+            radar_data['wind_mph'] = radar_wind
             
-            combined_text = ' '.join(text_fields).lower()
-            
-            if not combined_text.strip():
-                return None
-                
-            radar_data = {}
-            
-            # Parse hail size
-            hail_inches = self._extract_hail_size(combined_text)
-            if hail_inches is not None:
-                radar_data['hail_inches'] = hail_inches
-            
-            # Parse wind speed
-            wind_mph = self._extract_wind_speed(combined_text)
-            if wind_mph is not None:
-                radar_data['wind_mph'] = wind_mph
-            
-            return radar_data if radar_data else None
-            
-        except Exception as e:
-            logger.error(f"Error parsing radar indicated data: {e}")
-            return None
+        return radar_data if radar_data else None
     
     def _extract_hail_size(self, text: str) -> Optional[float]:
         """Extract hail size in inches from text"""

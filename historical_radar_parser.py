@@ -45,18 +45,24 @@ class HistoricalRadarParser:
         start_dt = datetime.strptime(start_date, '%Y-%m-%d')
         end_dt = datetime.strptime(end_date + ' 23:59:59', '%Y-%m-%d %H:%M:%S')
         
-        # Find severe thunderstorm warnings without radar data
+        # Find alerts without radar data that might contain radar parameters
         alerts_query = db.session.query(Alert).filter(
             and_(
-                Alert.event == 'Severe Thunderstorm Warning',
                 Alert.effective >= start_dt,
                 Alert.effective <= end_dt,
-                Alert.radar_indicated.is_(None)
+                Alert.radar_indicated.is_(None),
+                # Check for alerts that might have radar parameters
+                db.or_(
+                    Alert.properties['parameters']['maxHailSize'].astext.isnot(None),
+                    Alert.properties['parameters']['maxWindGust'].astext.isnot(None),
+                    Alert.event == 'Severe Thunderstorm Warning',
+                    Alert.event == 'Special Weather Statement'
+                )
             )
         )
         
         total_alerts = alerts_query.count()
-        logger.info(f"Found {total_alerts} severe thunderstorm warnings needing radar parsing")
+        logger.info(f"Found {total_alerts} alerts needing radar parsing (includes Severe Thunderstorm Warnings and Special Weather Statements)")
         
         # Process in batches
         offset = 0
