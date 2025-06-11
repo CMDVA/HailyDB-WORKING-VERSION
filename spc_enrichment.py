@@ -5,6 +5,7 @@ Adds contextual data to SPC reports including radar polygon matching and nearby 
 
 import logging
 import json
+import math
 import os
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
@@ -30,6 +31,31 @@ class SPCEnrichmentService:
     
     def __init__(self):
         self.openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    
+    def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """
+        Calculate the great-circle distance between two points on Earth using the Haversine formula
+        
+        Args:
+            lat1, lon1: Latitude and longitude of first point in decimal degrees
+            lat2, lon2: Latitude and longitude of second point in decimal degrees
+            
+        Returns:
+            Distance in miles
+        """
+        R = 3959.87433  # Earth's radius in miles
+        
+        # Convert decimal degrees to radians
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        
+        # Haversine formula
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        
+        return R * c
         
     def enrich_spc_report(self, spc_report: SPCReport) -> Dict[str, Any]:
         """
@@ -231,9 +257,24 @@ class SPCEnrichmentService:
                 if isinstance(places_list, list):
                     logger.info(f"Found {len(places_list)} places in response")
                     
-                    # Add nearest_city to the first place if it exists and has distance info
+                    # Recalculate accurate distances for all places
+                    for place in places_list:
+                        if 'approx_lat' in place and 'approx_lon' in place:
+                            accurate_distance = self._calculate_distance(
+                                lat, lon, place['approx_lat'], place['approx_lon']
+                            )
+                            place['distance_miles'] = round(accurate_distance, 1)
+                            logger.info(f"Recalculated distance for {place['name']}: {place['distance_miles']} miles")
+                    
+                    # Add nearest_city to the first place if it exists and recalculate its distance
                     if nearest_city and isinstance(nearest_city, dict) and 'name' in nearest_city:
-                        logger.info(f"Found nearest city: {nearest_city['name']} at {nearest_city.get('distance_miles', 'unknown')} miles")
+                        if 'approx_lat' in nearest_city and 'approx_lon' in nearest_city:
+                            accurate_distance = self._calculate_distance(
+                                lat, lon, nearest_city['approx_lat'], nearest_city['approx_lon']
+                            )
+                            nearest_city['distance_miles'] = round(accurate_distance, 1)
+                        
+                        logger.info(f"Found nearest city: {nearest_city['name']} at {nearest_city.get('distance_miles', 'unknown')} miles (recalculated)")
                         # Mark the nearest city with a special type
                         nearest_city['type'] = 'nearest_city'
                         places_list.insert(0, nearest_city)  # Add to beginning of list
