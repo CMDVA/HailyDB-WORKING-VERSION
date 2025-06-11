@@ -797,5 +797,16 @@ function exportData() {
     
     window.open(`/alerts/search?${params.toString()}`, '_blank');
 }
+
+// Initialize page when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default date range
+    document.getElementById('startDate').value = '2025-06-02';
+    document.getElementById('endDate').value = '2025-06-07';
+    
+    // Load both tables
+    loadRadarAlerts(1);
+    loadDirectRadarAlerts(1);
+});
 </script>
 {% endblock %}
