@@ -4,7 +4,7 @@ import requests
 import time
 from datetime import datetime
 from typing import Dict, List, Optional
-from models import WebhookRule, Alert, SPCReport, SchedulerLog, db
+from models import WebhookRule, Alert, SPCReport, SchedulerLog, WebhookEvent, db
 
 logger = logging.getLogger(__name__)
 
@@ -176,42 +176,59 @@ class WebhookService:
         # Determine source and value based on what triggered the condition
         source, value = self._get_trigger_source_and_value(rule, alert)
         
+        # Extract granular location data
+        location_data = self._extract_granular_location_data(alert)
+        
         payload = {
-            'event_type': rule.event_type,
-            'location': alert.area_desc,
-            'value': value,
             'timestamp': datetime.utcnow().isoformat() + 'Z',
-            'source': source,
+            'webhook_rule_id': rule.id,
             'alert_id': alert.id,
-            'alert_event': alert.event,
-            'effective_time': alert.effective.isoformat() if alert.effective else None,
-            'expires_time': alert.expires.isoformat() if alert.expires else None
+            'event_type': rule.event_type,
+            'threshold': rule.threshold_value,
+            'actual_value': value,
+            'trigger_source': source,
+            'location': location_data,
+            'alert': {
+                'id': alert.id,
+                'event': alert.event,
+                'severity': alert.severity,
+                'area_desc': alert.area_desc,
+                'effective': alert.effective.isoformat() if alert.effective else None,
+                'expires': alert.expires.isoformat() if alert.expires else None,
+                'sent': alert.sent.isoformat() if alert.sent else None,
+                'ai_summary': alert.ai_summary
+            }
         }
         
         # Retry logic with exponential backoff (up to 3 attempts)
         max_retries = 3
         base_delay = 1  # Start with 1 second
+        error_message = None
         
         for attempt in range(max_retries):
             try:
                 logger.info(f"Dispatching webhook (attempt {attempt + 1}/{max_retries}) to {rule.webhook_url}")
                 
+                start_time = time.time()
                 response = requests.post(
                     rule.webhook_url,
                     json=payload,
                     headers={'Content-Type': 'application/json'},
                     timeout=10
                 )
+                response_time = int((time.time() - start_time) * 1000)
                 
                 if 200 <= response.status_code < 300:
                     logger.info(f"Webhook dispatched successfully to {rule.webhook_url}: {response.status_code}")
-                    self._log_webhook_dispatch(rule, alert, True, payload, response.status_code)
+                    self._log_webhook_event(rule, alert, True, payload, response.status_code, response_time, value, location_data)
                     return True
                 else:
                     logger.warning(f"Webhook dispatch failed with status {response.status_code}: {response.text}")
+                    error_message = f"HTTP {response.status_code}: {response.text}"
                     
             except requests.exceptions.RequestException as e:
                 logger.warning(f"Webhook dispatch attempt {attempt + 1} failed: {e}")
+                error_message = str(e)
             
             # Wait before retry (exponential backoff)
             if attempt < max_retries - 1:
@@ -220,7 +237,7 @@ class WebhookService:
         
         # All retries failed
         logger.error(f"Webhook dispatch failed after {max_retries} attempts to {rule.webhook_url}")
-        self._log_webhook_dispatch(rule, alert, False, payload)
+        self._log_webhook_event(rule, alert, False, payload, None, None, value, location_data, error_message)
         return False
     
     def _get_trigger_source_and_value(self, rule: WebhookRule, alert: Alert) -> tuple:
@@ -264,9 +281,74 @@ class WebhookService:
         
         return ('Unknown', 0.0)
     
+    def _extract_granular_location_data(self, alert: Alert) -> Dict:
+        """
+        Extract maximum geographic granularity from alert data
+        """
+        location_data = {
+            'area_description': alert.area_desc,
+            'fips_codes': alert.fips_codes or [],
+            'county_names': alert.county_names or [],
+            'affected_states': alert.affected_states or [],
+            'geometry_bounds': alert.geometry_bounds or {},
+            'coordinate_count': alert.coordinate_count or 0,
+            'geometry_type': alert.geometry_type
+        }
+        
+        # Extract city mentions from area description
+        cities = []
+        if alert.area_desc:
+            # Common patterns for city mentions in NWS alerts
+            import re
+            city_patterns = [
+                r'(\w+(?:\s+\w+)*)\s+(?:County|Parish)',  # Before County/Parish
+                r'(?:near|including|around)\s+(\w+(?:\s+\w+)*)',  # After spatial keywords
+                r'(\w+(?:\s+\w+)*)\s+(?:area|vicinity|region)',  # Before area descriptors
+            ]
+            for pattern in city_patterns:
+                matches = re.findall(pattern, alert.area_desc, re.IGNORECASE)
+                cities.extend(matches)
+        
+        location_data['extracted_cities'] = list(set(cities))  # Remove duplicates
+        
+        return location_data
+    
+    def _log_webhook_event(self, rule: WebhookRule, alert: Alert, success: bool, payload: Dict, 
+                          status_code: int = None, response_time: int = None, actual_value: float = None,
+                          location_data: Dict = None, error_message: str = None):
+        """
+        Log webhook event to webhook_events table
+        """
+        try:
+            webhook_event = WebhookEvent(
+                webhook_rule_id=rule.id,
+                alert_id=alert.id,
+                user_id=rule.user_id,
+                event_type=rule.event_type,
+                threshold_value=rule.threshold_value,
+                actual_value=actual_value,
+                webhook_url=rule.webhook_url,
+                location_data=location_data,
+                payload=payload,
+                http_status_code=status_code,
+                response_time_ms=response_time,
+                success=success,
+                error_message=error_message,
+                retry_count=0  # Will be updated if retries are implemented
+            )
+            
+            self.db.session.add(webhook_event)
+            self.db.session.commit()
+            
+            logger.info(f"Logged webhook event: {webhook_event.id} for rule {rule.id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to log webhook event: {e}")
+            self.db.session.rollback()
+    
     def _log_webhook_dispatch(self, rule: WebhookRule, alert: Alert, success: bool, payload: Dict, status_code: int = None):
         """
-        Log webhook dispatch attempt to scheduler_logs
+        Legacy method for compatibility - redirects to _log_webhook_event
         """
         try:
             operation_metadata = {
