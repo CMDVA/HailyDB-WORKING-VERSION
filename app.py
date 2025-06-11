@@ -2143,6 +2143,11 @@ def hurricane_tracks():
     """View hurricane tracks page"""
     return render_template('hurricane_tracks.html')
 
+@app.route('/radar-alerts')
+def view_radar_alerts():
+    """View radar-detected alerts interface"""
+    return render_template('radar_alerts.html')
+
 @app.route('/spc-matches/data')
 def spc_matches_data():
     """API endpoint for SPC verified matches data"""
