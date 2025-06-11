@@ -349,7 +349,19 @@ function initializeDashboard() {
     }
     
     console.log('Starting initial alert load...');
-    loadLiveAlerts();
+    
+    // Test immediate call
+    console.log('Calling loadLiveAlerts() function...');
+    
+    // Call the function and handle any immediate errors
+    try {
+        loadLiveAlerts().catch(error => {
+            console.error('loadLiveAlerts promise rejected:', error);
+        });
+    } catch (error) {
+        console.error('loadLiveAlerts synchronous error:', error);
+    }
+    
     console.log('Dashboard initialized successfully');
 }
 
