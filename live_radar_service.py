@@ -555,7 +555,7 @@ class LiveRadarAlertService:
 # Global service instance
 live_radar_service = None
 
-def init_live_radar_service(db_session: Session = None):
+def init_live_radar_service(db_session = None):
     """Initialize the global live radar service"""
     global live_radar_service
     live_radar_service = LiveRadarAlertService(db_session)
