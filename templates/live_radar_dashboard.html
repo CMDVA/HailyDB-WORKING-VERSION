@@ -318,11 +318,37 @@ let autoRefreshEnabled = false;
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== DOM CONTENT LOADED ===');
+    console.log('Page ready state:', document.readyState);
     initializeDashboard();
 });
 
 function initializeDashboard() {
+    console.log('=== INITIALIZING DASHBOARD ===');
     console.log('Dashboard JavaScript loaded successfully');
+    
+    // Check if required elements exist
+    const tbody = document.getElementById('liveRadarTableBody');
+    const statsElements = {
+        hail: document.getElementById('total-hail-alerts'),
+        wind: document.getElementById('total-wind-alerts'),
+        active: document.getElementById('total-active-alerts'),
+        states: document.getElementById('total-states-affected')
+    };
+    
+    console.log('Required elements check:');
+    console.log('- Table body:', tbody ? 'FOUND' : 'MISSING');
+    console.log('- Hail stats:', statsElements.hail ? 'FOUND' : 'MISSING');
+    console.log('- Wind stats:', statsElements.wind ? 'FOUND' : 'MISSING');
+    console.log('- Active stats:', statsElements.active ? 'FOUND' : 'MISSING');
+    console.log('- States stats:', statsElements.states ? 'FOUND' : 'MISSING');
+    
+    if (!tbody) {
+        console.error('CRITICAL ERROR: Table body element not found!');
+        return;
+    }
+    
+    console.log('Starting initial alert load...');
     loadLiveAlerts();
     console.log('Dashboard initialized successfully');
 }
@@ -375,23 +401,39 @@ async function loadLiveAlerts() {
 }
 
 function displayAlerts(alerts) {
+    console.log('=== displayAlerts() called ===');
+    console.log('Received alerts:', alerts);
+    console.log('Alerts type:', typeof alerts);
+    console.log('Alerts length:', alerts ? alerts.length : 'N/A');
+    
     const tbody = document.getElementById('liveRadarTableBody');
+    console.log('Table body element found:', tbody ? 'YES' : 'NO');
     
     if (!alerts || alerts.length === 0) {
+        console.log('No alerts received, showing empty message');
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No live radar alerts currently active.</td></tr>';
         return;
     }
     
+    console.log('Processing alerts for filtering...');
     // Filter for alerts with radar data and wind/hail information
     const radarAlerts = alerts.filter(alert => {
         const radarData = alert.radar_data || {};
-        return radarData.hail_inches > 0 || radarData.wind_mph >= 50;
+        const hasHail = radarData.hail_inches > 0;
+        const hasWind = radarData.wind_mph >= 50;
+        console.log(`Alert ${alert.id}: hail=${radarData.hail_inches}, wind=${radarData.wind_mph}, hasHail=${hasHail}, hasWind=${hasWind}`);
+        return hasHail || hasWind;
     });
     
+    console.log(`Filtered results: ${radarAlerts.length} alerts meet criteria (hail > 0 OR wind >= 50)`);
+    
     if (radarAlerts.length === 0) {
+        console.log('No alerts meet radar criteria, showing no radar alerts message');
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No radar-detected wind/hail alerts currently active.</td></tr>';
         return;
     }
+    
+    console.log('Building table rows for', radarAlerts.length, 'alerts...');
     
     tbody.innerHTML = radarAlerts.map(alert => {
         const radarData = alert.radar_data || {};
@@ -487,10 +529,27 @@ function extractState(areaDesc) {
 }
 
 function updateStatistics(stats) {
-    document.getElementById('total-hail-alerts').textContent = stats.hail_alerts || 0;
-    document.getElementById('total-wind-alerts').textContent = stats.wind_alerts || 0;
-    document.getElementById('total-active-alerts').textContent = stats.total_alerts || 0;
-    document.getElementById('total-states-affected').textContent = stats.states_affected || 0;
+    console.log('=== updateStatistics() called ===');
+    console.log('Stats received:', stats);
+    
+    const elements = {
+        hail: document.getElementById('total-hail-alerts'),
+        wind: document.getElementById('total-wind-alerts'),
+        active: document.getElementById('total-active-alerts'),
+        states: document.getElementById('total-states-affected')
+    };
+    
+    console.log('Statistics elements check:');
+    Object.keys(elements).forEach(key => {
+        console.log(`- ${key}:`, elements[key] ? 'FOUND' : 'MISSING');
+    });
+    
+    if (elements.hail) elements.hail.textContent = stats.hail_alerts || 0;
+    if (elements.wind) elements.wind.textContent = stats.wind_alerts || 0;
+    if (elements.active) elements.active.textContent = stats.total_alerts || 0;
+    if (elements.states) elements.states.textContent = stats.states_affected || 0;
+    
+    console.log('Statistics updated successfully');
 }
 
 function displayError(message) {
@@ -530,5 +589,50 @@ function viewAlert(alertId) {
     // Open alert details in same window
     window.location.href = `/alerts/${alertId}`;
 }
+
+// Global error handler
+window.addEventListener('error', function(e) {
+    console.error('=== JAVASCRIPT ERROR ===');
+    console.error('Message:', e.message);
+    console.error('Filename:', e.filename);
+    console.error('Line:', e.lineno);
+    console.error('Column:', e.colno);
+    console.error('Error object:', e.error);
+    
+    const tbody = document.getElementById('liveRadarTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4">
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        JavaScript Error: ${e.message}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+});
+
+// Global unhandled promise rejection handler
+window.addEventListener('unhandledrejection', function(e) {
+    console.error('=== UNHANDLED PROMISE REJECTION ===');
+    console.error('Reason:', e.reason);
+    console.error('Promise:', e.promise);
+    
+    const tbody = document.getElementById('liveRadarTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4">
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Promise Rejection: ${e.reason}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+});
 </script>
 {% endblock %}
