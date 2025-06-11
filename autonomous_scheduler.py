@@ -202,11 +202,19 @@ class AutonomousScheduler:
             )
             
             # Systematic polling for T-0 through T-15
-            today = datetime.utcnow().date()
+            # Use SPC Day logic for T-0 (current day)
+            now_utc = datetime.utcnow()
+            
+            if now_utc.hour >= 12:
+                # Current time is >= 12:00Z, so SPC day is today
+                spc_day_base = now_utc.date()
+            else:
+                # Current time is < 12:00Z, so SPC day is yesterday
+                spc_day_base = (now_utc - timedelta(days=1)).date()
             
             total_reports = 0
             for days_back in range(16):  # T-0 through T-15
-                target_date = today - timedelta(days=days_back)
+                target_date = spc_day_base - timedelta(days=days_back)
                 
                 # Check if this date should be polled based on systematic schedule
                 # Only poll if we don't have recent successful data for this date
