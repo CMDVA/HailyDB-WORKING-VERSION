@@ -303,41 +303,6 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <!-- Enriched Summary -->
-                    {% if report.spc_enrichment.enriched_summary %}
-                    <div class="alert alert-primary mb-3">
-                        <div class="text-primary font-weight-bold small mb-1">Property Impact Assessment</div>
-                        <p class="mb-0 lead">{{ report.spc_enrichment.enriched_summary }}</p>
-                    </div>
-                    {% endif %}
-
-                    <!-- Radar Polygon Match Status -->
-                    <div class="row mb-3">
-                        <div class="col-12">
-                            <h6 class="text-muted mb-2">Radar Detection Status</h6>
-                            {% if report.spc_enrichment.radar_polygon_match %}
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-check-circle text-success me-2"></i>
-                                    <span class="text-success">Confirmed inside radar-detected polygon</span>
-                                </div>
-                                {% if report.spc_enrichment.radar_polygon_id %}
-                                <small class="text-muted d-block mt-1">
-                                    Radar Alert ID: {{ report.spc_enrichment.radar_polygon_id }}
-                                </small>
-                                {% endif %}
-                                {% if report.spc_enrichment.radar_event_type %}
-                                <small class="text-muted d-block">
-                                    Event Type: {{ report.spc_enrichment.radar_event_type.title() }}
-                                </small>
-                                {% endif %}
-                            {% else %}
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-times-circle text-warning me-2"></i>
-                                    <span class="text-warning">No radar polygon detected at this location</span>
-                                </div>
-                            {% endif %}
-                        </div>
-                    </div>
 
                     <!-- Nearby Places -->
                     {% if report.spc_enrichment.nearby_places and report.spc_enrichment.nearby_places|length > 0 %}
