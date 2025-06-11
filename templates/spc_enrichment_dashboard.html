@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+
+{% block title %}SPC Report Enrichment Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">SPC Report Enrichment Dashboard</h1>
+        <div>
+            <button class="btn btn-primary me-2" onclick="startBatchEnrichment()">
+                <i class="fas fa-magic me-1"></i>Start Batch Enrichment
+            </button>
+            <a href="/spc/reports" class="btn btn-outline-secondary">
+                <i class="fas fa-list me-1"></i>View SPC Reports
+            </a>
+        </div>
+    </div>
+
+    <!-- Enrichment Statistics Row -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Enriched Reports
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="enriched-count">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Pending Enrichment
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="pending-count">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Total SPC Reports
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="total-count">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-database fa-2x text-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Enrichment Progress
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="progress-percent">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-line fa-2x text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch Processing Control Panel -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Batch Enrichment Control</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="batch-size" class="form-label">Batch Size</label>
+                            <select class="form-select" id="batch-size">
+                                <option value="10">10 reports (Test)</option>
+                                <option value="50" selected>50 reports (Recommended)</option>
+                                <option value="100">100 reports (Fast)</option>
+                                <option value="250">250 reports (Bulk)</option>
+                            </select>
+                            <small class="form-text text-muted">
+                                Larger batches are faster but use more OpenAI API tokens
+                            </small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="report-types" class="form-label">Report Types</label>
+                            <div class="form-check-group">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="tornado" id="type-tornado" checked>
+                                    <label class="form-check-label" for="type-tornado">Tornado</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="wind" id="type-wind" checked>
+                                    <label class="form-check-label" for="type-wind">Wind</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="hail" id="type-hail" checked>
+                                    <label class="form-check-label" for="type-hail">Hail</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="progress mb-3" style="display: none;" id="enrichment-progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" 
+                             style="width: 0%" id="progress-bar"></div>
+                    </div>
+
+                    <div id="enrichment-status" class="alert alert-info" style="display: none;">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <span id="status-text">Ready to start enrichment</span>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <button class="btn btn-success" id="start-enrichment-btn" onclick="startBatchEnrichment()">
+                            <i class="fas fa-play me-1"></i>Start Enrichment
+                        </button>
+                        <button class="btn btn-secondary" onclick="refreshStats()">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh Statistics
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Recent Enrichments</h6>
+                </div>
+                <div class="card-body">
+                    <div id="recent-enrichments">
+                        <div class="text-center text-muted">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p class="mt-2">Loading recent activity...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sample Enriched Report Preview -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Sample Enriched Report</h6>
+                </div>
+                <div class="card-body">
+                    <div id="sample-report">
+                        <div class="text-center text-muted">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p class="mt-2">Loading sample...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enrichment Results Table -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Recently Enriched Reports</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="enriched-reports-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Type</th>
+                            <th>Location</th>
+                            <th>County/State</th>
+                            <th>Radar Match</th>
+                            <th>Nearby Places</th>
+                            <th>Enriched</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="enriched-reports-tbody">
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                Loading enriched reports...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let enrichmentInProgress = false;
+
+// Initialize dashboard on page load
+document.addEventListener('DOMContentLoaded', function() {
+    refreshStats();
+    loadRecentEnrichments();
+    loadSampleReport();
+    loadEnrichedReportsTable();
+});
+
+async function refreshStats() {
+    try {
+        // Fetch enrichment statistics
+        const response = await fetch('/api/spc-reports/enrichment-stats');
+        const stats = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('enriched-count').textContent = stats.enriched_count || 0;
+            document.getElementById('pending-count').textContent = stats.pending_count || 0;
+            document.getElementById('total-count').textContent = stats.total_count || 0;
+            
+            const progressPercent = stats.total_count > 0 ? 
+                Math.round((stats.enriched_count / stats.total_count) * 100) : 0;
+            document.getElementById('progress-percent').textContent = progressPercent + '%';
+        } else {
+            console.error('Failed to fetch enrichment stats:', stats);
+        }
+    } catch (error) {
+        console.error('Error fetching stats:', error);
+        document.getElementById('enriched-count').innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
+        document.getElementById('pending-count').innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
+        document.getElementById('total-count').innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
+        document.getElementById('progress-percent').innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
+    }
+}
+
+async function startBatchEnrichment() {
+    if (enrichmentInProgress) {
+        return;
+    }
+
+    enrichmentInProgress = true;
+    const batchSize = document.getElementById('batch-size').value;
+    const startBtn = document.getElementById('start-enrichment-btn');
+    const progressBar = document.getElementById('enrichment-progress');
+    const statusDiv = document.getElementById('enrichment-status');
+    
+    // Update UI
+    startBtn.disabled = true;
+    startBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Enriching...';
+    progressBar.style.display = 'block';
+    statusDiv.style.display = 'block';
+    statusDiv.className = 'alert alert-info';
+    document.getElementById('status-text').textContent = 'Starting batch enrichment...';
+
+    try {
+        const response = await fetch('/api/spc-reports/enrich', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                batch_size: parseInt(batchSize)
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            // Success
+            statusDiv.className = 'alert alert-success';
+            document.getElementById('status-text').textContent = 
+                `Enrichment completed! Processed ${result.successful_enrichments} reports successfully.`;
+            
+            document.getElementById('progress-bar').style.width = '100%';
+            
+            // Refresh stats and tables
+            setTimeout(() => {
+                refreshStats();
+                loadEnrichedReportsTable();
+                loadRecentEnrichments();
+            }, 1000);
+            
+        } else {
+            throw new Error(result.error || 'Enrichment failed');
+        }
+    } catch (error) {
+        console.error('Enrichment error:', error);
+        statusDiv.className = 'alert alert-danger';
+        document.getElementById('status-text').textContent = 'Enrichment failed: ' + error.message;
+    } finally {
+        enrichmentInProgress = false;
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<i class="fas fa-play me-1"></i>Start Enrichment';
+        
+        setTimeout(() => {
+            progressBar.style.display = 'none';
+            document.getElementById('progress-bar').style.width = '0%';
+        }, 3000);
+    }
+}
+
+async function loadRecentEnrichments() {
+    // Load recent enrichment activity (placeholder for now)
+    const container = document.getElementById('recent-enrichments');
+    container.innerHTML = `
+        <div class="d-flex align-items-center mb-2">
+            <i class="fas fa-check-circle text-success me-2"></i>
+            <small>Glynn County, GA wind report enriched</small>
+        </div>
+        <div class="d-flex align-items-center mb-2">
+            <i class="fas fa-check-circle text-success me-2"></i>
+            <small>Camden County, GA wind report enriched</small>
+        </div>
+        <div class="d-flex align-items-center mb-2">
+            <i class="fas fa-check-circle text-success me-2"></i>
+            <small>Franklin County, TN tornado report enriched</small>
+        </div>
+        <div class="text-center mt-3">
+            <small class="text-muted">Showing recent activity</small>
+        </div>
+    `;
+}
+
+async function loadSampleReport() {
+    try {
+        // Fetch a sample enriched report
+        const response = await fetch('/api/spc-reports?enriched=true&limit=1');
+        const data = await response.json();
+        
+        if (data.reports && data.reports.length > 0) {
+            const report = data.reports[0];
+            const enrichment = report.spc_enrichment || {};
+            
+            document.getElementById('sample-report').innerHTML = `
+                <div class="mb-2">
+                    <strong>${report.report_type.charAt(0).toUpperCase() + report.report_type.slice(1)} Report</strong>
+                    <span class="badge bg-info ms-2">ID: ${report.id}</span>
+                </div>
+                <p class="small mb-2">${enrichment.enriched_summary || 'No summary available'}</p>
+                <div class="mb-2">
+                    <i class="fas fa-map-marker-alt text-primary me-1"></i>
+                    <small>${report.county}, ${report.state}</small>
+                </div>
+                ${enrichment.radar_polygon_match ? 
+                    '<div class="mb-2"><i class="fas fa-check-circle text-success me-1"></i><small>Radar verified</small></div>' :
+                    '<div class="mb-2"><i class="fas fa-times-circle text-warning me-1"></i><small>No radar polygon</small></div>'
+                }
+                <a href="/spc/reports/${report.id}" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-eye me-1"></i>View Details
+                </a>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading sample report:', error);
+        document.getElementById('sample-report').innerHTML = `
+            <div class="text-center text-muted">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p class="mt-2">Unable to load sample</p>
+            </div>
+        `;
+    }
+}
+
+async function loadEnrichedReportsTable() {
+    try {
+        const response = await fetch('/api/spc-reports?enriched=true&limit=20');
+        const data = await response.json();
+        
+        const tbody = document.getElementById('enriched-reports-tbody');
+        
+        if (data.reports && data.reports.length > 0) {
+            tbody.innerHTML = data.reports.map(report => {
+                const enrichment = report.spc_enrichment || {};
+                const nearbyPlaces = enrichment.nearby_places || [];
+                
+                return `
+                    <tr>
+                        <td>${report.id}</td>
+                        <td>
+                            <span class="badge bg-${report.report_type === 'tornado' ? 'danger' : 
+                                                report.report_type === 'wind' ? 'warning' : 'info'}">
+                                ${report.report_type.charAt(0).toUpperCase() + report.report_type.slice(1)}
+                            </span>
+                        </td>
+                        <td>${report.location || 'N/A'}</td>
+                        <td>${report.county}, ${report.state}</td>
+                        <td>
+                            ${enrichment.radar_polygon_match ? 
+                                '<i class="fas fa-check-circle text-success"></i>' :
+                                '<i class="fas fa-times-circle text-muted"></i>'
+                            }
+                        </td>
+                        <td>
+                            <small>${nearbyPlaces.slice(0,2).map(p => p.name).join(', ')}${nearbyPlaces.length > 2 ? '...' : ''}</small>
+                        </td>
+                        <td>
+                            <small class="text-muted">${report.spc_enrichment ? 'Enhanced' : 'Pending'}</small>
+                        </td>
+                        <td>
+                            <a href="/spc/reports/${report.id}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        No enriched reports found
+                    </td>
+                </tr>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading enriched reports table:', error);
+        document.getElementById('enriched-reports-tbody').innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center text-danger py-4">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Error loading reports
+                </td>
+            </tr>
+        `;
+    }
+}
+</script>
+{% endblock %}

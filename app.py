@@ -3591,6 +3591,48 @@ def api_get_spc_report_enrichment(report_id):
         logger.error(f"SPC enrichment retrieval failed for report {report_id}: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/spc/enrichment-dashboard')
+def spc_enrichment_dashboard():
+    """SPC Report Enrichment Dashboard"""
+    return render_template('spc_enrichment_dashboard.html')
+
+@app.route('/api/spc-reports/enrichment-stats')
+def api_spc_enrichment_stats():
+    """Get SPC report enrichment statistics"""
+    try:
+        # Get total count of SPC reports
+        total_count = db.session.query(SPCReport).count()
+        
+        # Get count of enriched reports (those with non-empty spc_enrichment)
+        enriched_count = db.session.query(SPCReport).filter(
+            SPCReport.spc_enrichment.isnot(None),
+            SPCReport.spc_enrichment != {}
+        ).count()
+        
+        # Calculate pending count
+        pending_count = total_count - enriched_count
+        
+        # Get recent enrichment activity (last 24 hours)
+        from datetime import datetime, timedelta
+        recent_cutoff = datetime.utcnow() - timedelta(hours=24)
+        recent_enriched = db.session.query(SPCReport).filter(
+            SPCReport.spc_enrichment.isnot(None),
+            SPCReport.spc_enrichment != {},
+            SPCReport.created_at >= recent_cutoff
+        ).count()
+        
+        return jsonify({
+            'total_count': total_count,
+            'enriched_count': enriched_count,
+            'pending_count': pending_count,
+            'enrichment_percentage': round((enriched_count / total_count * 100) if total_count > 0 else 0, 1),
+            'recent_enriched_24h': recent_enriched
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting enrichment stats: {e}")
+        return jsonify({'error': 'Failed to get enrichment statistics'}), 500
+
 if __name__ == '__main__':
     with app.app_context():
         init_scheduler()
