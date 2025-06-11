@@ -1106,6 +1106,156 @@ def internal_status():
             'error': str(e)
         }), 500
 
+# Radar Alerts API Endpoints
+@app.route('/api/radar-alerts/stats')
+def api_radar_alerts_stats():
+    """Get statistics for processed radar alerts"""
+    try:
+        # Import RadarAlert model
+        from models import RadarAlert
+        
+        # Basic stats
+        total_events = RadarAlert.query.count()
+        hail_events = RadarAlert.query.filter(RadarAlert.event_type == 'hail').count()
+        wind_events = RadarAlert.query.filter(RadarAlert.event_type == 'wind').count()
+        
+        # Events created today
+        today = datetime.utcnow().date()
+        events_created_today = RadarAlert.query.filter(
+            db.func.date(RadarAlert.created_at) == today
+        ).count()
+        
+        # Date range
+        date_range = db.session.query(
+            db.func.min(RadarAlert.event_date).label('earliest'),
+            db.func.max(RadarAlert.event_date).label('latest')
+        ).first()
+        
+        return jsonify({
+            'total_events': total_events,
+            'hail_events': hail_events,
+            'wind_events': wind_events,
+            'events_created_today': events_created_today,
+            'earliest_date': date_range.earliest.isoformat() if date_range.earliest else None,
+            'latest_date': date_range.latest.isoformat() if date_range.latest else None
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting radar alerts stats: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/radar-alerts/available-dates')
+def api_radar_alerts_available_dates():
+    """Get available dates with radar event counts"""
+    try:
+        from models import RadarAlert
+        
+        # Group by event date and get counts
+        date_stats = db.session.query(
+            RadarAlert.event_date,
+            db.func.count(RadarAlert.id).label('total_count'),
+            db.func.sum(db.case((RadarAlert.event_type == 'hail', 1), else_=0)).label('hail_count'),
+            db.func.sum(db.case((RadarAlert.event_type == 'wind', 1), else_=0)).label('wind_count')
+        ).group_by(RadarAlert.event_date).order_by(RadarAlert.event_date.desc()).all()
+        
+        dates = []
+        for stat in date_stats:
+            dates.append({
+                'date': stat.event_date.isoformat(),
+                'count': stat.total_count,
+                'hail_count': stat.hail_count,
+                'wind_count': stat.wind_count
+            })
+        
+        return jsonify({'dates': dates})
+        
+    except Exception as e:
+        logger.error(f"Error getting available dates: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/radar-alerts')
+def api_radar_alerts_list():
+    """Get list of processed radar alerts with pagination"""
+    try:
+        from models import RadarAlert
+        
+        # Get query parameters
+        limit = min(int(request.args.get('limit', 50)), 100)  # Max 100 for performance
+        offset = int(request.args.get('offset', 0))
+        event_type = request.args.get('event_type')
+        date_filter = request.args.get('date')
+        
+        # Build query
+        query = RadarAlert.query
+        
+        if event_type:
+            query = query.filter(RadarAlert.event_type == event_type)
+        
+        if date_filter:
+            try:
+                filter_date = datetime.strptime(date_filter, '%Y-%m-%d').date()
+                query = query.filter(RadarAlert.event_date == filter_date)
+            except ValueError:
+                pass  # Invalid date format, ignore
+        
+        # Get results
+        alerts = query.order_by(
+            RadarAlert.detected_time.desc()
+        ).offset(offset).limit(limit).all()
+        
+        # Convert to dict format
+        events = []
+        for alert in alerts:
+            events.append(alert.to_dict())
+        
+        return jsonify({
+            'events': events,
+            'total': query.count(),
+            'limit': limit,
+            'offset': offset
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting radar alerts list: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/radar-alerts/backfill', methods=['POST'])
+def api_radar_alerts_backfill():
+    """Trigger radar alerts backfill processing"""
+    try:
+        import radar_backfill
+        
+        data = request.get_json()
+        start_date_str = data.get('start_date')
+        end_date_str = data.get('end_date') 
+        batch_size = data.get('batch_size', 100)
+        
+        if not start_date_str or not end_date_str:
+            return jsonify({'error': 'start_date and end_date are required'}), 400
+        
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+        
+        if start_date > end_date:
+            return jsonify({'error': 'start_date must be before or equal to end_date'}), 400
+        
+        # Run backfill processing
+        logger.info(f"Starting radar alerts backfill from {start_date} to {end_date}")
+        stats = radar_backfill.process_date_range(start_date, end_date, batch_size)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Backfill completed for {start_date} to {end_date}',
+            'stats': stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in radar alerts backfill: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/internal/dashboard')
 def internal_dashboard():
     """Admin dashboard"""
