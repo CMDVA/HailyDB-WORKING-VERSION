@@ -173,6 +173,22 @@
                         <div class="col-12">
                             <h6 class="text-muted mb-2">Location Context</h6>
                             
+                            <!-- Primary Location -->
+                            {% set primary_location = report.spc_enrichment.nearby_places|selectattr('type', 'equalto', 'primary_location')|first %}
+                            {% if primary_location %}
+                            <div class="mb-3 p-3 bg-primary bg-opacity-10 rounded border-start border-primary border-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-map-marker-alt text-primary me-2"></i>
+                                    <span class="fw-bold text-primary">Event Location:</span>
+                                    <span class="ms-2 fw-bold">{{ primary_location.name }}</span>
+                                    <span class="badge bg-primary ms-2">at coordinates</span>
+                                </div>
+                                <small class="text-muted d-block mt-1 ms-3">
+                                    Primary location where the event occurred
+                                </small>
+                            </div>
+                            {% endif %}
+
                             <!-- Nearest City (prominently displayed) -->
                             {% set nearest_city = report.spc_enrichment.nearby_places|selectattr('type', 'equalto', 'nearest_city')|first %}
                             {% if nearest_city %}
@@ -197,7 +213,7 @@
                             <h6 class="text-muted mb-2 small">Other Nearby Places</h6>
                             <div class="row">
                                 {% for place in report.spc_enrichment.nearby_places[:6] %}
-                                {% if place.type != 'nearest_city' %}
+                                {% if place.type != 'nearest_city' and place.type != 'primary_location' %}
                                 <div class="col-6 mb-2">
                                     <div class="d-flex align-items-center">
                                         <i class="fas fa-map-pin text-primary me-2 small"></i>
