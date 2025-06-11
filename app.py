@@ -3138,13 +3138,10 @@ def get_radar_alerts_summary():
             COUNT(CASE WHEN event_type = 'wind' THEN 1 END) as wind_count,
             MAX(CASE WHEN event_type = 'wind' THEN wind_mph END) as max_wind_mph
         FROM expanded_data
+        WHERE 1=1
         """
         
         params = {'start_date': start_date, 'end_date': end_date}
-        
-        sql_query += """
-        WHERE 1=1
-        """
         
         # Apply filters
         if state_filter:
