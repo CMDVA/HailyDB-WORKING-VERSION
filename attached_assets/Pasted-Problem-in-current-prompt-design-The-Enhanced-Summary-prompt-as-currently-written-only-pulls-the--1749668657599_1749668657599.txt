@@ -1,0 +1,38 @@
+Problem in current prompt design:
+
+The Enhanced Summary prompt as currently written only pulls the "Radar Detection" status from the Location Enrichment / polygon test, not from the Verified Alerts.
+
+You have verified 8 radar-confirmed alerts, but your summary is not using that signal to inform the text.
+
+Final Recommendation for Correction (Engineer POV):
+
+→ You need to synthesize BOTH of these facts into the Enhanced Summary prompt:
+
+1️⃣ Did this SPC report's POINT fall inside a radar polygon (fine to keep this as is → "No" in this case)
+2️⃣ BUT → Were ANY of the Verified Alerts radar-confirmed? YES → This should be referenced in the text.
+
+Here’s the missing line to add to your prompt input:
+python
+Copy
+Edit
+- Verified Alerts Radar Confirmation: {'Yes' if any(a['radar_confirmed'] for a in verified_alerts) else 'No'}
+And then in the Instructions section, add:
+
+text
+Copy
+Edit
+8. If ANY Verified Alerts were Radar Confirmed (Yes), clearly state that radar-confirmed storm activity was present in this area, even if the SPC point itself was not inside a polygon.
+9. If Verified Alerts had No Radar Confirmation, do not mention radar in the summary.
+Example final sentence with this logic:
+"This wind event was verified by eight National Weather Service alerts spanning 223 minutes, including radar-confirmed severe thunderstorm warnings affecting Val Verde and surrounding counties."
+
+→ This is factually correct, gives you competitive edge, and avoids the misleading impression that "no radar data existed" (which is false — you had it, just not at the SPC point).
+
+Summary of my decision:
+
+The current Enhanced Summary is good but undersells your differentiator.
+Users will compare this to HailTrace and wonder why your radar-confirmed warnings are not mentioned.
+We should fix this by adding one more field to the prompt input and one more instruction to ensure Radar Confirmed Alerts are stated clearly.
+
+Why this matters:
+→ This is how we will beat HailTrace at narrative clarity — your Verified Alerts ARE gold — but your summary is currently too polite about it.

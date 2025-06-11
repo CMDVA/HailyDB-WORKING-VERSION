@@ -218,10 +218,25 @@ class SPCEnhancedContextService:
                 if closest_places:
                     nearby_context = f"near {', '.join(closest_places)}"
 
-            # Check for radar polygon detection
+            # Check for radar polygon detection from verified alerts
             radar_polygon_match = False
             radar_event_type = 'N/A'
-            if hasattr(report, 'location_enrichment') and report.location_enrichment:
+            
+            # Check if any verified alerts have radar-indicated data (wind/hail measurements)
+            for alert in verified_alerts:
+                if hasattr(alert, 'radar_indicated') and alert.radar_indicated:
+                    try:
+                        radar_data = json.loads(alert.radar_indicated) if isinstance(alert.radar_indicated, str) else alert.radar_indicated
+                        # If alert has wind or hail measurements, it's radar-confirmed
+                        if radar_data and (radar_data.get('wind_mph', 0) > 0 or radar_data.get('hail_inches', 0) > 0):
+                            radar_polygon_match = True
+                            radar_event_type = alert.event if hasattr(alert, 'event') else 'severe thunderstorm'
+                            break
+                    except:
+                        continue
+            
+            # Fallback: check location enrichment if no radar data from alerts
+            if not radar_polygon_match and hasattr(report, 'location_enrichment') and report.location_enrichment:
                 try:
                     enrichment_data = json.loads(report.location_enrichment) if isinstance(report.location_enrichment, str) else report.location_enrichment
                     radar_polygon_match = enrichment_data.get('polygon_detected', False)
