@@ -230,9 +230,12 @@ class SPCEnhancedContextService:
                 self._check_radar_confirmation(alert, report) for alert in verified_alerts
             )
 
+            # Include SPC comments for damage emphasis
+            damage_details = report.comments if hasattr(report, 'comments') and report.comments else 'No damage details provided'
+            
             prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable property damage intelligence.
 
-You are generating an Enhanced Summary for an SPC storm report. Your goal is to clearly communicate the event location, its geographic context, and the strength of radar and NWS verification — in clean, professional layman terms.
+You are generating an Enhanced Summary for an SPC storm report. Your goal is to clearly communicate the event location, its geographic context, damage details, and the strength of radar and NWS verification — in clean, professional layman terms.
 
 Inputs:
 
@@ -241,6 +244,7 @@ SPC Report Details:
 - Location: {report.location}, {report.county}, {report.state}
 - Time: {report.time_utc}
 - Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
+- SPC Damage Comments: {damage_details}
 
 Location Context:
 - Event Location: {event_location}
@@ -255,14 +259,16 @@ Verification Context:
 Your Enhanced Summary MUST follow these principles:
 
 1️⃣ Lead with Event Location and Event Type in the first sentence.
-2️⃣ Include Nearest Major City in the first or second sentence.
-3️⃣ Reference Radar Detection Status in a clear factual sentence ("Radar-confirmed storm activity was detected in this area." or "No radar-confirmed polygon was present at this location.").
-4️⃣ Include 2–4 of the Nearby Places inline, to help human users understand location.
-5️⃣ Always positively frame verification — highlight that the event was supported by {len(verified_alerts)} NWS alerts over {duration_minutes} minutes.
-6️⃣ Do not include the name of the NWS Office or overly technical phrases.
-7️⃣ Avoid defensive or hedging language — focus on presenting a clean, confident, factual geographic summary.
+2️⃣ Include specific damage details from SPC comments - EMPHASIZE any mention of property damage, homes, structures.
+3️⃣ Include distance from Nearest Major City: "The event occurred [distance] from [city]"
+4️⃣ Reference Radar Detection Status in a clear factual sentence.
+5️⃣ Include 2–4 of the Nearby Places to help human users understand location.
+6️⃣ Always positively frame verification — highlight that the event was supported by {len(verified_alerts)} NWS alerts over {duration_minutes} minutes.
+7️⃣ Do not include the name of the NWS Office or overly technical phrases.
+8️⃣ Avoid defensive or hedging language — focus on presenting a clean, confident, factual geographic summary.
+9️⃣ NEVER use the phrase "providing a clearer understanding of the affected area"
 
-Do NOT omit the Nearby Places section. This is a critical feature and differentiator of our product."""
+Do NOT omit damage details or nearby places sections. These are critical features."""
 
             response = client.chat.completions.create(
                 model="gpt-4o",
@@ -302,6 +308,9 @@ Do NOT omit the Nearby Places section. This is a critical feature and differenti
                 if closest_places:
                     nearby_context = f"near {', '.join(closest_places)}"
 
+            # Include SPC comments for damage emphasis
+            damage_details = report.comments if hasattr(report, 'comments') and report.comments else 'No damage details provided'
+            
             prompt = f"""Generate a location-enhanced summary for this SPC storm report:
 
 SPC Report Details:
@@ -309,7 +318,7 @@ SPC Report Details:
 - Location: {report.location}, {report.county}, {report.state}
 - Time: {report.time_utc}
 - Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
-- Comments: {report.comments}
+- SPC Damage Comments: {damage_details}
 
 Location Context (USE THIS DATA):
 - Nearest Major City: {major_city} ({major_city_distance} away)
@@ -317,10 +326,12 @@ Location Context (USE THIS DATA):
 
 Create a 1-2 sentence enhanced summary that:
 1. Starts with the SPC report location: "{report.location}, {report.county}, {report.state}"
-2. Reference the nearest major city: "{major_city}" at "{major_city_distance}" away when available
-3. Include nearby places when available: {nearby_context}
-4. Describes the SPC report type and measurement clearly
-5. Makes the location meaningful and accessible to readers
+2. Include specific damage details from SPC comments - EMPHASIZE any mention of property damage, homes, structures
+3. Include distance from nearest major city: "The event occurred {major_city_distance} from {major_city}" 
+4. Include nearby places when available: {nearby_context}
+5. Describes the SPC report type and measurement clearly
+6. Makes the location meaningful and accessible to readers
+7. NEVER use the phrase "providing a clearer understanding of the affected area"
 
 CRITICAL: Use the provided location data exactly as given. Do not add historical context or speculation."""
 
