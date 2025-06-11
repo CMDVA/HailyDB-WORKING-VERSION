@@ -218,32 +218,24 @@ class SPCEnhancedContextService:
                 if closest_places:
                     nearby_context = f"near {', '.join(closest_places)}"
 
-            # Check for radar polygon detection from verified alerts
+            # Check for radar polygon detection at SPC point location
             radar_polygon_match = False
             radar_event_type = 'N/A'
             
-            # Check if any verified alerts have radar-indicated data (wind/hail measurements)
-            for alert in verified_alerts:
-                if hasattr(alert, 'radar_indicated') and alert.radar_indicated:
-                    try:
-                        radar_data = json.loads(alert.radar_indicated) if isinstance(alert.radar_indicated, str) else alert.radar_indicated
-                        # If alert has wind or hail measurements, it's radar-confirmed
-                        if radar_data and (radar_data.get('wind_mph', 0) > 0 or radar_data.get('hail_inches', 0) > 0):
-                            radar_polygon_match = True
-                            radar_event_type = alert.event if hasattr(alert, 'event') else 'severe thunderstorm'
-                            break
-                    except:
-                        continue
-            
-            # Fallback: check location enrichment if no radar data from alerts
-            if not radar_polygon_match and hasattr(report, 'location_enrichment') and report.location_enrichment:
+            # Check location enrichment for point-in-polygon radar detection
+            if hasattr(report, 'spc_enrichment') and report.spc_enrichment:
                 try:
-                    enrichment_data = json.loads(report.location_enrichment) if isinstance(report.location_enrichment, str) else report.location_enrichment
-                    radar_polygon_match = enrichment_data.get('polygon_detected', False)
+                    enrichment_data = json.loads(report.spc_enrichment) if isinstance(report.spc_enrichment, str) else report.spc_enrichment
+                    radar_polygon_match = enrichment_data.get('radar_polygon_match', False)
                     if radar_polygon_match:
-                        radar_event_type = enrichment_data.get('radar_event_type', 'storm activity')
+                        radar_event_type = 'storm activity'
                 except:
                     pass
+            
+            # Check if ANY verified alerts have radar confirmation (from polygon match status)
+            verified_alerts_radar_confirmed = any(
+                self._check_radar_confirmation(alert, report) for alert in verified_alerts
+            )
 
             prompt = f"""Generate a professional 2-3 sentence enhanced summary for this SPC storm report.
 
@@ -252,6 +244,7 @@ SPC Report Details:
 - Location: {report.location}, {report.county}, {report.state}
 - Time: {report.time_utc}
 - Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
+- Verified Alerts Radar Confirmation: {'Yes' if verified_alerts_radar_confirmed else 'No'}
 
 Location Context:
 - Nearest Major City: {major_city} ({major_city_distance} away)
@@ -277,6 +270,8 @@ Write a clear and professional summary that:
 5. Emphasizes the number of Verified NWS Alerts, duration, and geographic coverage.
 6. Optionally includes the NWS Office name to provide source credibility.
 7. Write for a broad audience — use plain language, avoid technical jargon like 'polygon', 'lat/lon', or 'point-in-polygon'.
+8. If ANY Verified Alerts were Radar Confirmed (Verified Alerts Radar Confirmation == Yes), clearly state that radar-confirmed storm activity was present in this area, even if the SPC point itself was not inside a radar polygon.
+9. If Verified Alerts Radar Confirmation == No, do not mention radar in the summary.
 
 CRITICAL:
 - Follow the above instructions strictly.
@@ -477,42 +472,16 @@ Focus on locations that would be relevant for insurance, restoration, or emergen
         return polygon_status
     
     def _check_radar_confirmation(self, alert: Alert, report: SPCReport) -> bool:
-        """Check if alert has radar confirmation at report location"""
-        try:
-            # Check if alert has radar_indicated data
-            if alert.radar_indicated:
-                return True
-            
-            # Check radar_alerts table for polygon match
-            if alert.geometry and report.lat and report.lon:
-                query = text("""
-                    SELECT COUNT(*) > 0 as has_radar
-                    FROM radar_alerts ra
-                    WHERE ST_Contains(
-                        ST_GeomFromGeoJSON(:geometry),
-                        ST_Point(:lon, :lat)
-                    )
-                    AND ra.event_date BETWEEN :start_date AND :end_date
-                """)
-                
-                start_date = alert.effective.date() if alert.effective else report.date_obj
-                end_date = alert.expires.date() if alert.expires else report.date_obj
-                
-                result = self.db.execute(query, {
-                    "geometry": alert.geometry,
-                    "lon": report.lon,
-                    "lat": report.lat,
-                    "start_date": start_date,
-                    "end_date": end_date
-                })
-                
-                return bool(result.scalar())
-            
-            return False
-            
-        except Exception as e:
-            logger.error(f"Error checking radar confirmation: {e}")
-            return False
+        """Check if alert has radar confirmation from polygon match status"""
+        # Check if this alert has radar-indicated data (wind/hail measurements)
+        if hasattr(alert, 'radar_indicated') and alert.radar_indicated:
+            try:
+                radar_data = json.loads(alert.radar_indicated) if isinstance(alert.radar_indicated, str) else alert.radar_indicated
+                # If alert has wind or hail measurements, it's radar-confirmed
+                return radar_data and (radar_data.get('wind_mph', 0) > 0 or radar_data.get('hail_inches', 0) > 0)
+            except:
+                pass
+        return False
     
     def enrich_all_verified_reports(self, batch_size: int = 50) -> Dict[str, int]:
         """Enrich all verified SPC reports with enhanced context"""
