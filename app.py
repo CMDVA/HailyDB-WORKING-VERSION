@@ -3736,222 +3736,94 @@ def api_generate_enhanced_context():
 @app.route('/api/live-radar-alerts', methods=['GET'])
 def api_live_radar_alerts():
     """
-    Hybrid Live Radar Alerts API
-    First loads recent radar-detected alerts from database, then supplements with fresh NWS data
-    This approach is more lightweight and provides complete historical coverage
+    Production-Grade Live NWS Radar Alerts API
+    Serves ONLY live in-memory NWS feed with webhook deduplication
+    Includes explicit certainty, alert status, and state/county filtering
     """
     try:
-        from datetime import datetime, timedelta
-        from sqlalchemy import or_
-        import requests
-        import re
+        from live_radar_service_enhanced import get_live_radar_service
         
-        # Step 1: Load recent radar-detected alerts from our database (last 24 hours)
-        cutoff_time = datetime.utcnow() - timedelta(hours=24)
+        # Get production-grade live radar service
+        live_service = get_live_radar_service()
         
-        db_alerts = db.session.query(Alert).filter(
-            Alert.radar_indicated.isnot(None),
-            Alert.effective >= cutoff_time,
-            or_(
-                Alert.radar_indicated.op('->>')('hail_inches').cast(db.Float) > 0,
-                Alert.radar_indicated.op('->>')('wind_mph').cast(db.Integer) >= 50
-            )
-        ).order_by(Alert.effective.desc()).limit(200).all()
+        # Get query parameters for filtering
+        state = request.args.get('state')
+        county = request.args.get('county')
         
-        enriched_alerts = []
-        states_set = set()
+        # Poll NWS alerts and get processed radar alerts
+        nws_result = live_service.poll_nws_alerts()
         
-        # Convert database alerts to API format
-        for alert in db_alerts:
-            radar_data = alert.radar_indicated or {}
-            
-            # Parse city names if available
-            city_names = []
-            if alert.city_names:
-                city_names = alert.city_names
-            elif alert.area_desc:
-                from city_parser import CityNameParser
-                city_parser = CityNameParser()
-                city_names = city_parser.parse_area_desc(alert.area_desc)
-            
-            # Extract states from area description
-            states = []
-            if alert.area_desc:
-                state_pattern = r'\b([A-Z]{2})\b'
-                state_matches = re.findall(state_pattern, alert.area_desc)
-                states = list(set(state_matches))
-                states_set.update(states)
-            
-            # Generate message template
-            message_template = generate_alert_message_template(
-                alert.raw.get('properties', {}) if alert.raw else {},
-                radar_data,
-                city_names
-            )
-            
-            enriched_alert = {
-                'id': alert.id,
-                'event': alert.event,
-                'urgency': alert.properties.get('urgency') if alert.properties else None,
-                'severity': alert.severity,
-                'certainty': alert.properties.get('certainty') if alert.properties else None,
-                'area_desc': alert.area_desc,
-                'headline': alert.properties.get('headline') if alert.properties else None,
-                'description': alert.properties.get('description') if alert.properties else None,
-                'effective': alert.effective.isoformat() if alert.effective else None,
-                'expires': alert.expires.isoformat() if alert.expires else None,
-                'sent': alert.sent.isoformat() if alert.sent else None,
-                'sender_name': alert.properties.get('senderName') if alert.properties else None,
-                'radar_indicated': True,
-                'radar_data': radar_data,
-                'city_names': city_names,
-                'states': states,
-                'message_template': message_template,
-                'geometry': alert.geometry,
-                'nws_id': alert.id,
-                'web_url': f"https://alerts.weather.gov/cap/{alert.id.split('.')[-1]}.html" if alert.id else None,
-                'source': 'database'
+        if not nws_result['success']:
+            return jsonify({
+                'success': False,
+                'error': nws_result.get('error', 'Failed to poll NWS alerts'),
+                'alerts': [],
+                'statistics': {}
+            }), 500
+        
+        # Apply filtering if requested
+        if state or county:
+            filtered_alerts = live_service.get_filtered_alerts(state=state, county=county)
+        else:
+            filtered_alerts = nws_result['alerts']
+        
+        # Convert to API response format with enhanced fields
+        api_alerts = []
+        for alert in filtered_alerts:
+            # Ensure consistent field mapping for client compatibility
+            api_alert = {
+                'id': alert['id'],
+                'event': alert['event'],
+                'max_wind_gust': alert.get('max_wind_gust'),
+                'max_hail_size': alert.get('max_hail_size'),
+                'area_desc': alert['area_desc'],
+                'affected_states': alert['affected_states'],
+                'county_names': alert['county_names'],
+                'certainty': alert['certainty'],  # Enhanced: "Observed" or "Expected"
+                'certainty_raw': alert['certainty_raw'],  # Original NWS value
+                'urgency': alert['urgency'],
+                'severity': alert['severity'],
+                'radar_indicated_event': alert['radar_indicated_event'],
+                'alert_message_template': alert['alert_message_template'],
+                'effective_time': alert.get('effective_time'),
+                'expires_time': alert.get('expires_time'),
+                'geometry': alert.get('geometry'),
+                'description': alert['description'],
+                'instruction': alert['instruction'],
+                'created_at': alert['created_at'],
+                'alert_status': alert['alert_status'],  # "ACTIVE" or "EXPIRED"
+                'source': alert['source'],  # "live_nws"
+                'web_url': alert.get('web_url'),
+                # Legacy field mapping for client compatibility
+                'radar_data': {
+                    'wind_mph': alert.get('max_wind_gust', 0),
+                    'hail_inches': alert.get('max_hail_size', 0.0)
+                },
+                'states': alert['affected_states'],
+                'message_template': alert['alert_message_template'],
+                'nws_id': alert['id']
             }
-            
-            enriched_alerts.append(enriched_alert)
+            api_alerts.append(api_alert)
         
-        # Step 2: Supplement with fresh NWS data for very recent alerts (last 2 hours)
-        # This catches any new alerts that might not be in our database yet
-        recent_cutoff = datetime.utcnow() - timedelta(hours=2)
-        db_alert_ids = {alert.id for alert in db_alerts if alert.id}
-        
-        try:
-            response = requests.get(Config.NWS_ALERT_URL, headers=Config.NWS_HEADERS, timeout=10)
-            response.raise_for_status()
-            
-            nws_data = response.json()
-            raw_alerts = nws_data.get('features', [])
-            
-            # Process fresh NWS alerts
-            from historical_radar_parser import HistoricalRadarParser
-            from city_parser import CityNameParser
-            
-            radar_parser = HistoricalRadarParser()
-            city_parser = CityNameParser()
-            
-            for feature in raw_alerts:
-                props = feature.get('properties', {})
-                alert_id = props.get('id')
-                
-                # Skip if we already have this alert from database
-                if alert_id in db_alert_ids:
-                    continue
-                
-                # Check if this is recent and severe weather related
-                effective_str = props.get('effective')
-                if effective_str:
-                    try:
-                        effective_dt = datetime.fromisoformat(effective_str.replace('Z', '+00:00')).replace(tzinfo=None)
-                        if effective_dt < recent_cutoff:
-                            continue
-                    except:
-                        continue
-                
-                event = (props.get('event') or '').lower()
-                description = (props.get('description') or '').lower()
-                
-                # Filter for severe weather alerts
-                is_severe_weather = any(keyword in event for keyword in [
-                    'severe thunderstorm', 'tornado', 'severe weather'
-                ])
-                
-                has_radar_keywords = any(keyword in description for keyword in [
-                    'radar indicated', 'radar showing', 'doppler radar', 'radar detected'
-                ])
-                
-                has_wind_hail_indicators = any(keyword in description for keyword in [
-                    'mph', 'wind', 'hail', 'quarter size', 'golf ball', 'ping pong', 'tennis ball'
-                ])
-                
-                if not (is_severe_weather or has_radar_keywords or has_wind_hail_indicators):
-                    continue
-                
-                # Extract radar data
-                class MockAlert:
-                    def __init__(self, properties):
-                        self.raw = {'properties': properties}
-                
-                mock_alert = MockAlert(props)
-                radar_data = radar_parser._extract_radar_data(mock_alert)
-                
-                # Only include if it has meaningful radar data
-                if not radar_data or (not radar_data.get('hail_inches', 0) and not radar_data.get('wind_mph', 0)):
-                    continue
-                
-                # Parse city names and states
-                area_desc = props.get('areaDesc', '')
-                city_names = city_parser.parse_area_desc(area_desc) if area_desc else []
-                
-                states = []
-                if area_desc:
-                    state_pattern = r'\b([A-Z]{2})\b'
-                    state_matches = re.findall(state_pattern, area_desc)
-                    states = list(set(state_matches))
-                    states_set.update(states)
-                
-                message_template = generate_alert_message_template(props, radar_data, city_names)
-                
-                enriched_alert = {
-                    'id': props.get('id'),
-                    'event': props.get('event'),
-                    'urgency': props.get('urgency'),
-                    'severity': props.get('severity'),
-                    'certainty': props.get('certainty'),
-                    'area_desc': area_desc,
-                    'headline': props.get('headline'),
-                    'description': props.get('description'),
-                    'effective': props.get('effective'),
-                    'expires': props.get('expires'),
-                    'sent': props.get('sent'),
-                    'sender_name': props.get('senderName'),
-                    'radar_indicated': True,
-                    'radar_data': radar_data,
-                    'city_names': city_names,
-                    'states': states,
-                    'message_template': message_template,
-                    'geometry': feature.get('geometry'),
-                    'nws_id': props.get('id'),
-                    'web_url': f"https://alerts.weather.gov/cap/{props.get('id', '').split('.')[-1]}.html" if props.get('id') else None,
-                    'source': 'live_nws'
-                }
-                
-                enriched_alerts.append(enriched_alert)
-                
-        except Exception as e:
-            logger.warning(f"Error fetching supplemental NWS data: {e}")
-            # Continue with database data only
-        
-        # Sort by effective time (most recent first)
-        enriched_alerts.sort(key=lambda x: x.get('effective', '') or '', reverse=True)
-        
-        # Calculate statistics
-        hail_alerts = sum(1 for alert in enriched_alerts if alert['radar_data'].get('hail_inches', 0) > 0)
-        wind_alerts = sum(1 for alert in enriched_alerts if alert['radar_data'].get('wind_mph', 0) >= 50)
-        
-        stats = {
-            'total_alerts': len(enriched_alerts),
-            'wind_hail_alerts': len(enriched_alerts),
-            'radar_detected': len(enriched_alerts),
-            'hail_alerts': hail_alerts,
-            'wind_alerts': wind_alerts,
-            'states_affected': list(states_set),
-            'states_count': len(states_set),
-            'database_alerts': sum(1 for alert in enriched_alerts if alert.get('source') == 'database'),
-            'live_nws_alerts': sum(1 for alert in enriched_alerts if alert.get('source') == 'live_nws')
-        }
+        # Enhanced statistics with production metrics
+        service_status = live_service.get_status_info()
+        enhanced_stats = nws_result['statistics'].copy()
+        enhanced_stats.update({
+            'filtered_alerts_count': len(api_alerts),
+            'service_status': service_status['service_status'],
+            'alerts_in_cache': service_status['alerts_in_store'],
+            'webhook_cache_size': service_status['webhook_cache_size'],
+            'webhook_suppressions': service_status['webhook_suppressions'],
+            'last_poll_timestamp': service_status['last_poll_timestamp']
+        })
         
         return jsonify({
             'success': True,
-            'alerts': enriched_alerts,
-            'statistics': stats,
-            'last_updated': datetime.utcnow().isoformat(),
-            'source': 'hybrid_database_nws',
-            'description': 'Recent radar-detected alerts from database supplemented with live NWS data'
+            'alerts': api_alerts,
+            'statistics': enhanced_stats,
+            'last_updated': nws_result['last_poll_timestamp'],
+            'source': 'live_nws_production',
+            'description': 'Production-grade live NWS radar alerts with webhook deduplication'
         })
         
     except Exception as e:

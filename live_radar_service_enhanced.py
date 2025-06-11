@@ -179,7 +179,9 @@ class ProductionLiveRadarService:
                 try:
                     param_wind = parameters['windSpeed'][0] if isinstance(parameters['windSpeed'], list) else parameters['windSpeed']
                     if isinstance(param_wind, str) and 'mph' in param_wind:
-                        wind_speed = max(wind_speed, int(re.search(r'(\d+)', param_wind).group(1)))
+                        wind_match = re.search(r'(\d+)', param_wind)
+                        if wind_match:
+                            wind_speed = max(wind_speed, int(wind_match.group(1)))
                 except:
                     pass
             
@@ -400,7 +402,7 @@ class ProductionLiveRadarService:
         self.webhook_seen_ids[alert_id] = True
         return True
     
-    def get_filtered_alerts(self, state: str = None, county: str = None) -> List[Dict]:
+    def get_filtered_alerts(self, state: Optional[str] = None, county: Optional[str] = None) -> List[Dict]:
         """Get alerts filtered by state and/or county"""
         alerts = list(self.alerts_store.values())
         
