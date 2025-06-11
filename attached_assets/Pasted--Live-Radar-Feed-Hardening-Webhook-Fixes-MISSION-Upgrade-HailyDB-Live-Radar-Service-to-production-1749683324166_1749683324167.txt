@@ -1,0 +1,130 @@
+ Live Radar Feed Hardening + Webhook Fixes
+MISSION: Upgrade HailyDB Live Radar Service to production readiness for paid client delivery.
+
+The following upgrades must be implemented across live_radar_service.py, spc_enrichment.py, /api/live-radar-alerts, and related webhook code.
+
+CORE RULE: Radar Alerts = Hail (any size) or Wind (≥ 50 mph). This is the primary logic and must remain the focus.
+
+1️⃣ API Cleanup
+→ Split API endpoints cleanly:
+
+/api/live-radar-alerts → serve only live in-memory NWS feed.
+
+/api/radar-alerts → serve only persisted historical radar_alerts table.
+
+→ Add required fields to each API response:
+
+json
+Copy
+Edit
+"source": "live_nws" | "historical_db",
+"alert_status": "ACTIVE" | "EXPIRED",    # computed from expires_time
+"certainty": "Observed" | "Expected",    # parsed certainty value
+"certainty_raw": original NWS certainty value
+"last_nws_poll_timestamp": ISO timestamp  # expose on live endpoint
+2️⃣ Observed vs Expected
+→ Enhance _determine_radar_indication():
+
+Must output explicit certainty = "Observed" | "Expected" based on:
+
+certainty field from NWS API
+
+NWS alert text patterns in description and parameters
+
+Include certainty + certainty_raw in webhook payload and API.
+
+3️⃣ Webhook Dedupe Logic
+→ Implement in-memory "seen ID" cache for webhook deduplication:
+
+Use TTLCache or similar:
+
+python
+Copy
+Edit
+self.seen_alert_ids = TTLCache(maxsize=5000, ttl=600)
+On webhook evaluation:
+
+python
+Copy
+Edit
+if alert.id in self.seen_alert_ids:
+    skip webhook dispatch
+else:
+    fire webhook, add alert.id to cache
+Log webhook suppressions.
+
+4️⃣ Auto-Refresh / Poll Sync
+→ Add field last_nws_poll_timestamp to /api/live-radar-alerts response.
+
+→ Update frontend to display "Last updated X seconds ago".
+
+5️⃣ State and County Filtering
+→ Add backend support for:
+
+bash
+Copy
+Edit
+GET /api/live-radar-alerts?state=FL&county=Orange
+→ Apply filters on:
+
+affected_states array
+
+county_names array
+
+→ Document this in API.
+
+6️⃣ Radar Polygon Matching in SPC Enrichment
+→ Improve _check_radar_polygon_containment():
+
+Use Shapely polygon.contains(Point) logic:
+
+python
+Copy
+Edit
+polygon = shape(radar_alert.geometry)
+point = Point(spc_report.longitude, spc_report.latitude)
+radar_polygon_match = polygon.contains(point)
+Store:
+
+json
+Copy
+Edit
+"radar_polygon_match": true/false,
+"radar_polygon_id": radar_alert.id if matched else null
+→ Radar polygon match must be precise polygon containment, not bounding box.
+
+7️⃣ Expired Live Alerts Handling
+→ Adjust _cleanup_expired_alerts():
+
+Retain expired live alerts for 15 min post-expires_time.
+
+Add alert_status: "ACTIVE" | "EXPIRED" field to API response.
+
+PRIORITIES:
+Live Feed must be hardened and stable first → this is critical for launch.
+
+Radar Alerts = Hail (any size), Wind ≥ 50 mph → keep focus.
+
+Webhooks must not spam → dedupe must work.
+
+Certainty must be explicit in API and webhooks.
+
+Polygon matching in SPC Enrichment must be precise.
+
+OUTPUT:
+Fully upgraded /api/live-radar-alerts endpoint, ready for client consumption.
+
+Live Radar Service hardened → ready for 60s polling.
+
+Webhooks safe to launch.
+
+SPC enrichment upgraded → precise polygon containment.
+
+Documentation updated.
+
+NOTE: Live Radar Feed belongs in HailyDB, NOT HailyAI or IDOLCheck. These apps will consume this API.
+
+When Complete:
+Print console message: "✅ Live Radar Upgrade Complete — Ready for Client Use"
+
+Then stop — do not automatically trigger any backfills or reprocesses unless instructed.

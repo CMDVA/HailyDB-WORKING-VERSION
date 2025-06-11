@@ -8,11 +8,14 @@ import logging
 import requests
 import threading
 import time
+import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from cachetools import TTLCache
+from shapely.geometry import shape, Point
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +32,7 @@ class LiveRadarAlert:
     affected_states: List[str]
     county_names: List[str]
     certainty: str
+    certainty_raw: str
     urgency: str
     severity: str
     radar_indicated_event: bool
@@ -41,19 +45,34 @@ class LiveRadarAlert:
     description: str
     instruction: str
     created_at: datetime
+    alert_status: str  # "ACTIVE" | "EXPIRED"
+    source: str  # "live_nws"
 
 class LiveRadarAlertService:
     """
-    Service for continuous polling and processing of live NWS radar alerts
-    Maintains in-memory store with optional database caching
+    Production-grade Live NWS radar alerts service with webhook deduplication
+    Maintains in-memory store with TTL cache for webhook spam prevention
     """
     
-    def __init__(self, db_session: Session = None):
+    def __init__(self, db_session: Session = None, nws_api_url: str = "https://api.weather.gov/alerts/active", 
+                 poll_interval: int = 60, webhook_dedupe_ttl: int = 600):
         self.db = db_session
-        self.active_alerts: Dict[str, LiveRadarAlert] = {}
-        self.running = False
-        self.poll_thread = None
-        self.poll_interval = 60  # 60 seconds for real-time updates
+        self.nws_api_url = nws_api_url
+        self.poll_interval = poll_interval
+        self.alerts_store: Dict[str, LiveRadarAlert] = {}
+        self.last_poll_timestamp: Optional[datetime] = None
+        self.is_running = False
+        self.poll_thread: Optional[threading.Thread] = None
+        
+        # Webhook deduplication cache - prevents spam
+        self.webhook_seen_ids = TTLCache(maxsize=5000, ttl=webhook_dedupe_ttl)
+        self.webhook_suppressions = 0
+        
+        # Request headers for NWS API
+        self.headers = {
+            'User-Agent': 'HailyDB-LiveRadar/2.0 (production@hailydb.com)',
+            'Accept': 'application/geo+json'
+        }
         
     def start_polling(self):
         """Start continuous polling of NWS active alerts"""

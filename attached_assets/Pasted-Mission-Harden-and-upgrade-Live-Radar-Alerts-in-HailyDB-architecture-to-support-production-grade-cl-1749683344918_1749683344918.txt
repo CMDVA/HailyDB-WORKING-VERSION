@@ -1,0 +1,142 @@
+Mission: Harden and upgrade Live Radar Alerts in HailyDB architecture to support production-grade client-facing LIVE API and webhook service.
+
+Context:
+We already have:
+
+✅ radar_alerts table for verified/persisted historical radar events
+✅ live_radar_service.py with in-memory polling of NWS /alerts/active
+✅ /api/live-radar-alerts endpoint serving both live and historical events, but mixing concepts
+✅ webhooks partially integrated but vulnerable to duplicate firing
+✅ spc_enrichment partial radar polygon containment implemented (needs improvement)
+
+Step 1️⃣ — Split Live vs Historical Feed
+
+Create separate clean endpoint:
+
+GET /api/live-radar-alerts → LIVE only — from in-memory LiveRadarService
+GET /api/radar-alerts → Historical radar_alerts table (already exists)
+
+Add explicit field to each API response:
+
+json
+Copy
+Edit
+"source": "live_nws" | "historical_db"
+"alert_status": "ACTIVE" | "EXPIRED" → compute from expires_time vs now()
+"certainty": "Observed" | "Expected" → parse from NWS alert certainty + NWS description text patterns
+Step 2️⃣ — Observed vs Expected
+
+Enhance live_radar_service.py:
+
+→ Extend _determine_radar_indication() to output explicit:
+
+json
+Copy
+Edit
+"certainty": "Observed" | "Expected"
+"certainty_raw": original NWS certainty field for traceability
+→ Apply same certainty field in webhook payloads → critical for clients!
+
+Step 3️⃣ — Webhook Dedupe Logic
+
+Implement lightweight "seen ID" cache for LIVE radar webhook dispatch:
+
+→ Use in-memory TTL cache (5–10 min default, configurable):
+
+python
+Copy
+Edit
+self.seen_alert_ids = TTLCache(maxsize=5000, ttl=600)  # example config
+→ On webhook evaluation:
+
+python
+Copy
+Edit
+if alert.id in self.seen_alert_ids:
+    skip webhook
+else:
+    fire webhook, add alert.id to cache
+→ Log webhook suppressions for audit.
+
+Why: You will lose credibility if you spam clients every 60s for same alert.
+
+Step 4️⃣ — Auto-Refresh & Poll Sync Improvements
+
+Add field in /api/live-radar-alerts:
+
+json
+Copy
+Edit
+"last_nws_poll_timestamp": ISO timestamp of last successful NWS API poll
+→ Update frontend to display "Last updated X seconds ago"
+→ Helps explain to clients why sometimes no new alerts show.
+
+Step 5️⃣ — State & County Filtering
+
+Expose backend support for state and county filters:
+
+→ API:
+
+bash
+Copy
+Edit
+GET /api/live-radar-alerts?state=FL&county=Orange
+→ Backend:
+
+Apply filter on affected_states array and county_names array.
+
+→ Document this in API for clients → roofing customers will want this badly.
+
+Step 6️⃣ — Radar Polygon Matching (SPC Enhancement)
+
+Improve _check_radar_polygon_containment():
+
+→ Implement point-in-polygon test (not just bounding box):
+
+→ Use Shapely library (already partially imported) to do:
+
+python
+Copy
+Edit
+polygon = shape(radar_alert.geometry)
+point = Point(spc_report.longitude, spc_report.latitude)
+radar_polygon_match = polygon.contains(point)
+→ Store precise radar_polygon_match: true/false in spc_enrichment.
+
+→ Optional future: add radar_polygon_id to track exact polygon matched.
+
+Step 7️⃣ — Retention of Expired Live Alerts
+
+Adjust _cleanup_expired_alerts():
+
+→ Retain expired alerts for 15 min post-expiration to improve dashboard UX.
+
+→ Add "alert_status": "ACTIVE" | "EXPIRED" flag in API response → clients must know this explicitly.
+
+→ Implement efficient cleanup cycle to purge old expired alerts.
+
+Summary of Expected Outcomes
+
+✅ /api/live-radar-alerts → clean LIVE feed, separated from historical
+✅ Certainty = Observed / Expected clearly exposed in API + webhooks
+✅ Webhook dedupe cache prevents spam
+✅ Frontend shows last NWS poll timestamp for user confidence
+✅ State and county filters supported → client value multiplier
+✅ SPC enrichment uses precise polygon containment → higher quality matching
+✅ Expired Live alerts handled gracefully → UX improvement
+
+Execution Notes:
+
+→ This work belongs in HailyDB core — NOT HailyAI / IDOLCheck → because:
+
+Live API feeds + webhook dispatch → core HailyDB feature
+
+IDOLCheck will be a client of this API → not its owner.
+
+→ Webhooks + Live API are what will sell this product. Get this 100% right before any marketing launch.
+
+→ Once done → we can layer advanced "heatmap" visual APIs and "impact probability scoring" on top of this stable core.
+
+Conclusion:
+This is your critical path → the rest of HailyDB is already best-in-class.
+Live feed must be rock solid, clean, predictable
