@@ -187,6 +187,7 @@
                                 <th>Time</th>
                                 <th>Event Type</th>
                                 <th>Location</th>
+                                <th>State</th>
                                 <th>Hail Size</th>
                                 <th>Wind Speed</th>
                                 <th>Severity</th>
@@ -195,7 +196,7 @@
                         </thead>
                         <tbody id="radarAlertsTableBody">
                             <tr>
-                                <td colspan="7" class="text-center py-4">
+                                <td colspan="8" class="text-center py-4">
                                     <div class="spinner-border text-primary" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
@@ -323,6 +324,9 @@ function updateAlertsTable(alerts) {
                 <td>
                     ${formatLocationInfo(alert)}
                 </td>
+                <td>
+                    ${formatStateInfo(alert)}
+                </td>
                 <td>${hailDisplay}</td>
                 <td>${windDisplay}</td>
                 <td>${severityBadge}</td>
@@ -356,37 +360,82 @@ document.addEventListener('DOMContentLoaded', function() {
 function formatLocationInfo(alert) {
     const parts = [];
     
-    // Extract cities from city_names array or area_desc
-    if (alert.city_names && alert.city_names.length > 0) {
+    // Extract cities from city_names array
+    if (alert.city_names && Array.isArray(alert.city_names) && alert.city_names.length > 0) {
         const cities = alert.city_names.slice(0, 3); // Show first 3 cities
-        parts.push(`<div><strong>${cities.join(', ')}</strong></div>`);
+        parts.push(cities.join(', '));
         if (alert.city_names.length > 3) {
-            parts.push(`<small class="text-muted">+${alert.city_names.length - 3} more cities</small>`);
+            parts.push(`+${alert.city_names.length - 3} more`);
         }
-    } else if (alert.areaDesc) {
-        // Fallback to area description
+        return parts.join(' ');
+    }
+    
+    // Fallback to county names if no cities
+    if (alert.county_names) {
+        let counties = [];
+        
+        // Handle county_names as an object with state keys
+        if (typeof alert.county_names === 'object' && !Array.isArray(alert.county_names)) {
+            for (const [state, countyList] of Object.entries(alert.county_names)) {
+                if (Array.isArray(countyList)) {
+                    counties = counties.concat(countyList);
+                }
+            }
+        } else if (Array.isArray(alert.county_names)) {
+            counties = alert.county_names;
+        }
+        
+        if (counties.length > 0) {
+            const displayCounties = counties.slice(0, 3);
+            parts.push(displayCounties.join(', '));
+            if (counties.length > 3) {
+                parts.push(`+${counties.length - 3} more`);
+            }
+            return parts.join(' ');
+        }
+    }
+    
+    // Final fallback to area description
+    if (alert.areaDesc) {
         const shortArea = alert.areaDesc.length > 50 ? 
             alert.areaDesc.substring(0, 50) + '...' : alert.areaDesc;
-        parts.push(`<div><strong>${shortArea}</strong></div>`);
+        return shortArea;
     }
     
-    // Extract states from affected_states
-    if (alert.affected_states && alert.affected_states.length > 0) {
-        parts.push(`<small class="text-muted">States: ${alert.affected_states.join(', ')}</small>`);
+    return 'Location data unavailable';
+}
+
+function formatStateInfo(alert) {
+    // Try to get states from affected_states first
+    if (alert.affected_states && Array.isArray(alert.affected_states) && alert.affected_states.length > 0) {
+        return alert.affected_states.join(', ');
     }
     
-    // Extract counties from county_names
-    if (alert.county_names && Object.keys(alert.county_names).length > 0) {
-        const counties = Object.values(alert.county_names).flat().slice(0, 3);
-        if (counties.length > 0) {
-            parts.push(`<small class="text-muted">Counties: ${counties.join(', ')}</small>`);
-            if (Object.values(alert.county_names).flat().length > 3) {
-                parts.push(`<small class="text-muted">+${Object.values(alert.county_names).flat().length - 3} more</small>`);
-            }
+    // Fallback to extracting states from county_names object keys
+    if (alert.county_names && typeof alert.county_names === 'object' && !Array.isArray(alert.county_names)) {
+        const states = Object.keys(alert.county_names);
+        if (states.length > 0) {
+            return states.join(', ');
         }
     }
     
-    return parts.length > 0 ? parts.join('<br>') : '<span class="text-muted">Location data unavailable</span>';
+    // Final fallback to geocode UGC parsing
+    if (alert.geocode && alert.geocode.UGC && Array.isArray(alert.geocode.UGC)) {
+        const states = new Set();
+        alert.geocode.UGC.forEach(ugc => {
+            if (ugc.includes('C')) {
+                const parts = ugc.split('C');
+                if (parts.length === 2) {
+                    states.add(parts[0]);
+                }
+            }
+        });
+        if (states.size > 0) {
+            return Array.from(states).join(', ');
+        }
+    }
+    
+    return 'N/A';
 }
 
 function getHailDescription(size) {
