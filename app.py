@@ -2995,6 +2995,32 @@ def test_webhook_evaluation():
         }), 500
 
 # City Names and Point-in-Polygon API Endpoints
+@app.route('/api/radar-alerts/parse-historical', methods=['POST'])
+def trigger_historical_radar_parsing():
+    """
+    Trigger historical radar parsing for alerts missing radar_indicated data
+    """
+    try:
+        data = request.get_json() or {}
+        start_date = data.get('start_date', '2025-06-02')
+        end_date = data.get('end_date', '2025-06-09')
+        batch_size = data.get('batch_size', 100)
+        
+        # Import here to avoid circular imports
+        from historical_radar_parser import parse_historical_radar_data
+        
+        stats = parse_historical_radar_data(start_date, end_date, batch_size)
+        
+        return jsonify({
+            "success": True,
+            "message": f"Historical radar parsing completed for {start_date} to {end_date}",
+            "stats": stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Historical radar parsing failed: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/api/radar-alerts/backfill', methods=['POST'])
 def trigger_radar_backfill():
     """

@@ -108,6 +108,18 @@ class RadarBackfillProcessor:
         if not radar_data:
             return stats
             
+        # Parse JSON string to dictionary if needed
+        if isinstance(radar_data, str):
+            try:
+                import json
+                radar_data = json.loads(radar_data)
+            except (json.JSONDecodeError, TypeError):
+                logger.error(f"Failed to parse radar_indicated JSON for alert {alert.id}: {radar_data}")
+                return stats
+        
+        if not isinstance(radar_data, dict):
+            return stats
+            
         # Check if already processed
         existing = db.session.query(RadarAlert).filter_by(alert_id=alert.id).first()
         if existing:
