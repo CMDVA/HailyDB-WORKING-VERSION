@@ -346,28 +346,39 @@ function updateRadarAlertsTable(radarEvents) {
     tbody.innerHTML = radarEvents.map(event => {
         // Handle individual radar alert data
         const hailSize = event.hail_inches ? parseFloat(event.hail_inches) : 0;
-        const windSpeed = event.wind_mph ? parseInt(event.wind_mph) : 0;
+        const windSpeed = event.wind_mph ? parseInt(event.wind_mph) : null;
         const cityNames = Array.isArray(event.city_names) ? event.city_names.join(', ') : (event.city_names || 'Unknown');
         const states = Array.isArray(event.affected_states) && event.affected_states.length > 0 ? 
             event.affected_states.join(', ') : 'Unknown';
-        const eventDate = event.event_date ? new Date(event.event_date).toLocaleDateString() : 'Unknown Date';
-        const detectedTime = event.detected_time ? new Date(event.detected_time).toLocaleTimeString() : 'Unknown Time';
+        
+        // Parse dates properly
+        const eventDate = event.event_date || 'Unknown Date';
+        const detectedTimeStr = event.detected_time ? new Date(event.detected_time).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        }) : 'Unknown Time';
+        const formattedDate = event.event_date ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', {
+            month: '2-digit',
+            day: '2-digit',
+            year: 'numeric'
+        }) : 'Unknown';
         
         const hailDisplay = event.event_type === 'hail' && hailSize > 0 ? 
             `<span class="badge bg-danger">${hailSize.toFixed(2)}"</span>` :
             '<span class="text-muted">-</span>';
             
-        const windDisplay = event.event_type === 'wind' && windSpeed > 0 ? 
+        const windDisplay = windSpeed && windSpeed > 0 ? 
             `<span class="badge bg-warning text-dark">${windSpeed} mph</span>` :
-            (windSpeed > 0 ? `<span class="badge bg-warning text-dark">${windSpeed} mph</span>` : '<span class="text-muted">-</span>');
+            '<span class="text-muted">-</span>';
         
-        const severityBadge = getSeverityBadge(hailSize, windSpeed);
+        const severityBadge = getSeverityBadge(hailSize, windSpeed || 0);
         
         return `
             <tr style="cursor: pointer;">
                 <td>
-                    <div>${detectedTime}</div>
-                    <small class="text-muted">${eventDate}</small>
+                    <div>${detectedTimeStr}</div>
+                    <small class="text-muted">${formattedDate}</small>
                 </td>
                 <td>
                     <span class="badge bg-${event.event_type === 'hail' ? 'danger' : 'warning'}">${event.event_type.toUpperCase()}</span>
@@ -383,7 +394,7 @@ function updateRadarAlertsTable(radarEvents) {
                 <td>${windDisplay}</td>
                 <td>${severityBadge}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-info" onclick="showEventDetails('${event.alert_id}')" title="View Details">
+                    <button class="btn btn-sm btn-outline-info" onclick="showRadarEventDetails('${event.alert_id}', '${event.event_type}', '${hailSize}', '${windSpeed || 0}', '${cityNames}', '${formattedDate}')" title="View Details">
                         <i class="fas fa-eye"></i>
                     </button>
                 </td>
@@ -571,8 +582,44 @@ function updateRadarPagination(radarEvents, page) {
     pagination.innerHTML = paginationHTML;
 }
 
-function showEventDetails(city, state, date) {
-    alert(`Radar Event Details:\nLocation: ${city}, ${state}\nDate: ${date}\n\nDetailed analysis coming soon!`);
+function showRadarEventDetails(alertId, eventType, hailSize, windSpeed, cities, date) {
+    // Create modal content for radar event details
+    const modalContent = `
+        <div class="modal fade" id="radarEventModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Radar Event Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p><strong>Alert ID:</strong><br><small>${alertId}</small></p>
+                        <p><strong>Date:</strong> ${date}</p>
+                        <p><strong>Event Type:</strong> ${eventType.toUpperCase()}</p>
+                        <p><strong>Cities:</strong> ${cities}</p>
+                        ${hailSize > 0 ? `<p><strong>Hail Size:</strong> ${hailSize}" diameter</p>` : ''}
+                        ${windSpeed > 0 ? `<p><strong>Wind Speed:</strong> ${windSpeed} mph</p>` : ''}
+                        <hr>
+                        <p><em>Detailed analysis coming soon!</em></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if present
+    const existingModal = document.getElementById('radarEventModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to page and show it
+    document.body.insertAdjacentHTML('beforeend', modalContent);
+    const modal = new bootstrap.Modal(document.getElementById('radarEventModal'));
+    modal.show();
 }
 
 function applyFilters() {
