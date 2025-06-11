@@ -3182,6 +3182,89 @@ def get_radar_alerts_summary():
         logger.error(f"Radar alerts summary failed: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/radar-alerts/list')
+def get_radar_alerts_list():
+    """Get list of processed radar alerts with pagination"""
+    try:
+        from models import RadarAlert
+        
+        # Get query parameters
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 25))
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        state_filter = request.args.get('state')
+        min_hail_inches = float(request.args.get('min_hail_inches', 0))
+        min_wind_mph = int(request.args.get('min_wind_mph', 0))
+        city_filter = request.args.get('city')
+        
+        # Build base query
+        query = db.session.query(RadarAlert)
+        
+        # Apply date filters
+        if start_date:
+            query = query.filter(RadarAlert.event_date >= start_date)
+        if end_date:
+            query = query.filter(RadarAlert.event_date <= end_date)
+            
+        # Apply hail/wind filters
+        if min_hail_inches > 0:
+            query = query.filter(
+                db.or_(
+                    RadarAlert.hail_inches >= min_hail_inches,
+                    RadarAlert.wind_mph >= min_wind_mph
+                )
+            )
+        elif min_wind_mph > 0:
+            query = query.filter(RadarAlert.wind_mph >= min_wind_mph)
+        
+        # Apply state filter (search in affected_states array)
+        if state_filter:
+            query = query.filter(db.text("'{}' = ANY(affected_states)".format(state_filter)))
+        
+        # Apply city filter (search in city_names array)
+        if city_filter:
+            query = query.filter(db.text("EXISTS (SELECT 1 FROM unnest(city_names) AS city WHERE city ILIKE '%{}%')".format(city_filter)))
+        
+        # Get total count for pagination
+        total_count = query.count()
+        
+        # Apply pagination and ordering
+        offset = (page - 1) * limit
+        alerts = query.order_by(RadarAlert.detected_time.desc()).offset(offset).limit(limit).all()
+        
+        # Format results
+        results = []
+        for alert in alerts:
+            results.append({
+                'id': alert.id,
+                'alert_id': alert.alert_id,
+                'event_type': alert.event_type,
+                'event_date': alert.event_date.isoformat() if alert.event_date else None,
+                'detected_time': alert.detected_time.isoformat() if alert.detected_time else None,
+                'hail_inches': float(alert.hail_inches) if alert.hail_inches else None,
+                'wind_mph': int(alert.wind_mph) if alert.wind_mph else None,
+                'city_names': alert.city_names or [],
+                'county_names': alert.county_names or [],
+                'fips_codes': alert.fips_codes or [],
+                'affected_states': alert.affected_states or [],
+                'severity': 'High' if (alert.hail_inches and alert.hail_inches >= 1.75) or (alert.wind_mph and alert.wind_mph >= 80) else 'Moderate'
+            })
+        
+        return jsonify({
+            'alerts': results,
+            'pagination': {
+                'page': page,
+                'limit': limit,
+                'total': total_count,
+                'pages': (total_count + limit - 1) // limit
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Radar alerts list failed: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/radar-alerts/contains-address')
 def contains_address():
     """

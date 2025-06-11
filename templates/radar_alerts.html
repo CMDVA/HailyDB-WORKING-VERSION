@@ -291,13 +291,13 @@ function loadRadarAlerts(page = 1) {
     document.getElementById('radarAlertsTableBody').innerHTML = 
         '<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0 text-muted">Loading radar-detected alerts...</p></td></tr>';
     
-    fetch(`/api/radar-alerts/summary?${params.toString()}`)
+    fetch(`/api/radar-alerts/list?${params.toString()}`)
         .then(response => response.json())
         .then(data => {
-            const radarEvents = data.summary || [];
+            const radarEvents = data.alerts || [];
             updateRadarStatistics(radarEvents);
             updateRadarAlertsTable(radarEvents);
-            updateRadarPagination(radarEvents, page);
+            updateRadarPagination(data.pagination, page);
         })
         .catch(error => {
             console.error('Error loading radar alerts:', error);
@@ -313,17 +313,19 @@ function updateRadarStatistics(radarEvents) {
     let maxWind = 0;
     
     radarEvents.forEach(event => {
-        hailAlerts += parseInt(event.hail_count) || 0;
-        windAlerts += parseInt(event.wind_count) || 0;
-        
-        const eventMaxHail = event.max_hail_inches ? parseFloat(event.max_hail_inches) : 0;
-        const eventMaxWind = event.max_wind_mph ? parseInt(event.max_wind_mph) : 0;
-        
-        if (eventMaxHail > maxHail) {
-            maxHail = eventMaxHail;
+        if (event.event_type === 'hail') {
+            hailAlerts++;
+            const hailSize = event.hail_inches ? parseFloat(event.hail_inches) : 0;
+            if (hailSize > maxHail) {
+                maxHail = hailSize;
+            }
         }
-        if (eventMaxWind > maxWind) {
-            maxWind = eventMaxWind;
+        if (event.event_type === 'wind' || event.wind_mph) {
+            windAlerts++;
+            const windSpeed = event.wind_mph ? parseInt(event.wind_mph) : 0;
+            if (windSpeed > maxWind) {
+                maxWind = windSpeed;
+            }
         }
     });
     
@@ -342,46 +344,46 @@ function updateRadarAlertsTable(radarEvents) {
     }
     
     tbody.innerHTML = radarEvents.map(event => {
-        // Safely handle null values
-        const maxHail = event.max_hail_inches ? parseFloat(event.max_hail_inches) : 0;
-        const maxWind = event.max_wind_mph ? parseInt(event.max_wind_mph) : 0;
-        const hailCount = parseInt(event.hail_count) || 0;
-        const windCount = parseInt(event.wind_count) || 0;
-        const city = event.city || 'Unknown';
-        const state = event.state || 'Unknown';
-        const eventDate = event.date ? new Date(event.date).toLocaleDateString() : 'Unknown Date';
+        // Handle individual radar alert data
+        const hailSize = event.hail_inches ? parseFloat(event.hail_inches) : 0;
+        const windSpeed = event.wind_mph ? parseInt(event.wind_mph) : 0;
+        const cityNames = Array.isArray(event.city_names) ? event.city_names.join(', ') : (event.city_names || 'Unknown');
+        const states = Array.isArray(event.affected_states) && event.affected_states.length > 0 ? 
+            event.affected_states.join(', ') : 'Unknown';
+        const eventDate = event.event_date ? new Date(event.event_date).toLocaleDateString() : 'Unknown Date';
+        const detectedTime = event.detected_time ? new Date(event.detected_time).toLocaleTimeString() : 'Unknown Time';
         
-        const hailDisplay = hailCount > 0 && maxHail > 0 ? 
-            `<span class="badge bg-danger">${maxHail.toFixed(2)}"</span><br><small>${hailCount} events</small>` :
+        const hailDisplay = event.event_type === 'hail' && hailSize > 0 ? 
+            `<span class="badge bg-danger">${hailSize.toFixed(2)}"</span>` :
             '<span class="text-muted">-</span>';
             
-        const windDisplay = windCount > 0 && maxWind > 0 ? 
-            `<span class="badge bg-warning text-dark">${maxWind} mph</span><br><small>${windCount} events</small>` :
-            '<span class="text-muted">-</span>';
+        const windDisplay = event.event_type === 'wind' && windSpeed > 0 ? 
+            `<span class="badge bg-warning text-dark">${windSpeed} mph</span>` :
+            (windSpeed > 0 ? `<span class="badge bg-warning text-dark">${windSpeed} mph</span>` : '<span class="text-muted">-</span>');
         
-        const severityBadge = getSeverityBadge(maxHail, maxWind);
+        const severityBadge = getSeverityBadge(hailSize, windSpeed);
         
         return `
             <tr style="cursor: pointer;">
                 <td>
-                    <div>${eventDate}</div>
-                    <small class="text-muted">${city}, ${state}</small>
+                    <div>${detectedTime}</div>
+                    <small class="text-muted">${eventDate}</small>
                 </td>
                 <td>
-                    <span class="badge bg-secondary">Severe Thunderstorm Warning</span>
+                    <span class="badge bg-${event.event_type === 'hail' ? 'danger' : 'warning'}">${event.event_type.toUpperCase()}</span>
                 </td>
                 <td>
-                    <strong>${city}</strong><br>
-                    <small class="text-muted">${state}</small>
+                    <strong>${cityNames}</strong><br>
+                    <small class="text-muted">${states}</small>
                 </td>
                 <td>
-                    <span class="badge bg-primary">${state}</span>
+                    <span class="badge bg-primary">${states}</span>
                 </td>
                 <td>${hailDisplay}</td>
                 <td>${windDisplay}</td>
                 <td>${severityBadge}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-info" onclick="showEventDetails('${city}', '${state}', '${eventDate}')" title="View Details">
+                    <button class="btn btn-sm btn-outline-info" onclick="showEventDetails('${event.alert_id}')" title="View Details">
                         <i class="fas fa-eye"></i>
                     </button>
                 </td>
