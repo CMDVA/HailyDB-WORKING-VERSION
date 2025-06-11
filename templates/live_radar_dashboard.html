@@ -117,63 +117,31 @@
                         </datalist>
                     </div>
                     
-                    <!-- Event Type -->
-                    <div class="col-md-3">
-                        <label for="eventTypeFilter" class="form-label">Event Type</label>
-                        <select class="form-select" id="eventTypeFilter">
-                            <option value="">All Events</option>
-                            <option value="hail">Hail Events</option>
-                            <option value="wind">Wind Events</option>
-                            <option value="Severe Thunderstorm Warning">Severe Thunderstorm Warning</option>
-                            <option value="Tornado Warning">Tornado Warning</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Minimum Hail Size -->
-                    <div class="col-md-3">
-                        <label for="minHailSize" class="form-label">Minimum Hail Size</label>
-                        <select class="form-select" id="minHailSize">
-                            <option value="">All Sizes</option>
-                            <option value="0.25">0.25" (Pea)</option>
-                            <option value="0.5">0.5" (Marble)</option>
-                            <option value="0.75">0.75" (Penny)</option>
-                            <option value="1.0">1.0" (Quarter)</option>
-                            <option value="1.25">1.25" (Half Dollar)</option>
-                            <option value="1.5">1.5" (Ping Pong Ball)</option>
-                            <option value="1.75">1.75" (Golf Ball)</option>
-                            <option value="2.0">2.0" (Egg)</option>
-                            <option value="2.5">2.5" (Tennis Ball)</option>
-                            <option value="2.75">2.75" (Baseball)</option>
-                            <option value="3.0">3.0" (Large Apple)</option>
-                            <option value="4.0">4.0" (Softball)</option>
-                            <option value="4.5">4.5"+ (Grapefruit/Record)</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Minimum Wind Speed -->
-                    <div class="col-md-3">
-                        <label for="minWindSpeed" class="form-label">Minimum Wind Speed</label>
-                        <select class="form-select" id="minWindSpeed">
-                            <option value="">All Speeds</option>
-                            <option value="50" selected>50+ mph</option>
-                            <option value="60">60+ mph</option>
-                            <option value="70">70+ mph</option>
-                            <option value="80">80+ mph</option>
-                            <option value="90">90+ mph</option>
-                            <option value="100">100+ mph</option>
-                        </select>
+                    <!-- Alert Type Filter Toggles -->
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Filter by Alert Type:</label>
+                        <div class="btn-group w-100" role="group" aria-label="Alert type filter">
+                            <input type="radio" class="btn-check" name="alertTypeFilter" id="filterAll" value="all" checked>
+                            <label class="btn btn-outline-primary" for="filterAll">
+                                <i class="fas fa-list me-1"></i>All Alerts
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="alertTypeFilter" id="filterHail" value="hail">
+                            <label class="btn btn-outline-danger" for="filterHail">
+                                <i class="fas fa-circle me-1"></i>Hail Only
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="alertTypeFilter" id="filterWind" value="wind">
+                            <label class="btn btn-outline-warning" for="filterWind">
+                                <i class="fas fa-wind me-1"></i>Wind Only
+                            </label>
+                        </div>
                     </div>
                 </div>
                 
                 <div class="row mt-3">
                     <div class="col-12">
-                        <button type="button" class="btn btn-primary" onclick="applyFilters()">
-                            <i class="fas fa-search me-1"></i>Search & Filter
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
-                            <i class="fas fa-times me-1"></i>Clear All
-                        </button>
-                        <span class="text-muted ms-3" id="lastUpdateTime">Last updated: Never</span>
+                        <span class="text-muted" id="lastUpdateTime">Last updated: Never</span>
                     </div>
                 </div>
             </div>
