@@ -1213,36 +1213,36 @@ function updateWorldClock() {
     // All Continental US Time Zones
     const pacificTime = now.toLocaleTimeString('en-US', {
         timeZone: 'America/Los_Angeles',
-        hour12: false,
-        hour: '2-digit',
+        hour12: true,
+        hour: 'numeric',
         minute: '2-digit'
     });
     
     const mountainTime = now.toLocaleTimeString('en-US', {
         timeZone: 'America/Denver',
-        hour12: false,
-        hour: '2-digit',
+        hour12: true,
+        hour: 'numeric',
         minute: '2-digit'
     });
     
     const centralTime = now.toLocaleTimeString('en-US', {
         timeZone: 'America/Chicago',
-        hour12: false,
-        hour: '2-digit',
+        hour12: true,
+        hour: 'numeric',
         minute: '2-digit'
     });
     
     const easternTime = now.toLocaleTimeString('en-US', {
         timeZone: 'America/New_York',
-        hour12: false,
-        hour: '2-digit',
+        hour12: true,
+        hour: 'numeric',
         minute: '2-digit'
     });
     
     const utcTime = now.toLocaleTimeString('en-US', {
         timeZone: 'UTC',
-        hour12: false,
-        hour: '2-digit',
+        hour12: true,
+        hour: 'numeric',
         minute: '2-digit'
     });
     
