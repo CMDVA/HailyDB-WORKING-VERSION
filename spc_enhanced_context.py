@@ -350,41 +350,46 @@ CRITICAL: Use the provided location data exactly as given. Do not add historical
             try:
                 existing_enrichment = json.loads(report.spc_enrichment) if isinstance(report.spc_enrichment, str) else report.spc_enrichment
                 
-                # Extract nearby places data from the actual format
-                nearby_places = existing_enrichment.get('nearby_places', [])
+                # Extract nearby places data from the actual Location Enrichment format
+                nearby_places_data = existing_enrichment.get('nearby_places', [])
                 
                 # Use the primary location from the report
                 primary_location = f"{report.county} County"
                 
-                # Format nearby places for Enhanced Context (take first 4-5 places)
+                # Format nearby places for Enhanced Context using the actual enrichment data
                 nearby_place_names = []
-                for place in nearby_places[:5]:
+                for place in nearby_places_data[:5]:  # Take first 5 places
                     place_name = place.get('name', '')
                     if place_name:
-                        # Calculate approximate distance if not provided
+                        # Use a reasonable distance estimation for nearby places
                         nearby_place_names.append({
                             'name': place_name,
-                            'distance_miles': 5.0  # Approximation since exact distance not in enrichment
+                            'distance_miles': 3.0  # Reasonable approximation for "nearby" places
                         })
                 
-                # For now, use a major city fallback since the enrichment doesn't include it yet
+                # Extract nearest major city info (for now use fallback since not in current enrichment format)
                 nearest_major_city = "Unknown"
                 major_city_distance = ""
+                
+                # Get radar polygon match status
+                radar_polygon_match = existing_enrichment.get('radar_polygon_match', False)
                 
                 location_context = {
                     'primary_location': primary_location,
                     'nearest_major_city': nearest_major_city,
                     'major_city_distance': major_city_distance,
                     'nearby_places': nearby_place_names,
-                    'radar_polygon_match': existing_enrichment.get('radar_polygon_match', False)
+                    'radar_polygon_match': radar_polygon_match
                 }
                 
+                logger.info(f"Successfully extracted location context for report {report.id}: {len(nearby_place_names)} nearby places, radar match: {radar_polygon_match}")
                 return location_context
                 
             except (json.JSONDecodeError, KeyError, AttributeError) as e:
                 logger.warning(f"Error parsing SPC enrichment for report {report.id}: {e}")
         
         # Fallback to basic location
+        logger.info(f"Using fallback location context for report {report.id} - no enrichment data available")
         return {
             'primary_location': f"{report.county} County, {report.state}",
             'nearby_places': [],
