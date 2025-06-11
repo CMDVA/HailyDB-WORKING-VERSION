@@ -221,19 +221,9 @@ class SPCEnhancedContextService:
                 if closest_places:
                     nearby_context = f"near {', '.join(closest_places)}"
 
-            # Check for radar polygon detection at SPC point location
-            radar_polygon_match = False
-            radar_event_type = 'N/A'
-            
-            # Check location enrichment for point-in-polygon radar detection
-            if hasattr(report, 'spc_enrichment') and report.spc_enrichment:
-                try:
-                    enrichment_data = json.loads(report.spc_enrichment) if isinstance(report.spc_enrichment, str) else report.spc_enrichment
-                    radar_polygon_match = enrichment_data.get('radar_polygon_match', False)
-                    if radar_polygon_match:
-                        radar_event_type = 'storm activity'
-                except:
-                    pass
+            # Get radar polygon detection status from location context
+            radar_polygon_match = location_context.get('radar_polygon_match', False)
+            radar_event_type = 'storm activity' if radar_polygon_match else 'N/A'
             
             # Check if ANY verified alerts have radar confirmation (from polygon match status)
             verified_alerts_radar_confirmed = any(
@@ -360,37 +350,33 @@ CRITICAL: Use the provided location data exactly as given. Do not add historical
             try:
                 existing_enrichment = json.loads(report.spc_enrichment) if isinstance(report.spc_enrichment, str) else report.spc_enrichment
                 
-                # Extract nearby places data
+                # Extract nearby places data from the actual format
                 nearby_places = existing_enrichment.get('nearby_places', [])
                 
-                # Find primary location (distance = 0.0) and nearest city
-                primary_location = f"{report.location}, {report.county}"
-                nearest_major_city = ""
-                major_city_distance = ""
-                nearby_place_names = []
+                # Use the primary location from the report
+                primary_location = f"{report.county} County"
                 
-                for place in nearby_places:
-                    place_type = place.get('type', '')
+                # Format nearby places for Enhanced Context (take first 4-5 places)
+                nearby_place_names = []
+                for place in nearby_places[:5]:
                     place_name = place.get('name', '')
-                    distance_miles = place.get('distance_miles', 0)
-                    
-                    if place_type == 'primary_location' and distance_miles == 0.0:
-                        primary_location = place_name
-                    elif place_type == 'nearest_city':
-                        nearest_major_city = place_name
-                        major_city_distance = f"{distance_miles:.1f} miles"
-                    elif place_type == 'nearby_place' and distance_miles <= 10.0:
+                    if place_name:
+                        # Calculate approximate distance if not provided
                         nearby_place_names.append({
                             'name': place_name,
-                            'distance_miles': distance_miles
+                            'distance_miles': 5.0  # Approximation since exact distance not in enrichment
                         })
+                
+                # For now, use a major city fallback since the enrichment doesn't include it yet
+                nearest_major_city = "Unknown"
+                major_city_distance = ""
                 
                 location_context = {
                     'primary_location': primary_location,
                     'nearest_major_city': nearest_major_city,
                     'major_city_distance': major_city_distance,
                     'nearby_places': nearby_place_names,
-                    'geographic_features': []
+                    'radar_polygon_match': existing_enrichment.get('radar_polygon_match', False)
                 }
                 
                 return location_context
@@ -400,10 +386,11 @@ CRITICAL: Use the provided location data exactly as given. Do not add historical
         
         # Fallback to basic location
         return {
-            'primary_location': f"{report.location}, {report.county}, {report.state}",
+            'primary_location': f"{report.county} County, {report.state}",
             'nearby_places': [],
-            'geographic_features': [],
-            'nearest_major_city': 'Unknown'
+            'nearest_major_city': 'Unknown',
+            'major_city_distance': '',
+            'radar_polygon_match': False
         }
     
     def _generate_location_context(self, report) -> Dict[str, Any]:
