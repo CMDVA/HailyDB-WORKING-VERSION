@@ -3818,7 +3818,7 @@ def api_live_radar_alerts():
         # Step 2: Supplement with fresh NWS data for very recent alerts (last 2 hours)
         # This catches any new alerts that might not be in our database yet
         recent_cutoff = datetime.utcnow() - timedelta(hours=2)
-        db_alert_ids = {alert.nws_id for alert in db_alerts if alert.nws_id}
+        db_alert_ids = {alert.id for alert in db_alerts if alert.id}
         
         try:
             response = requests.get(Config.NWS_ALERT_URL, headers=Config.NWS_HEADERS, timeout=10)
