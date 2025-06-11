@@ -1,0 +1,110 @@
+Implement a new SPC report enrichment process for HailyDB.
+
+Purpose:
+Enhance spc_reports records with location and polygon context to improve /spc/reports/{id} detail pages and API responses.
+
+Instructions:
+1️⃣ Database Schema Change
+Add a new column to the spc_reports table:
+
+sql
+Copy
+Edit
+ALTER TABLE spc_reports ADD COLUMN spc_enrichment JSONB DEFAULT '{}'::jsonb;
+2️⃣ Enrichment Logic (Per spc_reports Record)
+For each spc_reports row:
+
+a) Radar Polygon Match Test
+Use the lat and lon fields from spc_reports.
+
+Query the radar_alerts table:
+
+Field: geometry (GeoJSON Polygon).
+
+Perform point-in-polygon test to see if this SPC report location is inside any radar_alert polygon.
+
+Store results:
+
+"radar_polygon_match": true/false
+
+"radar_polygon_id": radar_alert.id or null
+
+b) Nearby Places Enrichment (OpenAI-based)
+Use OpenAI API to generate 3–6 truthful nearby place names within approx. 5 miles.
+
+Base only on:
+
+SPC report lat/lon
+
+County / State info
+
+Known GNIS / Google Maps / news corpuses
+
+Avoid hallucination → if uncertain, return fewer results.
+
+Return as:
+
+json
+Copy
+Edit
+"nearby_places": [
+  { "name": "West Tocoi", "approx_lat": 29.8493, "approx_lon": -81.6028 },
+  { "name": "Elkton", "approx_lat": 29.7911, "approx_lon": -81.4725 }
+]
+Approx_lat and approx_lon can be coarse — just anchor the name to reasonable map coordinates.
+
+c) Enriched Summary Generation
+Use OpenAI to generate a 1–2 sentence factual, non-exaggerated summary:
+
+Inputs:
+
+SPC report type (hail / wind / tornado)
+
+Magnitude (hail size, wind speed, or F-scale)
+
+Location / County / State
+
+Nearby places list (above)
+
+Radar polygon match result (yes/no)
+
+Example 1 (polygon matched):
+
+"This 1.0 inch hail report in St. Johns County, FL occurred near West Tocoi and Elkton, and was confirmed inside a radar-detected hail polygon."
+
+Example 2 (no polygon match):
+
+"This 60 mph wind report in Cook County, IL occurred near Evanston and Rogers Park, but no radar-detected polygon was present at this location."
+
+d) Update spc_enrichment
+Final object to store in:
+
+json
+Copy
+Edit
+spc_enrichment = {
+  "radar_polygon_match": true/false,
+  "radar_polygon_id": integer or null,
+  "nearby_places": [...],
+  "enriched_summary": string
+}
+3️⃣ Operational Requirements
+The enrichment should be built so it can be run:
+
+As a backfill job on all existing spc_reports.
+
+As a routine job on new spc_reports.
+
+The enrichment process should be non-destructive — safe to re-run and overwrite spc_enrichment.
+
+It must not interfere with the existing spc_matches / alerts.spc_reports logic.
+
+Summary:
+✅ Add spc_enrichment JSONB to spc_reports
+✅ Implement polygon match (radar_alerts) → store result
+✅ Implement nearby_places generation
+✅ Implement enriched_summary generation
+✅ Store all into spc_enrichment
+✅ Make runnable for full backfill and future reports
+
+✅ Deliver only the enrichment — no changes to /alerts.spc_reports logic.
