@@ -3728,7 +3728,65 @@ def api_generate_enhanced_context():
         logger.error(f"Error generating enhanced context: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/live-radar-alerts', methods=['GET'])
+def api_live_radar_alerts():
+    """
+    API endpoint for real-time live radar alerts
+    Returns currently active wind/hail alerts with pre-formatted message templates
+    """
+    try:
+        from live_radar_service import get_live_radar_service
+        
+        service = get_live_radar_service()
+        if not service:
+            return jsonify({"error": "Live radar service not initialized"}), 503
+            
+        # Get active alerts
+        alerts = service.get_active_alerts()
+        
+        return jsonify({
+            "alerts": alerts,
+            "count": len(alerts),
+            "timestamp": datetime.utcnow().isoformat(),
+            "service_status": "active" if service.running else "inactive"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving live radar alerts: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/live-radar-alerts/start', methods=['POST'])
+def start_live_radar_alerts():
+    """Start the live radar alerts polling service"""
+    try:
+        from live_radar_service import start_live_radar_service
+        start_live_radar_service()
+        return jsonify({"success": True, "message": "Live radar alerts service started"})
+    except Exception as e:
+        logger.error(f"Error starting live radar service: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/live-radar-alerts/stop', methods=['POST'])
+def stop_live_radar_alerts():
+    """Stop the live radar alerts polling service"""
+    try:
+        from live_radar_service import stop_live_radar_service
+        stop_live_radar_service()
+        return jsonify({"success": True, "message": "Live radar alerts service stopped"})
+    except Exception as e:
+        logger.error(f"Error stopping live radar service: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     with app.app_context():
         init_scheduler()
+        
+        # Initialize live radar alert service
+        try:
+            from live_radar_service import init_live_radar_service, start_live_radar_service
+            init_live_radar_service(db.session)
+            start_live_radar_service()
+            print("Live radar alert service initialized and started")
+        except Exception as e:
+            print(f"Error initializing live radar service: {e}")
     app.run(host='0.0.0.0', port=5000, debug=True)

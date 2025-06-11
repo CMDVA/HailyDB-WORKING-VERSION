@@ -1,0 +1,180 @@
+(Radar Alerts LIVE Stream + Critical Enhancements)
+Context:
+We are extending HailyDB to deliver a robust, real-time Live Radar Alerts API for client apps and webhooks.
+We already parse and ingest NWS alerts for our historical radar_alerts table.
+This new system must expose truly LIVE alerts, served via API and webhooks, that clients can use for immediate notifications.
+
+Primary Goal:
+Build a distinct Live Radar Alerts pipeline and API stream based on polling https://api.weather.gov/alerts/active.
+This must not rely on our HailyDB internal NWS ingestion cycles or radar_alerts table → this is a live feed, refreshed continuously.
+
+Key Enhancements Required:
+1️⃣ Build Distinct Live Radar Alerts Service
+Create LiveRadarAlertService which continuously polls https://api.weather.gov/alerts/active (no counter delays — live poll).
+
+Build separate in-memory / transient "live_radar_alerts" store:
+
+If suitable → we can also optionally cache in new DB table live_radar_alerts with short TTL (~2 hours) if needed for API scaling.
+
+Parse each alert:
+
+Check for parameters.maxWindGust >= 50 → capture
+
+Check for parameters.maxHailSize > 0 → capture
+
+Do not capture other alerts in this stream.
+
+2️⃣ Process and Store Critical Fields for Each Live Alert:
+For each live alert matching our wind/hail logic, capture:
+
+id
+
+event
+
+parameters.maxWindGust
+
+parameters.maxHailSize
+
+affected_states
+
+county_names
+
+areaDesc (as area_desc)
+
+certainty
+
+urgency
+
+severity
+
+geometry polygon if available
+
+description
+
+instruction
+
+effective_time
+
+expires_time
+
+NEW FIELDS TO COMPUTE & STORE:
+
+radar_indicated_event: true/false → based on:
+
+if "radar indicated" present in description (case insensitive)
+
+or certainty == "Observed"
+
+event_certainty: store certainty value
+
+event_urgency: store urgency value
+
+alert_message_template: see generation logic below
+
+3️⃣ Alert Message Template — Mandatory Field
+For each live alert, generate and store a alert_message_template string based on this logic:
+
+pseudocode
+Copy
+Edit
+If radar_indicated_event == true:
+    "⚠️ {size}\" hail detected by radar near {locations}!"
+    OR
+    "⚠️ {wind_speed} mph winds detected by radar near {locations}!"
+
+Else if urgency == "Immediate":
+    "⚠️ {size}\" hail WARNING issued for {locations}!"
+    OR
+    "⚠️ {wind_speed} mph WIND WARNING issued for {locations}!"
+
+Else if urgency == "Expected":
+    "Heads up: Potential {size}\" hail expected in {locations}."
+    OR
+    "Heads up: Potential {wind_speed} mph winds expected in {locations}."
+
+Else:
+    "Weather advisory issued for {locations}."
+Definitions:
+
+{size} → maxHailSize in inches, formatted "1.25""
+
+{wind_speed} → maxWindGust in mph
+
+{locations} → first 2 city/county names parsed from areaDesc; if empty fallback to state
+
+Purpose: This field MUST be exposed in both /api/live-radar-alerts and webhooks.
+This allows client apps to send human-readable messages without needing to parse your API.
+
+4️⃣ Build New API Endpoint:
+GET /api/live-radar-alerts
+
+Return JSON:
+
+json
+Copy
+Edit
+{
+  "alerts": [
+    {
+      "id": "...",
+      "event": "...",
+      "maxHailSize": 1.25,
+      "maxWindGust": 70,
+      "area_desc": "...",
+      "affected_states": [...],
+      "county_names": [...],
+      "certainty": "...",
+      "urgency": "...",
+      "severity": "...",
+      "radar_indicated_event": true,
+      "event_certainty": "...",
+      "event_urgency": "...",
+      "alert_message_template": "...",
+      "effective_time": "...",
+      "expires_time": "...",
+      "geometry": {...}
+    }
+  ]
+}
+5️⃣ Webhook Integration:
+Extend webhook_rules and webhook_dispatcher to support new live_radar_alerts feed.
+
+Allow rules to target:
+
+radar_indicated_event == true
+
+event_certainty == "Observed"
+
+event_urgency == "Immediate"
+
+maxHailSize >= x
+
+maxWindGust >= y
+
+Webhook POST payload should include alert_message_template.
+
+6️⃣ Display in UI:
+Update /radar-alerts page to show new table section: LIVE Radar-Detected Events (distinct from historical radar_alerts).
+
+Display alert_message_template prominently in this table.
+
+Additional Recommendations (DO THIS IN HAILYDB):
+✅ This functionality is core to HailyDB → LiveRadarAlertService + API + webhook_rules should live here.
+✅ HailyAI / IDOLCheck clients should simply consume this API and webhooks — they do not need to parse NWS API themselves.
+✅ This will strongly differentiate us → fast, enriched, pre-processed alerts with message templates ready to push to end users.
+
+Final Notes:
+Use the exact processing logic already proven in our NWS ingestion for parsing wind/hail parameters — do not rewrite this logic.
+
+Prioritize low latency for this stream → keep polling interval at ~60 seconds max.
+
+If necessary, implement a live_radar_alerts table with automatic pruning (keep only 2–3 hour window of data).
+
+Summary:
+We want to create the best Live NWS Wind & Hail Alert API on the market:
+→ Real-time parsing
+→ Pre-formatted actionable messages
+→ Split observed vs expected events cleanly
+→ Easy-to-consume API and webhooks
+→ Display clearly in HailyDB UI
+
