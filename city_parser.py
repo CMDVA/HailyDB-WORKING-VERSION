@@ -6,6 +6,7 @@ Extracts city names from NWS area_desc fields for radar-detected events
 import re
 from typing import List, Set
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from models import Alert
 import logging
 
@@ -183,7 +184,7 @@ def parse_and_update_city_names(db: Session, alert_id: str = None, batch_size: i
             # Only process alerts without city_names or with empty city_names
             # Use raw SQL to handle ARRAY column properly
             query = query.filter(
-                db.text("(city_names IS NULL OR array_length(city_names, 1) IS NULL)")
+                text("(city_names IS NULL OR array_length(city_names, 1) IS NULL)")
             )
         
         alerts = query.limit(batch_size).all()

@@ -1,5 +1,5 @@
 from app import db
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy import Column, String, Text, DateTime, Date, Boolean, func, Index, UniqueConstraint
 from datetime import datetime
 import re
@@ -43,7 +43,7 @@ class Alert(db.Model):
     # Full Geometry & County Mapping (Feature 3)
     fips_codes = Column(JSONB)             # List of FIPS county codes from geometry
     county_names = Column(JSONB)           # Extracted county names with state mapping
-    city_names = Column(JSONB)             # Extracted city names from area_desc for enhanced targeting
+    city_names = Column(ARRAY(String))     # Extracted city names from area_desc for enhanced targeting
     geometry_type = Column(String(20))     # "Polygon", "MultiPolygon", "Point"
     coordinate_count = Column(db.Integer)  # Number of coordinate pairs for complexity analysis
     affected_states = Column(JSONB)        # List of state abbreviations
