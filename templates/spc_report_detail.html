@@ -325,7 +325,11 @@
                                     <i class="fas fa-map-marker-alt text-primary me-2"></i>
                                     <span class="fw-bold text-primary">Event Location:</span>
                                     <span class="ms-2 fw-bold">{{ primary_location.name }}</span>
+                                    {% if primary_location.distance_miles %}
+                                    <span class="badge bg-primary ms-2">{{ "%.1f"|format(primary_location.distance_miles) }} miles away</span>
+                                    {% else %}
                                     <span class="badge bg-primary ms-2">at coordinates</span>
+                                    {% endif %}
                                 </div>
                                 <small class="text-muted d-block mt-1 ms-3">
                                     Primary location where the event occurred
