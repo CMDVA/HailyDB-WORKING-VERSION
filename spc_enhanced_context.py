@@ -45,9 +45,8 @@ class SPCEnhancedContextService:
             if not report:
                 raise ValueError(f"SPC report {report_id} not found")
             
-            if not report.spc_verified:
-                logger.info(f"SPC report {report_id} is not verified, skipping enrichment")
-                return {}
+            # Generate enhanced context for both verified and unverified reports
+            # Unverified reports will get location-based enhanced context
             
             # Get verified alerts that match this report
             verified_alerts = self._get_verified_alerts_for_report(report_id)
