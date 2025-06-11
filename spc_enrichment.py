@@ -201,12 +201,14 @@ class SPCEnrichmentService:
             DISTANT REFERENCE (8+ miles) - ONLY if nothing closer found:
             - Major cities for regional context
             
-            SPECIFIC INSTRUCTIONS for {lat:.4f}, {lon:.4f}:
+            SPECIFIC INSTRUCTIONS for {lat:.4f}, {lon:.4f} in {county} County, {state}:
             1. Start by identifying the absolutely CLOSEST places within 3 miles
-            2. Look specifically for Mt Pleasant, Millingport, and other nearby communities
-            3. Only include distant places if nothing is found closer
-            4. Nearest city should be the closest significant city (population 5,000+)
-            5. Provide precise latitude/longitude coordinates for each place
+            2. For Florida locations, look specifically for places like West Tocoi, Bakersville, Hastings, Federal Point
+            3. For North Carolina locations, look for Mt Pleasant, Millingport, and similar communities  
+            4. Search for unincorporated communities, crossroads, and local place names
+            5. Only include distant places if nothing is found closer
+            6. Nearest city should be the closest significant city (population 5,000+)
+            7. Provide precise latitude/longitude coordinates for each place
             
             Return JSON format:
             {{
