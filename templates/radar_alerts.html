@@ -192,6 +192,48 @@
     </div>
 </div>
 
+<!-- Direct Radar Events Table -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-radar-dish me-1"></i>
+                    Radar-Detected Events (Direct Database Query)
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0" id="directRadarTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Time</th>
+                                <th>Event Type</th>
+                                <th>Location</th>
+                                <th>State</th>
+                                <th>Hail Size</th>
+                                <th>Wind Speed</th>
+                                <th>Severity</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="directRadarTableBody">
+                            <tr>
+                                <td colspan="8" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2 mb-0 text-muted">Loading radar-detected events...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Statistics Cards -->
 <div class="row mb-4">
     <div class="col-md-3">
@@ -607,6 +649,95 @@ function updatePagination(data) {
     pagination.innerHTML = paginationHTML;
 }
 
+// Direct radar alerts variables
+let directCurrentPage = 1;
+let directTotalPages = 1;
+
+async function loadDirectRadarAlerts(page = 1) {
+    try {
+        directCurrentPage = page;
+        
+        const params = new URLSearchParams({
+            page: page,
+            limit: 25,
+            ...currentFilters
+        });
+        
+        const response = await fetch(`/api/radar-alerts/direct?${params.toString()}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        directTotalPages = data.pages;
+        updateDirectRadarTable(data.alerts);
+        updateDirectPagination();
+        
+    } catch (error) {
+        console.error('Error loading direct radar alerts:', error);
+        document.getElementById('directRadarTableBody').innerHTML = 
+            '<tr><td colspan="8" class="text-center py-4 text-danger">Error loading radar alerts: ' + error.message + '</td></tr>';
+    }
+}
+
+function updateDirectRadarTable(alerts) {
+    const tbody = document.getElementById('directRadarTableBody');
+    
+    if (alerts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No radar-detected alerts found for the current filters.</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = alerts.map(alert => {
+        const radarData = alert.radar_indicated || {};
+        const hailSize = radarData.hail_inches || 0;
+        const windSpeed = radarData.wind_mph || 0;
+        
+        const hailDisplay = hailSize > 0 ? 
+            `<span class="badge bg-danger">${hailSize.toFixed(2)}"</span>` :
+            '<span class="text-muted">-</span>';
+            
+        const windDisplay = windSpeed > 0 ? 
+            `<span class="badge bg-warning text-dark">${windSpeed} mph</span>` :
+            '<span class="text-muted">-</span>';
+        
+        const severityBadge = getSeverityBadge(hailSize, windSpeed);
+        const effectiveTime = new Date(alert.effective).toLocaleString();
+        
+        return `
+            <tr class="clickable-row" onclick="window.location.href='/alerts/${alert.id}'" style="cursor: pointer;">
+                <td>
+                    <div>${effectiveTime}</div>
+                    <small class="text-muted">${alert.id.substring(0, 8)}...</small>
+                </td>
+                <td>
+                    <span class="badge bg-secondary">${alert.event}</span>
+                </td>
+                <td>
+                    ${formatLocationInfo(alert)}
+                </td>
+                <td>
+                    ${formatStateInfo(alert)}
+                </td>
+                <td>${hailDisplay}</td>
+                <td>${windDisplay}</td>
+                <td>${severityBadge}</td>
+                <td>
+                    <a href="/alerts/${alert.id}" class="btn btn-sm btn-outline-primary" title="View Details" onclick="event.stopPropagation();">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateDirectPagination() {
+    // Add pagination controls for direct table if needed
+    // For now, we'll keep it simple and just load the first page
+}
+
 function applyFilters() {
     currentFilters = {};
     
@@ -632,6 +763,7 @@ function applyFilters() {
     if (endDate) currentFilters.end_date = endDate;
     
     loadRadarAlerts(1);
+    loadDirectRadarAlerts(1);
 }
 
 function clearFilters() {
@@ -644,10 +776,12 @@ function clearFilters() {
     document.getElementById('endDate').value = '2025-06-07';
     currentFilters = {};
     loadRadarAlerts(1);
+    loadDirectRadarAlerts(1);
 }
 
 function refreshAlerts() {
     loadRadarAlerts(currentPage);
+    loadDirectRadarAlerts(directCurrentPage);
 }
 
 function exportData() {

@@ -3101,6 +3101,92 @@ def get_radar_alerts_stats():
         logger.error(f"Failed to get radar alerts stats: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/radar-alerts/direct')
+def get_direct_radar_alerts():
+    """
+    Direct query of radar-detected alerts with minimal filtering
+    """
+    try:
+        # Get query parameters
+        page = request.args.get('page', 1, type=int)
+        limit = min(request.args.get('limit', 25, type=int), 100)
+        search = request.args.get('q', '').strip()
+        state = request.args.get('state', '').strip()
+        event_type = request.args.get('event_type', '').strip()
+        min_hail = request.args.get('min_hail', type=float)
+        min_wind = request.args.get('min_wind', type=int)
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+        
+        # Build base query for alerts with radar data
+        query = Alert.query.filter(Alert.radar_indicated.isnot(None))
+        
+        # Apply search filter
+        if search:
+            search_pattern = f'%{search}%'
+            query = query.filter(
+                db.or_(
+                    Alert.event.ilike(search_pattern),
+                    Alert.area_desc.ilike(search_pattern),
+                    Alert.ai_summary.ilike(search_pattern)
+                )
+            )
+        
+        # Apply state filter
+        if state:
+            query = query.filter(Alert.area_desc.ilike(f'%{state}%'))
+        
+        # Apply event type filter
+        if event_type:
+            query = query.filter(Alert.event.ilike(f'%{event_type}%'))
+        
+        # Apply hail size filter
+        if min_hail:
+            query = query.filter(Alert.radar_indicated['hail_inches'].astext.cast(db.Float) >= min_hail)
+        
+        # Apply wind speed filter
+        if min_wind:
+            query = query.filter(Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= min_wind)
+        
+        # Apply date range filters
+        if start_date:
+            try:
+                from datetime import datetime
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                query = query.filter(Alert.effective >= start_dt)
+            except ValueError:
+                pass
+        
+        if end_date:
+            try:
+                from datetime import datetime, timedelta
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+                query = query.filter(Alert.effective < end_dt)
+            except ValueError:
+                pass
+        
+        # Get total count
+        total = query.count()
+        
+        # Apply pagination and ordering
+        alerts = query.order_by(Alert.effective.desc()).offset((page - 1) * limit).limit(limit).all()
+        
+        # Calculate pagination info
+        pages = (total + limit - 1) // limit
+        
+        return jsonify({
+            'alerts': [alert.to_dict() for alert in alerts],
+            'total': total,
+            'page': page,
+            'limit': limit,
+            'pages': pages,
+            'has_more': page < pages
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting direct radar alerts: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/radar-alerts/summary')
 def get_radar_alerts_summary():
     """
