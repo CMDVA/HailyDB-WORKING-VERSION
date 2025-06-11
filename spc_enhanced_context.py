@@ -482,21 +482,33 @@ Focus on locations that would be relevant for insurance, restoration, or emergen
                 pass
         return False
     
-    def enrich_all_verified_reports(self, batch_size: int = 50) -> Dict[str, int]:
-        """Enrich all verified SPC reports with enhanced context"""
+    def enrich_all_reports(self, batch_size: int = 50, unenriched_only: bool = True) -> Dict[str, int]:
+        """Enrich ALL SPC reports with enhanced context (verified and unverified)"""
         try:
-            # Get all verified SPC reports
-            verified_reports = self.db.query(SPCReport).filter_by(spc_verified=True).all()
+            # Get all SPC reports that need enrichment
+            if unenriched_only:
+                # Only enrich reports without enhanced_context or with empty enhanced_context
+                query = self.db.query(SPCReport).filter(
+                    db.or_(
+                        SPCReport.enhanced_context.is_(None),
+                        SPCReport.enhanced_context == {}
+                    )
+                )
+            else:
+                # Enrich all reports (re-enrichment)
+                query = self.db.query(SPCReport)
             
-            total_reports = len(verified_reports)
+            all_reports = query.all()
+            
+            total_reports = len(all_reports)
             processed = 0
             successful = 0
             failed = 0
             
-            logger.info(f"Starting enrichment of {total_reports} verified SPC reports")
+            logger.info(f"Starting enhanced context generation for {total_reports} SPC reports")
             
             for i in range(0, total_reports, batch_size):
-                batch = verified_reports[i:i+batch_size]
+                batch = all_reports[i:i+batch_size]
                 
                 for report in batch:
                     try:
@@ -541,6 +553,6 @@ def enrich_spc_report_context(report_id: int) -> Dict[str, Any]:
     return service.enrich_spc_report(report_id)
 
 def enrich_all_spc_reports() -> Dict[str, int]:
-    """Standalone function to enrich all verified SPC reports"""
+    """Standalone function to enrich all SPC reports"""
     service = SPCEnhancedContextService(db.session)
-    return service.enrich_all_verified_reports()
+    return service.enrich_all_reports()
