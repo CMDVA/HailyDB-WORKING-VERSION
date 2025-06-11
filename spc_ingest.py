@@ -90,7 +90,7 @@ class SPCIngestService:
             if not last_log:
                 return True  # Never polled before
                 
-            # For T-0 through T-2, poll every 5 minutes for real-time updates
+            # For T-0 through T-2, poll every 5 minutes for real-time updates regardless of existing count
             time_since_last = datetime.utcnow() - last_log.completed_at
             return time_since_last.total_seconds() >= (5 * 60)  # 5 minutes for T-0, T-1, T-2
         
@@ -113,10 +113,10 @@ class SPCIngestService:
             
         time_since_last = datetime.utcnow() - last_log.completed_at
         
-        # Only re-poll if interval has passed AND we have minimal data (suggesting incomplete ingestion)
+        # Only re-poll if interval has passed - allow updates to existing data
         interval_passed = time_since_last.total_seconds() >= (interval_minutes * 60)
         
-        return interval_passed and existing_count < 10  # Avoid re-polling dates with substantial data
+        return interval_passed  # Allow re-polling to capture additional reports
     
     def is_backfill_candidate(self, report_date: date) -> bool:
         """
