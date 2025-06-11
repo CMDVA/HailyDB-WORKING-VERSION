@@ -162,7 +162,7 @@ class ProductionLiveRadarService:
                 if wind_match:
                     wind_speed = max(wind_speed, int(wind_match.group(1)))
             
-            # Extract hail size
+            # Extract hail size - numeric patterns
             hail_patterns = [
                 r'(\d+\.?\d*)\s*inch.*?hail',
                 r'hail.*?(\d+\.?\d*)\s*inch',
@@ -173,6 +173,27 @@ class ProductionLiveRadarService:
                 hail_match = re.search(pattern, description)
                 if hail_match:
                     hail_size = max(hail_size, float(hail_match.group(1)))
+            
+            # Extract hail size - NWS descriptive sizes
+            hail_size_map = {
+                'pea': 0.25, 'peanut': 0.5, 'penny': 0.75,
+                'nickel': 0.88, 'quarter': 1.0, 'half dollar': 1.25,
+                'ping pong ball': 1.5, 'golf ball': 1.75, 'egg': 2.0,
+                'tennis ball': 2.5, 'baseball': 2.75, 'large apple': 3.0,
+                'softball': 4.0, 'grapefruit': 4.5
+            }
+            
+            hail_description_patterns = [
+                r'(pea|peanut|penny|nickel|quarter|half dollar|ping pong ball|golf ball|egg|tennis ball|baseball|large apple|softball|grapefruit)\s*size.*?hail',
+                r'hail.*?(pea|peanut|penny|nickel|quarter|half dollar|ping pong ball|golf ball|egg|tennis ball|baseball|large apple|softball|grapefruit)\s*size'
+            ]
+            
+            for pattern in hail_description_patterns:
+                hail_desc_match = re.search(pattern, description, re.IGNORECASE)
+                if hail_desc_match:
+                    size_desc = hail_desc_match.group(1).lower()
+                    if size_desc in hail_size_map:
+                        hail_size = max(hail_size, hail_size_map[size_desc])
             
             # Check NWS parameters for more precise data
             if 'windSpeed' in parameters:
