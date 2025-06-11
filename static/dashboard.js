@@ -1253,9 +1253,10 @@ function updateWorldClock() {
         hour: '2-digit'
     }));
     
-    // Get UTC date in DD format
+    // Get UTC date in MMM DD format
     const utcDate = now.toLocaleDateString('en-US', { 
         timeZone: 'UTC',
+        month: 'short',
         day: '2-digit'
     });
     
@@ -1288,7 +1289,7 @@ function updateWorldClock() {
     if (centralElement) centralElement.textContent = centralTime;
     if (easternElement) easternElement.textContent = easternTime;
     if (utcElement) utcElement.textContent = utcTime;
-    if (spcUtcDateElement) spcUtcDateElement.textContent = `${spcDate} / ${utcDate}`;
+    if (spcUtcDateElement) spcUtcDateElement.textContent = `${utcDate.replace(/(\w{3}) (\d{2})/, '$1 $2')} / ${spcDate}`;
 }
 
 // Time Mode Toggle Functions
