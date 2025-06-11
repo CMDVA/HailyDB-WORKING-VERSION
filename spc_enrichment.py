@@ -183,47 +183,43 @@ class SPCEnrichmentService:
         try:
             # Enhanced prompt with distance-aware geographic search and nearest city identification
             prompt = f"""
-            You are a precise geographic locator for {county} County, {state}. Find the CLOSEST real places to coordinates {lat:.4f}, {lon:.4f}.
+            You are a precision mapping system. Search for places within a 3-mile radius of coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
             
-            CRITICAL REQUIREMENT: Search by proximity starting from the exact coordinates outward.
+            CONSTRAINT: You must find places within 3 miles. If no places exist within 3 miles (which is extremely rare), then and only then expand to 5 miles.
             
-            IMMEDIATE VICINITY (0-3 miles) - HIGHEST PRIORITY:
-            - Small towns, villages, communities (like Mt Pleasant, Millingport)
-            - Unincorporated places, crossroads, settlements
-            - Local neighborhoods, subdivisions, districts
-            - Post offices, fire stations, schools, churches
+            SEARCH RADIUS ENFORCEMENT:
+            - Start with a 1-mile radius around {lat:.4f}, {lon:.4f}
+            - Expand to 2-mile radius
+            - Expand to 3-mile radius
+            - DO NOT include any place beyond 3 miles unless absolutely no places exist closer
             
-            NEAR VICINITY (3-8 miles) - SECONDARY:
-            - Larger towns and cities  
-            - County seats, regional centers
-            - Major landmarks or geographic features
+            REQUIRED PLACE TYPES (search in this order):
+            1. Small towns, communities, villages, crossroads
+            2. Unincorporated places, settlements, districts
+            3. Churches, schools, fire stations, post offices
+            4. Geographic features (creeks, lakes, hills, parks)
+            5. Road intersections, bridges, landmarks
             
-            DISTANT REFERENCE (8+ miles) - ONLY if nothing closer found:
-            - Major cities for regional context
+            STRICT DISTANCE VALIDATION:
+            - Calculate straight-line distance from {lat:.4f}, {lon:.4f} to each place
+            - Reject any suggestion over 3 miles unless no closer places exist
+            - Prioritize the 3 closest places found
             
-            SPECIFIC INSTRUCTIONS for {lat:.4f}, {lon:.4f} in {county} County, {state}:
-            1. Start by identifying the absolutely CLOSEST places within 3 miles
-            2. For Florida locations, look specifically for places like West Tocoi, Bakersville, Hastings, Federal Point
-            3. For North Carolina locations, look for Mt Pleasant, Millingport, and similar communities  
-            4. Search for unincorporated communities, crossroads, and local place names
-            5. Only include distant places if nothing is found closer
-            6. Nearest city should be the closest significant city (population 5,000+)
-            7. Provide precise latitude/longitude coordinates for each place
+            COORDINATE PRECISION:
+            Provide exact latitude/longitude for each place within 0.01 degree accuracy.
             
-            Return JSON format:
+            For {lat:.4f}, {lon:.4f}, find the 3 closest real places and return as JSON:
+            
             {{
-                "nearest_city": {{"name": "Closest Major City", "distance_miles": 5.2, "approx_lat": 35.1234, "approx_lon": -80.5678}},
+                "nearest_city": {{"name": "Closest Major City", "distance_miles": 8.2, "approx_lat": 35.4088, "approx_lon": -80.5795}},
                 "places": [
-                    {{"name": "Closest Real Place", "distance_miles": 1.5, "approx_lat": 35.3800, "approx_lon": -80.3700}},
-                    {{"name": "Next Closest Place", "distance_miles": 2.8, "approx_lat": 35.3600, "approx_lon": -80.3500}}
+                    {{"name": "Closest Place Within 3 Miles", "distance_miles": 1.2, "approx_lat": 35.3968, "approx_lon": -80.3456}},
+                    {{"name": "Second Closest Within 3 Miles", "distance_miles": 2.1, "approx_lat": 35.4032, "approx_lon": -80.4356}},
+                    {{"name": "Third Closest Within 3 Miles", "distance_miles": 2.8, "approx_lat": 35.3800, "approx_lon": -80.3700}}
                 ]
             }}
             
-            REQUIREMENTS:
-            - Focus on the CLOSEST places first - proximity is most important
-            - Include Mt Pleasant and Millingport if they are near these coordinates
-            - Only include places that actually exist with real coordinates
-            - Always provide distance_miles and coordinates for each place
+            VALIDATION: Every place must be within 3 miles of {lat:.4f}, {lon:.4f}. No exceptions. Return only valid JSON format.
             """
             
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
