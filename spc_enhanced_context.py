@@ -176,8 +176,11 @@ class SPCEnhancedContextService:
     
     def _generate_multi_alert_summary(self, report: SPCReport, verified_alerts: List[Alert], 
                                     duration_minutes: int, counties_affected: set, nws_office: str) -> str:
-        """Generate AI-powered multi-alert summary"""
+        """Generate AI-powered enhanced summary with location context"""
         try:
+            # Get location context for enhanced summary
+            location_context = self._get_location_context(report)
+            
             # Prepare context for AI
             alert_details = []
             for alert in verified_alerts:
@@ -188,7 +191,12 @@ class SPCEnhancedContextService:
                     "counties": alert.county_names
                 })
             
-            prompt = f"""Generate a concise 1-2 sentence summary for this SPC storm report that was validated by multiple NWS alerts:
+            # Extract meaningful location references
+            nearby_places = location_context.get('nearby_places', [])
+            geographic_features = location_context.get('geographic_features', [])
+            primary_location = location_context.get('primary_location', f"{report.location}, {report.county}")
+            
+            prompt = f"""Generate a comprehensive 2-3 sentence enhanced summary for this SPC storm report with location enrichment:
 
 SPC Report Details:
 - Type: {report.report_type}
@@ -197,6 +205,11 @@ SPC Report Details:
 - Time: {report.time_utc}
 - Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
 
+Enhanced Location Context:
+- Primary Location: {primary_location}
+- Nearby Places: {', '.join([place.get('name', '') for place in nearby_places]) if nearby_places else 'None identified'}
+- Geographic Features: {', '.join(geographic_features) if geographic_features else 'None identified'}
+
 Verified Alerts ({len(verified_alerts)} total):
 {json.dumps(alert_details, indent=2)}
 
@@ -204,22 +217,23 @@ Event Duration: {duration_minutes} minutes
 Counties Affected: {', '.join(sorted(counties_affected))}
 NWS Office: {nws_office}
 
-Create a professional summary that emphasizes:
-1. The SPC report type and measurement
-2. Number of verified NWS alerts that confirmed it
-3. Geographic and temporal scope
-4. Authoritative validation
+Create an enhanced professional summary that:
+1. Uses the most recognizable location reference from the context data
+2. Emphasizes the SPC report type and measurement
+3. Highlights verification by multiple NWS alerts
+4. Includes geographic scope and temporal duration
+5. References nearby landmarks or recognizable places when available
 
-Keep it factual and focused on the multi-source verification."""
+Make the location more meaningful by incorporating nearby places or geographic features that help readers understand the precise area."""
 
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "You are a meteorological data analyst. Create concise, professional summaries of verified storm reports."},
+                    {"role": "system", "content": "You are a meteorological data analyst specializing in location-enhanced weather summaries. Create comprehensive summaries that make locations more recognizable and meaningful."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=200,
-                temperature=0.3
+                max_tokens=250,
+                temperature=0.2
             )
             
             return response.choices[0].message.content.strip()
