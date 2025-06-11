@@ -1,0 +1,99 @@
+The purpose of this enrichment is to improve SPC Report Details pages and API responses, by adding contextual data to each individual SPC report.
+
+You will add a new column to the spc_reports table:
+
+sql
+Copy
+Edit
+ALTER TABLE spc_reports ADD COLUMN spc_enrichment JSONB DEFAULT '{}'::jsonb;
+This field will store a JSON object structured as:
+
+json
+Copy
+Edit
+{
+  "radar_polygon_match": true/false,
+  "radar_polygon_id": integer or null,
+  "nearby_places": [
+    { "name": string, "approx_lat": float, "approx_lon": float },
+    ...
+  ],
+  "enriched_summary": string
+}
+Key Logic to Implement:
+
+For each spc_reports row:
+
+Take the lat and lon coordinates of the SPC report.
+
+Perform polygon containment test:
+
+Query the radar_alerts table:
+
+Use radar_alerts.geometry field (GeoJSON Polygon).
+
+Check if the SPC report lat/lon falls inside any radar_alert polygon.
+
+If so, record:
+
+"radar_polygon_match": true
+
+"radar_polygon_id": radar_alert.id
+
+If not:
+
+"radar_polygon_match": false
+
+"radar_polygon_id": null
+
+Perform nearby places enrichment:
+
+Use OpenAI API to generate 3-6 nearby place names within approx. 5 miles of the SPC report lat/lon.
+
+Use Google Maps style, USGS GNIS, or known local naming conventions.
+
+If no suitable places found, return empty array.
+
+Structure as:
+
+json
+Copy
+Edit
+{ "name": "...", "approx_lat": ..., "approx_lon": ... }
+Generate enriched_summary:
+
+Use OpenAI to create a 1-2 sentence factual summary based only on:
+
+SPC report type (hail / wind / tornado)
+
+Magnitude
+
+Location / County / State
+
+Nearby places list
+
+Whether the report fell inside a radar_alert polygon
+
+Example summary:
+
+"This 1.0 inch hail report in St. Johns County, FL occurred near West Tocoi and Elkton, and was confirmed inside a radar-detected hail polygon."
+
+Another example:
+
+"This 60 mph wind report in Cook County, IL occurred near Evanston and Rogers Park, but no radar-detected polygon was present at this location."
+
+Update the spc_reports.spc_enrichment field with this object.
+
+Other Notes:
+
+This enrichment process is fully independent of the existing /spc-matches flow and should not modify alerts.spc_reports or alerts.spc_verified.
+
+This enrichment is designed purely for enhancing the display of /spc/reports/{id} and related APIs.
+
+The goal is to beat competitive platforms in clarity and richness of location detail.
+
+The process should be designed so it can be run both:
+
+For backfilling all historical SPC reports.
+
+As a scheduled enrichment on new SPC reports.

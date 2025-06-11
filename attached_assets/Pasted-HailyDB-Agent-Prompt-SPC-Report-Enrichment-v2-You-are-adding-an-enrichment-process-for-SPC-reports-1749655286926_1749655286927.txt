@@ -1,0 +1,124 @@
+HailyDB Agent Prompt: SPC Report Enrichment v2
+
+You are adding an enrichment process for SPC reports in HailyDB.
+
+Purpose: Add geographic and contextual metadata to spc_reports, improving value of SPC event previews and API consumers.
+
+Target Table: spc_reports
+
+New Field:
+
+sql
+Copy
+Edit
+ALTER TABLE spc_reports ADD COLUMN spc_enrichment JSONB DEFAULT '{}';
+Field Format:
+
+json
+Copy
+Edit
+{
+  "nearby_places": [
+    { "name": "West Tocoi", "approx_lat": 29.8493, "approx_lon": -81.6028 },
+    { "name": "Elkton", "approx_lat": 29.8000, "approx_lon": -81.4500 },
+    ...
+  ],
+  "enriched_summary": "1.00\" hail observed near West Tocoi, St. Johns County, FL. This event falls within an active radar-detected hail warning polygon."
+}
+Enrichment Process:
+
+For each SPC report:
+
+✅ Use the following fields:
+
+latitude
+
+longitude
+
+report_type
+
+size_inches or speed
+
+county
+
+state
+
+comments
+
+report_time + report_date
+
+✅ Perform the following steps:
+
+1️⃣ Nearby Places Extraction
+
+Reverse lookup lat/lon using internal AI geographic knowledge
+
+Reference USGS GNIS data, Google Maps data, historical/local place names
+
+Extract 0 to N nearby valid places within ~5 miles
+
+Format result as array of objects { name, approx_lat, approx_lon }
+
+DO NOT hallucinate or force 5+ items — return only truthful nearby places
+
+2️⃣ Enriched Summary Generation
+
+Write a factual 1–2 sentence summary suitable for display on /spc/reports/{id} and API consumers
+
+Example pattern:
+
+→ "1.00” hail observed near West Tocoi, St. Johns County, FL. SPC verified. Within radar-indicated hail polygon."
+
+→ If no polygon match:
+
+→ "1.00” hail observed near West Tocoi, St. Johns County, FL."
+
+3️⃣ Radar Polygon Match Check
+
+Query existing radar_alerts table:
+
+If any radar_alert polygon contains SPC report lat/lon:
+
+Set radar_polygon_match = TRUE
+
+Store radar_polygon_id = radar_alert.id
+
+Else:
+
+Set radar_polygon_match = FALSE
+
+radar_polygon_id = NULL
+
+You may need to extend spc_reports:
+
+sql
+Copy
+Edit
+ALTER TABLE spc_reports ADD COLUMN radar_polygon_match BOOLEAN DEFAULT FALSE;
+ALTER TABLE spc_reports ADD COLUMN radar_polygon_id UUID;
+4️⃣ Store Result
+
+Store entire enrichment output in spc_enrichment JSONB column.
+
+Processing Scope (Execution Instruction)
+
+Execute first for 2025-06-10 SPC reports to validate.
+
+On success, backfill all SPC reports with valid lat/lon.
+
+Additional Notes
+
+DO NOT store fictional places.
+
+Use existing radar_alerts table polygons for radar match.
+
+Do not modify existing ai_summary field — use spc_enrichment as single authoritative enrichment JSONB.
+
+If no valid places are found, nearby_places = [].
+
+Summary:
+
+✅ Single new JSONB field → spc_enrichment
+✅ Adds structured nearby places → real ones
+✅ Adds enriched summary → AI generated but truth-anchored
+✅ Adds polygon match metadata → cross-referenced to radar_alerts

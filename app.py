@@ -3537,6 +3537,60 @@ def geocode_address(address):
         logger.error(f"Geocoding error for address '{address}': {e}")
         return None, None
 
+@app.route('/api/spc-reports/enrich', methods=['POST'])
+def api_enrich_spc_reports():
+    """
+    API endpoint to trigger SPC report enrichment with polygon containment and nearby places
+    """
+    try:
+        from spc_enrichment import SPCEnrichmentService
+        
+        # Get parameters
+        data = request.get_json() or {}
+        batch_size = data.get('batch_size', 50)
+        target_report_id = data.get('report_id')
+        
+        # Initialize enrichment service
+        enrichment_service = SPCEnrichmentService()
+        
+        # Process enrichment
+        if target_report_id:
+            result = enrichment_service.enrich_spc_reports_batch(target_report_id=target_report_id)
+        else:
+            result = enrichment_service.enrich_spc_reports_batch(batch_size=batch_size)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"SPC enrichment API failed: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/spc-reports/<int:report_id>/enrichment')
+def api_get_spc_report_enrichment(report_id):
+    """
+    API endpoint to retrieve enrichment data for a specific SPC report
+    """
+    try:
+        report = SPCReport.query.get_or_404(report_id)
+        
+        # Return enrichment data
+        enrichment_data = report.spc_enrichment or {}
+        
+        return jsonify({
+            "report_id": report.id,
+            "report_type": report.report_type,
+            "location": report.location,
+            "county": report.county,
+            "state": report.state,
+            "latitude": report.latitude,
+            "longitude": report.longitude,
+            "enrichment": enrichment_data
+        })
+        
+    except Exception as e:
+        logger.error(f"SPC enrichment retrieval failed for report {report_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     with app.app_context():
         init_scheduler()

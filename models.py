@@ -369,6 +369,9 @@ class SPCReport(db.Model):
     row_hash = Column(String(64), unique=True)  # SHA256 hash for strict duplicate detection
     ingested_at = Column(DateTime, server_default=func.now())
     
+    # SPC Report Enrichment
+    spc_enrichment = Column(JSONB, default=lambda: {})  # Contextual enrichment data
+    
     __table_args__ = (
         Index('idx_spc_date_type', 'report_date', 'report_type'),
         Index('idx_spc_location', 'state', 'county'),
