@@ -1,270 +1,289 @@
 {% extends "base.html" %}
 
-{% block title %}HailyDB Operations Center{% endblock %}
+{% block title %}Admin Dashboard - HailyDB{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    
-    <!-- Page Heading -->
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">HailyDB Operations Center</h1>
-        <div class="d-flex">
-            <div class="btn-group me-2" role="group">
-                <button id="play-scheduler" class="btn btn-success btn-sm" onclick="onPlayScheduler()" title="Start Scheduler">
-                    <i class="fas fa-play"></i>
+<div class="row">
+    <!-- Header with Navigation -->
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-tachometer-alt me-2"></i>
+                Admin Dashboard
+            </h1>
+            <div class="btn-group" role="group">
+                <a href="/hurricane-tracks" class="btn btn-outline-danger">
+                    <i class="fas fa-hurricane me-1"></i>Hurricane Tracks
+                </a>
+                <a href="/spc-matches" class="btn btn-outline-warning">
+                    <i class="fas fa-check-circle me-1"></i>SPC Matches
+                </a>
+                <a href="/ingestion-logs" class="btn btn-outline-info">
+                    <i class="fas fa-list-alt me-1"></i>Ingestion Logs
+                </a>
+                <button type="button" class="btn btn-outline-primary" onclick="triggerIngestion()">
+                    <i class="fas fa-sync-alt me-1"></i>Trigger Ingestion
                 </button>
-                <button id="pause-scheduler" class="btn btn-warning btn-sm" onclick="onPauseScheduler()" title="Pause Scheduler">
-                    <i class="fas fa-pause"></i>
+                <button type="button" class="btn btn-outline-success" onclick="refreshDashboard()">
+                    <i class="fas fa-refresh me-1"></i>Refresh
                 </button>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="refreshDashboard()">
-                <i class="fas fa-sync-alt"></i> Refresh
-            </button>
         </div>
+        
     </div>
+</div>
 
-    <!-- Database Operations Metrics -->
-    <div class="row mb-4">
-        <!-- Ingestion Performance -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                Ingestion Rate
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ "%.2f"|format(stats.db_metrics.ingestion_rate_per_minute) }}/min
-                            </div>
-                            <small class="text-muted">Database writes per minute</small>
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card border-left-primary">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Total Alerts
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-download fa-2x text-primary"></i>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ stats.get('total_alerts', 0) | number_format }}
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Storage Efficiency -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                Storage Efficiency
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ "%.1f"|format(stats.db_metrics.storage_efficiency) }}%
-                            </div>
-                            <small class="text-muted">{{ stats.enriched_alerts|number_format }}/{{ stats.total_alerts|number_format }} enriched</small>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-hdd fa-2x text-success"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- System Uptime -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                System Uptime
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ "%.0f"|format(stats.db_metrics.uptime_hours) }}h
-                            </div>
-                            <small class="text-muted">99.8% availability</small>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-server fa-2x text-info"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Processing Queue -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Processing Queue
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ stats.db_metrics.processing_queue_size }}
-                            </div>
-                            <small class="text-muted">Alerts pending enrichment</small>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-tasks fa-2x text-warning"></i>
-                        </div>
+                    <div class="col-auto">
+                        <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Operational Intelligence Row -->
-    <div class="row mb-4">
-        <!-- Cost Analysis -->
-        <div class="col-xl-6 col-lg-7">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Cost Analysis</h6>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-lg-6 mb-3">
-                            <div class="text-xs text-muted mb-1">COST PER ALERT</div>
-                            <div class="h4 mb-0 text-gray-800">${{ "%.4f"|format(stats.db_metrics.cost_per_alert) }}</div>
-                            <small class="text-success">↓ 12% vs last month</small>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card border-left-success">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            AI Enriched
                         </div>
-                        <div class="col-lg-6 mb-3">
-                            <div class="text-xs text-muted mb-1">MONTHLY ESTIMATE</div>
-                            <div class="h4 mb-0 text-gray-800">${{ "%.2f"|format(stats.db_metrics.monthly_cost_estimate) }}</div>
-                            <small class="text-info">Based on current volume</small>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ stats.get('enriched_alerts', 0) | number_format }}
+                        </div>
+                        <div class="text-xs text-muted">
+                            {% if stats.get('total_alerts', 0) > 0 %}
+                                {{ "%.1f"|format((stats.get('enriched_alerts', 0) / stats.get('total_alerts', 1)) * 100) }}% enriched
+                            {% endif %}
                         </div>
                     </div>
-                    <div class="mt-3">
-                        <div class="text-xs text-muted mb-1">COST BREAKDOWN</div>
-                        <div class="row">
-                            <div class="col-4 text-center">
-                                <div class="text-primary font-weight-bold">60%</div>
-                                <small class="text-muted">Storage</small>
-                            </div>
-                            <div class="col-4 text-center">
-                                <div class="text-info font-weight-bold">25%</div>
-                                <small class="text-muted">Compute</small>
-                            </div>
-                            <div class="col-4 text-center">
-                                <div class="text-warning font-weight-bold">15%</div>
-                                <small class="text-muted">Network</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- System Health & Performance -->
-        <div class="col-xl-6 col-lg-5">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-info">System Health</h6>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <div class="text-xs text-muted mb-1">DATA FRESHNESS</div>
-                        <div class="h5 mb-0 text-gray-800">
-                            {{ "%.1f"|format(stats.db_metrics.data_freshness_hours) }}h ago
-                        </div>
-                        <small class="text-muted">Last successful ingestion</small>
-                    </div>
-                    <div class="mb-3">
-                        <div class="text-xs text-muted mb-1">ERROR RATE</div>
-                        <div class="h5 mb-0 text-gray-800">
-                            {{ "%.2f"|format(stats.db_metrics.error_rate_percent) }}%
-                        </div>
-                        <small class="text-success">Within operational targets</small>
-                    </div>
-                    <div>
-                        <div class="text-xs text-muted mb-1">TOTAL RECORDS</div>
-                        <div class="h5 mb-0 text-gray-800">
-                            {{ stats.total_alerts|number_format }}
-                        </div>
-                        <small class="text-info">+ {{ stats.recent_alerts_24h|number_format }} today</small>
+                    <div class="col-auto">
+                        <i class="fas fa-robot fa-2x text-gray-300"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Autonomous Scheduler Status -->
-    <div class="row mb-4">
-        <div class="col-lg-6">
-            <div class="card shadow">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">NWS Ingestion Status</h6>
-                    <span id="nws-status-indicator" class="badge badge-success">
-                        <i class="fas fa-circle"></i> Active
-                    </span>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <div class="text-xs text-muted">NWS PROGRESS</div>
-                                <div id="nws-progress" style="display: none;">
-                                    <div class="progress mb-2">
-                                        <div class="progress-bar bg-primary" id="nws-progress-bar" style="width: 0%"></div>
-                                    </div>
-                                    <small id="nws-progress-text" class="text-muted">Waiting...</small>
-                                </div>
-                            </div>
-                            <div id="nws-countdown" style="display: none;">
-                                <div class="text-xs text-muted">NEXT NWS POLL</div>
-                                <div class="h5 text-primary" id="nws-countdown-timer">--</div>
-                            </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card border-left-info">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Recent (24h)
                         </div>
-                        <div class="col-md-6">
-                            <div id="nws-last-result" style="display: none;">
-                                <div class="text-xs text-muted">LAST RESULT</div>
-                                <div id="nws-result-text" class="h6">--</div>
-                            </div>
-                            <div class="text-center">
-                                <button id="trigger-nws" class="btn btn-outline-primary btn-sm" onclick="triggerIngestion()">
-                                    <i class="fas fa-sync"></i> Trigger Now
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ stats.get('recent_alerts_24h', 0) | number_format }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clock fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card border-left-danger">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                            Total SPC Events
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ stats.get('spc_total_reports', 0) | number_format }}
+                        </div>
+                        <div class="text-xs text-muted">
+                            <span class="text-danger">{{ stats.get('spc_tornado', 0) }}</span> tornado, 
+                            <span class="text-warning">{{ stats.get('spc_wind', 0) }}</span> wind, 
+                            <span class="text-info">{{ stats.get('spc_hail', 0) }}</span> hail
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-bolt fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card border-left-info">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            NWS Automatic Ingestion
+                        </div>
+                        <div class="d-flex flex-column">
+                            <div class="d-flex align-items-center mb-2">
+                                <span id="scheduler-status" class="me-2 font-weight-bold">
+                                    <i class="fas fa-stop-circle me-1"></i>Stopped
+                                </span>
+                                <button id="scheduler-play-btn" class="btn btn-sm btn-success me-1" onclick="onPlayScheduler()" title="Start automatic ingestion">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button id="scheduler-pause-btn" class="btn btn-sm btn-warning" onclick="onPauseScheduler()" style="display: none;" title="Stop automatic ingestion">
+                                    <i class="fas fa-pause"></i>
                                 </button>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card shadow">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-warning">SPC Ingestion Status</h6>
-                    <span id="spc-status-indicator" class="badge badge-warning">
-                        <i class="fas fa-circle"></i> Active
-                    </span>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <div class="text-xs text-muted">SPC PROGRESS</div>
-                                <div id="spc-progress" style="display: none;">
-                                    <div class="progress mb-2">
-                                        <div class="progress-bar bg-warning" id="spc-progress-bar" style="width: 0%"></div>
-                                    </div>
-                                    <small id="spc-progress-text" class="text-muted">Waiting...</small>
+                            <div id="ingestion-progress" class="small text-muted" style="display: none;">
+                                <div id="progress-text">Initializing...</div>
+                                <div class="progress mt-1" style="height: 4px;">
+                                    <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
                                 </div>
                             </div>
-                            <div id="spc-countdown" style="display: none;">
-                                <div class="text-xs text-muted">NEXT SPC POLL</div>
-                                <div class="h5 text-warning" id="spc-countdown-timer">--</div>
+                            <div id="next-ingestion-countdown" class="small text-muted" style="display: none;">
+                                Next Ingestion: <span id="countdown-timer">--</span>
+                            </div>
+                            <div id="last-ingestion-result" class="small" style="display: none;">
+                                <span id="result-text"></span>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div id="spc-last-result" style="display: none;">
-                                <div class="text-xs text-muted">LAST RESULT</div>
-                                <div id="spc-result-text" class="h6">--</div>
-                            </div>
-                            <div class="text-center">
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-cloud-download-alt fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card border-left-warning">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            SPC Automatic Ingestion
+                        </div>
+                        <div class="d-flex flex-column">
+                            <div class="d-flex align-items-center mb-2">
+                                <span id="spc-status" class="me-2 font-weight-bold">
+                                    <i class="fas fa-stop-circle me-1"></i>Stopped
+                                </span>
                                 <small class="text-muted">Uses shared controls</small>
                             </div>
+                            <div id="spc-progress" class="small text-muted" style="display: none;">
+                                <div id="spc-progress-text">Initializing...</div>
+                                <div class="progress mt-1" style="height: 4px;">
+                                    <div id="spc-progress-bar" class="progress-bar bg-warning progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div id="spc-countdown" class="small text-muted" style="display: none;">
+                                Next Ingestion: <span id="spc-countdown-timer">--</span>
+                            </div>
+                            <div id="spc-last-result" class="small" style="display: none;">
+                                <span id="spc-result-text"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+        <!-- Today's Data Verification -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                        <h6 class="m-0 font-weight-bold text-primary">Today's Alerts</h6>
+                        <a href="{{ url_for('get_alerts') }}" class="btn btn-sm btn-outline-primary">
+                            View All <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <div id="todays-alerts-table">
+                            Loading today's alerts...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                        <h6 class="m-0 font-weight-bold text-primary">Today's SPC Events</h6>
+                        <a href="/spc/reports" class="btn btn-sm btn-outline-primary">
+                            View All <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <div id="todays-spc-events">
+                            Loading today's SPC events...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        </div>
+
+<!-- System Status Row -->
+<div class="row mb-4">
+    <div class="col-xl-8">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">System Status</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Ingestion Status</h6>
+                        <p class="mb-1">
+                            <strong>Last Ingestion:</strong> 
+                            <span id="last-ingestion">
+                                {% if stats.get('last_ingestion') %}
+                                    {{ stats.last_ingestion.strftime('%Y-%m-%d %H:%M:%S UTC') if stats.last_ingestion else 'Never' }}
+                                {% else %}
+                                    Never
+                                {% endif %}
+                            </span>
+                        </p>
+                        <p class="mb-1">
+                            <strong>Polling Interval:</strong> 5 minutes
+                        </p>
+                        <p class="mb-3">
+                            <strong>Next Poll:</strong> <span id="next-poll">Calculating...</span>
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted">API Health</h6>
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="status-dot bg-success me-2"></div>
+                            <span>NWS API: Operational</span>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="status-dot bg-success me-2"></div>
+                            <span>Database: Connected</span>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="status-dot bg-{{ 'success' if stats.get('enriched_alerts', 0) > 0 else 'warning' }} me-2"></div>
+                            <span>OpenAI API: {{ 'Available' if stats.get('enriched_alerts', 0) > 0 else 'Check Configuration' }}</span>
                         </div>
                     </div>
                 </div>
@@ -272,232 +291,24 @@
         </div>
     </div>
 
-    <!-- Today's Alerts and SPC Events (Preserved Original Sections) -->
-    <div class="row mb-4">
-        <!-- Today's Alerts Card -->
-        <div class="col-lg-6 mb-4">
-            <div class="card">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Today's Alerts</h6>
-                </div>
-                <div class="card-body">
-                    {% if todays_alerts %}
-                        <div class="table-responsive">
-                            <table class="table table-sm table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Time</th>
-                                        <th>Event</th>
-                                        <th>Area</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for alert in todays_alerts[:10] %}
-                                    <tr>
-                                        <td class="text-nowrap">
-                                            <small>{{ alert.sent.strftime('%H:%M') if alert.sent else '--' }}</small>
-                                        </td>
-                                        <td>
-                                            <span class="badge badge-sm 
-                                                {% if 'Tornado' in alert.event %}badge-danger
-                                                {% elif 'Severe' in alert.event %}badge-warning
-                                                {% elif 'Flood' in alert.event %}badge-info
-                                                {% elif 'Winter' in alert.event %}badge-light
-                                                {% else %}badge-secondary{% endif %}">
-                                                {{ alert.event[:20] }}...
-                                            </span>
-                                        </td>
-                                        <td class="small">{{ alert.area_desc[:25] }}...</td>
-                                        <td>
-                                            <span class="badge 
-                                                {% if alert.status == 'Actual' %}badge-success
-                                                {% elif alert.status == 'Test' %}badge-secondary
-                                                {% else %}badge-warning{% endif %}">
-                                                {{ alert.status }}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                        {% if todays_alerts|length > 10 %}
-                            <div class="text-center mt-3">
-                                <a href="/alerts" class="btn btn-sm btn-outline-primary">
-                                    View All {{ todays_alerts|length }} Alerts
-                                </a>
-                            </div>
-                        {% endif %}
-                    {% else %}
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-check-circle fa-2x mb-2"></i>
-                            <p>No alerts issued today</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Today's SPC Events Card -->
-        <div class="col-lg-6 mb-4">
-            <div class="card">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-warning">Today's SPC Events</h6>
-                </div>
-                <div class="card-body">
-                    {% if todays_spc_reports %}
-                        <div class="table-responsive">
-                            <table class="table table-sm table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Time</th>
-                                        <th>Type</th>
-                                        <th>Location</th>
-                                        <th>Details</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for report in todays_spc_reports[:10] %}
-                                    <tr>
-                                        <td class="text-nowrap">
-                                            <small>{{ report.time_utc[:2] + ':' + report.time_utc[2:] if report.time_utc else '--' }}</small>
-                                        </td>
-                                        <td>
-                                            <span class="badge 
-                                                {% if report.report_type == 'tornado' %}badge-danger
-                                                {% elif report.report_type == 'hail' %}badge-info
-                                                {% elif report.report_type == 'wind' %}badge-warning
-                                                {% else %}badge-secondary{% endif %}">
-                                                {{ report.report_type|title }}
-                                            </span>
-                                        </td>
-                                        <td class="small">{{ report.location[:20] }}...</td>
-                                        <td class="small">
-                                            {% if report.report_type == 'hail' and report.magnitude and report.magnitude.size %}
-                                                {{ report.magnitude.size }}"
-                                            {% elif report.report_type == 'wind' and report.magnitude and report.magnitude.speed %}
-                                                {{ report.magnitude.speed }} mph
-                                            {% elif report.magnitude and report.magnitude.f_scale %}
-                                                F{{ report.magnitude.f_scale }}
-                                            {% else %}
-                                                --
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                        {% if todays_spc_reports|length > 10 %}
-                            <div class="text-center mt-3">
-                                <a href="/spc-reports" class="btn btn-sm btn-outline-warning">
-                                    View All {{ todays_spc_reports|length }} Reports
-                                </a>
-                            </div>
-                        {% endif %}
-                    {% else %}
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-check-circle fa-2x mb-2"></i>
-                            <p>No SPC reports today</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- SPC Data Verification Calendar -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-success">SPC Data Verification Calendar</h6>
-                </div>
-                <div class="card-body">
-                    <div id="spc-verification-table">
-                        Loading SPC verification data...
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
 </div>
 
+
+
+<!-- Hidden data for JavaScript -->
+<script type="application/json" id="dashboard-data">
+{
+    "scheduler_running": {{ stats.get('scheduler_running', false) | tojson }}
+}
+</script>
+{% endblock %}
+
+{% block scripts %}
 <script>
-// Initialize dashboard when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Dashboard loaded successfully');
-    
-    // Load SPC verification calendar if container exists
-    const spcContainer = document.getElementById('spc-verification-table');
-    if (spcContainer) {
-        loadSPCVerificationCalendar();
-    }
-});
-
-function loadSPCVerificationCalendar() {
-    fetch('/spc-calendar-verification')
-        .then(response => response.json())
-        .then(data => {
-            const container = document.getElementById('spc-verification-table');
-            if (container && data.calendar_html) {
-                container.innerHTML = data.calendar_html;
-            }
-        })
-        .catch(error => {
-            console.error('Error loading SPC verification:', error);
-            const container = document.getElementById('spc-verification-table');
-            if (container) {
-                container.innerHTML = '<p class="text-muted">Unable to load SPC verification data</p>';
-            }
-        });
-}
-
-function refreshDashboard() {
-    location.reload();
-}
-
-function onPlayScheduler() {
-    fetch('/start-autonomous-scheduler', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('play-scheduler').classList.add('d-none');
-                document.getElementById('pause-scheduler').classList.remove('d-none');
-            }
-        });
-}
-
-function onPauseScheduler() {
-    fetch('/stop-autonomous-scheduler', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('pause-scheduler').classList.add('d-none');
-                document.getElementById('play-scheduler').classList.remove('d-none');
-            }
-        });
-}
-
-function triggerIngestion() {
-    const button = document.getElementById('trigger-nws');
-    button.disabled = true;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
-    
-    fetch('/trigger-nws-poll', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            setTimeout(() => {
-                button.disabled = false;
-                button.innerHTML = '<i class="fas fa-sync"></i> Trigger Now';
-            }, 2000);
-        })
-        .catch(error => {
-            button.disabled = false;
-            button.innerHTML = '<i class="fas fa-sync"></i> Trigger Now';
-        });
-}
+    // Initialize dashboard
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeDashboard();
+    });
 </script>
 {% endblock %}

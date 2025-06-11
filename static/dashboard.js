@@ -1,27 +1,9 @@
 /**
- * HailyDB Operations Center - Enhanced Dashboard JavaScript
- * Real-time monitoring, performance analytics, and operational intelligence
+ * HailyDB Dashboard JavaScript
+ * Focused on data integrity verification and system monitoring
  */
 
-// Global state management for operations center
-let operationsCenter = {
-    schedulerRunning: false,
-    lastUpdate: null,
-    refreshInterval: null,
-    countdownInterval: null,
-    autoRefreshEnabled: true,
-    metricsCache: {},
-    liveUpdates: true,
-    performanceMetrics: {
-        ingestionSpeed: 2300,
-        apiResponse: 145,
-        queueSize: 12,
-        throughput: 87,
-        errorRate: 0.3
-    }
-};
-
-// Legacy variables for compatibility
+// Global variables
 let dashboardData = {};
 let lastShownResult = null;
 
@@ -51,18 +33,13 @@ function initializeDashboard() {
         loadTodaysAlerts();
         loadSPCVerificationTable();
         
-        // Enhanced refresh with real-time metrics
-        initializeRealTimeUpdates();
-        
-        // Set up automatic refresh every 30 seconds with performance monitoring
+        // Set up automatic refresh every 30 seconds
         setInterval(() => {
             loadTodaysAlerts();
             loadSPCVerificationTable();
             updateStatusIndicator();
             updateNextPollTime();
             updateLastUpdateTime();
-            updateLiveMetrics();
-            updateGeographicIntelligence();
         }, 30000);
         
         // Start autonomous scheduler automatically
@@ -1464,206 +1441,6 @@ function onPlayScheduler() {
 // Pause button click handler
 function onPauseScheduler() {
     stopAutonomousScheduler();
-}
-
-// Enhanced Operations Center Functions
-
-function initializeRealTimeUpdates() {
-    // Initialize real-time performance indicators
-    updateLiveMetrics();
-    updateGeographicIntelligence();
-    initializePerformanceCharts();
-    
-    // Start live update intervals
-    if (operationsCenter.liveUpdates) {
-        // Update metrics every 10 seconds
-        setInterval(updateLiveMetrics, 10000);
-        
-        // Update geographic intelligence every 15 seconds
-        setInterval(updateGeographicIntelligence, 15000);
-        
-        // Update performance charts every 20 seconds
-        setInterval(updatePerformanceCharts, 20000);
-    }
-}
-
-function updateLiveMetrics() {
-    // Simulate real-time performance metrics with realistic variations
-    const baseMetrics = operationsCenter.performanceMetrics;
-    
-    // Add realistic variations to metrics
-    const variations = {
-        ingestionSpeed: Math.floor(baseMetrics.ingestionSpeed + (Math.random() - 0.5) * 400),
-        apiResponse: Math.floor(baseMetrics.apiResponse + (Math.random() - 0.5) * 30),
-        queueSize: Math.max(0, Math.floor(baseMetrics.queueSize + (Math.random() - 0.5) * 8)),
-        throughput: Math.min(100, Math.max(0, baseMetrics.throughput + (Math.random() - 0.5) * 20)),
-        errorRate: Math.max(0, Math.min(5, baseMetrics.errorRate + (Math.random() - 0.5) * 0.8))
-    };
-    
-    // Update metric displays
-    updateMetricDisplay('ingestion-speed', variations.ingestionSpeed, '/min');
-    updateMetricDisplay('api-response', variations.apiResponse, 'ms');
-    updateMetricDisplay('queue-size', variations.queueSize, ' items');
-    updateMetricDisplay('throughput', variations.throughput.toFixed(1), '%');
-    updateMetricDisplay('error-rate', variations.errorRate.toFixed(1), '%');
-    
-    // Update progress bars
-    updateProgressBar('throughput-progress', variations.throughput);
-    updateProgressBar('error-progress', 100 - variations.errorRate * 20);
-}
-
-function updateMetricDisplay(elementId, value, suffix) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.textContent = value + suffix;
-        
-        // Add pulse animation for updates
-        element.parentElement.classList.add('live-indicator');
-        setTimeout(() => {
-            element.parentElement.classList.remove('live-indicator');
-        }, 2000);
-    }
-}
-
-function updateProgressBar(elementId, percentage) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.style.width = percentage + '%';
-        element.setAttribute('aria-valuenow', percentage);
-    }
-}
-
-function updateGeographicIntelligence() {
-    // Simulate geographic distribution updates
-    const regions = ['Northeast', 'Southeast', 'Midwest', 'Southwest', 'West'];
-    const regionData = {};
-    
-    regions.forEach(region => {
-        regionData[region] = {
-            alerts: Math.floor(Math.random() * 50) + 10,
-            severity: Math.random() > 0.7 ? 'high' : (Math.random() > 0.4 ? 'medium' : 'low')
-        };
-    });
-    
-    // Update geographic display if it exists
-    const geoElement = document.getElementById('geographic-distribution');
-    if (geoElement) {
-        let html = '<div class="row">';
-        Object.entries(regionData).forEach(([region, data]) => {
-            const severityClass = data.severity === 'high' ? 'text-danger' : 
-                                 data.severity === 'medium' ? 'text-warning' : 'text-success';
-            html += `
-                <div class="col-md-2 text-center mb-2">
-                    <div class="metric-value ${severityClass}">${data.alerts}</div>
-                    <div class="metric-label">${region}</div>
-                </div>
-            `;
-        });
-        html += '</div>';
-        geoElement.innerHTML = html;
-    }
-}
-
-function initializePerformanceCharts() {
-    // Initialize small performance indicator charts
-    const chartContainers = document.querySelectorAll('.performance-chart');
-    chartContainers.forEach(container => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 100;
-        canvas.height = 30;
-        canvas.style.width = '100px';
-        canvas.style.height = '30px';
-        container.appendChild(canvas);
-        
-        // Draw simple line chart
-        drawSparkline(canvas);
-    });
-}
-
-function drawSparkline(canvas) {
-    const ctx = canvas.getContext('2d');
-    const width = canvas.width;
-    const height = canvas.height;
-    
-    // Generate sample data points
-    const points = [];
-    for (let i = 0; i < 20; i++) {
-        points.push(Math.random() * 0.8 + 0.1);
-    }
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height);
-    
-    // Draw line
-    ctx.strokeStyle = '#4e73df';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    
-    points.forEach((point, index) => {
-        const x = (index / (points.length - 1)) * width;
-        const y = height - (point * height);
-        
-        if (index === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
-    });
-    
-    ctx.stroke();
-    
-    // Add gradient fill
-    ctx.globalAlpha = 0.3;
-    ctx.fillStyle = '#4e73df';
-    ctx.lineTo(width, height);
-    ctx.lineTo(0, height);
-    ctx.closePath();
-    ctx.fill();
-}
-
-function updatePerformanceCharts() {
-    // Redraw all performance charts with new data
-    const chartContainers = document.querySelectorAll('.performance-chart canvas');
-    chartContainers.forEach(canvas => {
-        drawSparkline(canvas);
-    });
-}
-
-// Enhanced status indicator with operational intelligence
-function updateSystemStatus() {
-    const statusElement = document.getElementById('system-status');
-    if (statusElement) {
-        const currentTime = new Date();
-        const uptime = Math.floor((currentTime - new Date('2025-06-10T00:00:00')) / 1000 / 60);
-        
-        statusElement.innerHTML = `
-            <div class="d-flex align-items-center">
-                <span class="status-indicator status-operational"></span>
-                <span class="fw-bold">Operational</span>
-                <span class="ms-2 text-muted">• Uptime: ${uptime}m</span>
-            </div>
-        `;
-    }
-}
-
-// Load enhanced metrics for today
-function loadTodaysMetrics() {
-    // This function will be called to load today's operational metrics
-    fetch('/api/internal/metrics')
-        .then(response => response.json())
-        .then(data => {
-            // Update dashboard with real metrics from the API
-            if (data.total_alerts) {
-                updateMetricDisplay('total-alerts-today', data.total_alerts, '');
-            }
-            if (data.active_alerts) {
-                updateMetricDisplay('active-alerts', data.active_alerts, '');
-            }
-        })
-        .catch(error => {
-            console.log('Metrics loading with simulated data');
-            // Continue with simulated metrics for demo purposes
-        });
 }
 
 console.log('Dashboard JavaScript loaded successfully');
