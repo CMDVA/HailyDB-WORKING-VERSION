@@ -56,8 +56,8 @@
                 <div class="row g-3">
                     <!-- Search -->
                     <div class="col-md-6">
-                        <label for="searchQuery" class="form-label">Search</label>
-                        <input type="text" class="form-control" id="searchQuery" placeholder="Search by location, event type, or description...">
+                        <label for="searchFilter" class="form-label">Search</label>
+                        <input type="text" class="form-control" id="searchFilter" placeholder="Search by location, event type, or description...">
                     </div>
                     
                     <!-- State -->
@@ -700,34 +700,45 @@ function updateDirectPagination() {
 function applyFilters() {
     currentFilters = {};
     
-    const search = document.getElementById('searchFilter').value;
-    const state = document.getElementById('stateFilter').value;
-    const eventType = document.getElementById('eventTypeFilter').value;
-    const minHail = document.getElementById('minHailSize').value;
-    const minWind = document.getElementById('minWindSpeed').value;
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
+    // Get elements with null checks
+    const searchEl = document.getElementById('searchFilter');
+    const stateEl = document.getElementById('stateFilter');
+    const eventTypeEl = document.getElementById('eventTypeFilter');
+    const minHailEl = document.getElementById('minHailSize');
+    const minWindEl = document.getElementById('minWindSpeed');
+    const startDateEl = document.getElementById('startDate');
+    const endDateEl = document.getElementById('endDate');
     
-    // Apply new filters
-    if (search) currentFilters.q = search;
-    if (state) currentFilters.state = state;
-    if (eventType) currentFilters.event = eventType;
-    if (minHail) currentFilters.min_hail = parseFloat(minHail);
-    if (minWind) currentFilters.min_wind = parseInt(minWind);
-    if (startDate) currentFilters.start_date = startDate;
-    if (endDate) currentFilters.end_date = endDate;
+    // Apply new filters with null safety
+    if (searchEl && searchEl.value) currentFilters.q = searchEl.value;
+    if (stateEl && stateEl.value) currentFilters.state = stateEl.value;
+    if (eventTypeEl && eventTypeEl.value) currentFilters.event = eventTypeEl.value;
+    if (minHailEl && minHailEl.value) currentFilters.min_hail = parseFloat(minHailEl.value);
+    if (minWindEl && minWindEl.value) currentFilters.min_wind = parseInt(minWindEl.value);
+    if (startDateEl && startDateEl.value) currentFilters.start_date = startDateEl.value;
+    if (endDateEl && endDateEl.value) currentFilters.end_date = endDateEl.value;
     
     loadRadarAlerts(1);
 }
 
 function clearFilters() {
-    document.getElementById('searchFilter').value = '';
-    document.getElementById('stateFilter').value = '';
-    document.getElementById('eventTypeFilter').value = '';
-    document.getElementById('minHailSize').value = '';
-    document.getElementById('minWindSpeed').value = '';
-    document.getElementById('startDate').value = '2025-06-02';
-    document.getElementById('endDate').value = '2025-06-07';
+    // Clear elements with null safety
+    const searchEl = document.getElementById('searchFilter');
+    const stateEl = document.getElementById('stateFilter');
+    const eventTypeEl = document.getElementById('eventTypeFilter');
+    const minHailEl = document.getElementById('minHailSize');
+    const minWindEl = document.getElementById('minWindSpeed');
+    const startDateEl = document.getElementById('startDate');
+    const endDateEl = document.getElementById('endDate');
+    
+    if (searchEl) searchEl.value = '';
+    if (stateEl) stateEl.value = '';
+    if (eventTypeEl) eventTypeEl.value = '';
+    if (minHailEl) minHailEl.value = '';
+    if (minWindEl) minWindEl.value = '';
+    if (startDateEl) startDateEl.value = '2025-06-02';
+    if (endDateEl) endDateEl.value = '2025-06-07';
+    
     currentFilters = {};
     loadRadarAlerts(1);
 }
