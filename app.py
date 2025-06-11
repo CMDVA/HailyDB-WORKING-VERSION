@@ -293,6 +293,24 @@ def get_alerts():
             query = query.filter(db.func.date(Alert.ingested_at) == filter_date)
         except ValueError:
             pass  # Invalid date format, ignore filter
+    
+    # Add effective time range filters for SPC Day support
+    effective_start = request.args.get('effective_start')
+    effective_end = request.args.get('effective_end')
+    if effective_start:
+        from datetime import datetime
+        try:
+            start_datetime = datetime.fromisoformat(effective_start.replace('Z', '+00:00'))
+            query = query.filter(Alert.effective >= start_datetime)
+        except ValueError:
+            pass  # Invalid datetime format, ignore filter
+    if effective_end:
+        from datetime import datetime
+        try:
+            end_datetime = datetime.fromisoformat(effective_end.replace('Z', '+00:00'))
+            query = query.filter(Alert.effective <= end_datetime)
+        except ValueError:
+            pass  # Invalid datetime format, ignore filter
     if active_only:
         from datetime import datetime
         now = datetime.utcnow()

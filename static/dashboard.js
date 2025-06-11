@@ -1535,17 +1535,36 @@ async function loadTodaysAlertsWithMode(mode) {
         let endpoint, dateParam;
         
         if (mode === 'spc') {
-            // Use SPC Day - fetch from our new SPC Day endpoint
-            const response = await fetch('/api/spc/reports/today');
+            // SPC Day - fetch NWS alerts effective during SPC Day window
+            const spcDay = getSPCDay();
+            const spcWindow = getSPCDayWindow(spcDay);
+            
+            const cacheBuster = new Date().getTime();
+            endpoint = `/alerts?format=json&per_page=1000&effective_start=${spcWindow.start}&effective_end=${spcWindow.end}&_cb=${cacheBuster}`;
+            
+            const response = await fetch(endpoint);
             const data = await response.json();
             
-            if (data.reports && data.reports.length > 0) {
-                displaySPCReports(data.reports, data.spc_day, tableContainer);
+            const spcDayAlerts = data.alerts || [];
+            
+            if (spcDayAlerts.length > 0) {
+                // Group by event type for compact breakdown
+                const alertsByType = spcDayAlerts.reduce((acc, alert) => {
+                    const eventType = alert.event || 'Unknown';
+                    acc[eventType] = (acc[eventType] || 0) + 1;
+                    return acc;
+                }, {});
+                
+                const totalSPCDay = data.pagination ? data.pagination.total : spcDayAlerts.length;
+                let html = `<div class="mb-3"><strong>${spcDayAlerts.length}/${totalSPCDay} NWS alerts for SPC Day ${spcDay}</strong></div>
+                           <div class="mb-2"><small class="text-muted">SPC Day: ${spcWindow.start} → ${spcWindow.end} (effective time window)</small></div>`;
+                
+                displayNWSAlerts(spcDayAlerts, html, tableContainer);
             } else {
                 tableContainer.innerHTML = `
                     <div class="text-center py-3">
                         <div class="h5 text-warning">0</div>
-                        <small class="text-muted">No SPC reports for current SPC day (${data.spc_day})</small>
+                        <small class="text-muted">No NWS alerts effective during SPC Day ${spcDay}</small>
                     </div>`;
             }
             return;
@@ -1703,6 +1722,36 @@ function getNextDay(dateString) {
     const date = new Date(dateString + 'T00:00:00Z');
     date.setUTCDate(date.getUTCDate() + 1);
     return date.toISOString().split('T')[0];
+}
+
+function getSPCDay() {
+    const now = new Date();
+    const utcHour = parseInt(now.toLocaleTimeString('en-US', {
+        timeZone: 'UTC',
+        hour12: false,
+        hour: '2-digit'
+    }));
+    
+    if (utcHour >= 12) {
+        // Current time is >= 12:00Z, so SPC day is today (UTC date)
+        return now.toLocaleDateString('en-CA', { timeZone: 'UTC' });
+    } else {
+        // Current time is < 12:00Z, so SPC day is yesterday (UTC date - 1)
+        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        return yesterday.toLocaleDateString('en-CA', { timeZone: 'UTC' });
+    }
+}
+
+function getSPCDayWindow(spcDay) {
+    // SPC Day runs from 12:00Z to 11:59Z next day
+    const startTime = `${spcDay}T12:00:00Z`;
+    const nextDay = getNextDay(spcDay);
+    const endTime = `${nextDay}T11:59:59Z`;
+    
+    return {
+        start: startTime,
+        end: endTime
+    };
 }
 
 console.log('Dashboard JavaScript loaded successfully');
