@@ -321,8 +321,7 @@ function updateAlertsTable(alerts) {
                     <span class="badge bg-secondary">${alert.event}</span>
                 </td>
                 <td>
-                    <div><strong>${alert.areaDesc}</strong></div>
-                    <small class="text-muted">${alert.state || ''}</small>
+                    ${formatLocationInfo(alert)}
                 </td>
                 <td>${hailDisplay}</td>
                 <td>${windDisplay}</td>
@@ -353,6 +352,42 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     document.head.appendChild(style);
 });
+
+function formatLocationInfo(alert) {
+    const parts = [];
+    
+    // Extract cities from city_names array or area_desc
+    if (alert.city_names && alert.city_names.length > 0) {
+        const cities = alert.city_names.slice(0, 3); // Show first 3 cities
+        parts.push(`<div><strong>${cities.join(', ')}</strong></div>`);
+        if (alert.city_names.length > 3) {
+            parts.push(`<small class="text-muted">+${alert.city_names.length - 3} more cities</small>`);
+        }
+    } else if (alert.areaDesc) {
+        // Fallback to area description
+        const shortArea = alert.areaDesc.length > 50 ? 
+            alert.areaDesc.substring(0, 50) + '...' : alert.areaDesc;
+        parts.push(`<div><strong>${shortArea}</strong></div>`);
+    }
+    
+    // Extract states from affected_states
+    if (alert.affected_states && alert.affected_states.length > 0) {
+        parts.push(`<small class="text-muted">States: ${alert.affected_states.join(', ')}</small>`);
+    }
+    
+    // Extract counties from county_names
+    if (alert.county_names && Object.keys(alert.county_names).length > 0) {
+        const counties = Object.values(alert.county_names).flat().slice(0, 3);
+        if (counties.length > 0) {
+            parts.push(`<small class="text-muted">Counties: ${counties.join(', ')}</small>`);
+            if (Object.values(alert.county_names).flat().length > 3) {
+                parts.push(`<small class="text-muted">+${Object.values(alert.county_names).flat().length - 3} more</small>`);
+            }
+        }
+    }
+    
+    return parts.length > 0 ? parts.join('<br>') : '<span class="text-muted">Location data unavailable</span>';
+}
 
 function getHailDescription(size) {
     if (size >= 2.0) return 'Softball+';
