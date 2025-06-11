@@ -484,24 +484,29 @@ class HurricaneIngestService:
                 }
                 all_track_points.append(track_point_data)
                 
-                # Create new track record with enhanced metadata
-                track = HurricaneTrack(
-                    storm_id=storm_id,
-                    name=name,
-                    year=year,
-                    track_point_index=idx,
-                    timestamp=timestamp,
-                    lat=point['lat'],
-                    lon=point['lon'],
-                    category=point.get('category'),
-                    wind_mph=point.get('wind_mph'),
-                    pressure_mb=point.get('pressure_mb'),
-                    status=point.get('status'),
-                    full_track_points=track_point_data,
-                    landfall_metadata={'is_landfall': is_landfall, 'location': self._get_landfall_location(point['lat'], point['lon']) if is_landfall else None},
-                    raw_data=point,
-                    row_hash=row_hash
-                )
+                # Prepare raw_data with JSON-serializable timestamps
+                raw_data = {}
+                for key, value in point.items():
+                    if isinstance(value, datetime):
+                        raw_data[key] = value.isoformat()
+                    else:
+                        raw_data[key] = value
+                
+                # Create new track record
+                track = HurricaneTrack()
+                track.storm_id = storm_id
+                track.name = name
+                track.year = year
+                track.track_point_index = idx
+                track.timestamp = timestamp
+                track.lat = point['lat']
+                track.lon = point['lon']
+                track.category = point.get('category')
+                track.wind_mph = point.get('wind_mph')
+                track.pressure_mb = point.get('pressure_mb')
+                track.status = point.get('status')
+                track.raw_data = raw_data
+                track.row_hash = row_hash
                 
                 try:
                     self.db.add(track)
