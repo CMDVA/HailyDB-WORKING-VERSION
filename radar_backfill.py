@@ -136,6 +136,10 @@ class RadarBackfillProcessor:
         event_date = alert.effective.date() if alert.effective else date.today()
         detected_time = alert.effective or datetime.utcnow()
         
+        # Serialize complex data types for PostgreSQL
+        geometry_json = json.dumps(alert.geometry) if alert.geometry else None
+        geometry_bounds_json = json.dumps(alert.geometry_bounds) if alert.geometry_bounds else None
+        
         # Create radar alert events
         if create_hail_event:
             radar_alert = RadarAlert(
@@ -145,12 +149,12 @@ class RadarBackfillProcessor:
                 detected_time=detected_time,
                 hail_inches=hail_inches,
                 wind_mph=None,
-                city_names=city_names,
-                county_names=county_names,
-                fips_codes=fips_codes,
-                affected_states=affected_states,
-                geometry=alert.geometry,
-                geometry_bounds=alert.geometry_bounds
+                city_names=json.dumps(city_names),
+                county_names=json.dumps(county_names),
+                fips_codes=json.dumps(fips_codes),
+                affected_states=json.dumps(affected_states),
+                geometry=geometry_json,
+                geometry_bounds=geometry_bounds_json
             )
             db.session.add(radar_alert)
             stats['hail_events'] = 1
@@ -164,12 +168,12 @@ class RadarBackfillProcessor:
                 detected_time=detected_time,
                 hail_inches=None,
                 wind_mph=wind_mph,
-                city_names=city_names,
-                county_names=county_names,
-                fips_codes=fips_codes,
-                affected_states=affected_states,
-                geometry=alert.geometry,
-                geometry_bounds=alert.geometry_bounds
+                city_names=json.dumps(city_names),
+                county_names=json.dumps(county_names),
+                fips_codes=json.dumps(fips_codes),
+                affected_states=json.dumps(affected_states),
+                geometry=geometry_json,
+                geometry_bounds=geometry_bounds_json
             )
             db.session.add(radar_alert)
             stats['wind_events'] = 1
@@ -183,12 +187,12 @@ class RadarBackfillProcessor:
                 detected_time=detected_time,
                 hail_inches=None,
                 wind_mph=wind_mph,
-                city_names=city_names,
-                county_names=county_names,
-                fips_codes=fips_codes,
-                affected_states=affected_states,
-                geometry=alert.geometry,
-                geometry_bounds=alert.geometry_bounds
+                city_names=json.dumps(city_names),
+                county_names=json.dumps(county_names),
+                fips_codes=json.dumps(fips_codes),
+                affected_states=json.dumps(affected_states),
+                geometry=geometry_json,
+                geometry_bounds=geometry_bounds_json
             )
             db.session.add(radar_alert)
             stats['wind_events'] = 1
