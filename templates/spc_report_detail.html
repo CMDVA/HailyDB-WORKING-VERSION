@@ -189,6 +189,26 @@
             </div>
             {% endif %}
 
+            <!-- Enhanced Context Generation Section -->
+            {% if not (report.enhanced_context and report.enhanced_context.multi_alert_summary) %}
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="fas fa-magic me-2"></i>Enhanced Context Summary
+                    </h6>
+                    <span class="badge bg-warning">Not Generated</span>
+                </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-brain text-warning mb-3" style="font-size: 2rem;"></i>
+                    <p class="text-muted mb-3">Enhanced AI-powered context summary has not been generated yet.</p>
+                    <p class="small text-muted mb-3">This will analyze verified alerts, radar confirmation, and location intelligence.</p>
+                    <button class="btn btn-outline-warning btn-sm" onclick="generateEnhancedContext({{ report.id }}, this)">
+                        <i class="fas fa-magic me-1"></i>Generate Enhanced Context
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+
             {% if report.comments %}
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
@@ -570,6 +590,53 @@ async function regenerateContext(reportId) {
         setTimeout(() => {
             button.innerHTML = originalText;
             button.className = 'btn btn-sm btn-outline-primary ms-2';
+            button.disabled = false;
+        }, 3000);
+    }
+}
+
+async function generateEnhancedContext(reportId, button) {
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Generating...';
+    button.disabled = true;
+    
+    try {
+        const response = await fetch('/api/spc-reports/enhanced-context/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                'report_id': reportId
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            // Show success message and reload page to show updated data
+            button.innerHTML = '<i class="fas fa-check me-1"></i>Generated!';
+            button.className = 'btn btn-success btn-sm';
+            
+            // Reload page after 1 second to show updated enhanced context
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            throw new Error(result.error || 'Enhanced context generation failed');
+        }
+        
+    } catch (error) {
+        console.error('Enhanced context generation failed:', error);
+        button.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Failed';
+        button.className = 'btn btn-danger btn-sm';
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.className = 'btn btn-outline-warning btn-sm';
             button.disabled = false;
         }, 3000);
     }
