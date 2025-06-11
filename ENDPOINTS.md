@@ -292,6 +292,41 @@ GET /api/alerts/by-county/{state}/{county}
 
 ## 🌪️ SPC (Storm Prediction Center) Endpoints
 
+### SPC Day Reporting Window 🚨
+The Storm Prediction Center (SPC) defines its storm reporting day based on UTC time:
+
+**SPC Day runs from 1200 UTC (12:00Z) on the current day → 1159 UTC (11:59Z) the next day.**
+
+This is different from a standard calendar day (midnight to midnight).
+
+**Example:**
+For spc_day = 2025-06-06, SPC reports cover:
+```yaml
+From: 2025-06-06T12:00Z  
+To:   2025-06-07T11:59Z
+```
+
+This is why the `/api/spc/reports/today` endpoint is provided:
+
+### Get SPC Reports for Current SPC Day
+```
+GET /api/spc/reports/today
+```
+
+**Description**: Returns SPC reports for the current active SPC reporting window.
+
+**Example Response**:
+```json
+{
+  "spc_day": "2025-06-06",
+  "reports": [ /* SPC reports for current SPC day */ ]
+}
+```
+
+**Client Guidance:**
+- If you want to show "today's SPC reports" matching the SPC's official window, always use `/api/spc/reports/today`
+- Do not try to calculate this with calendar dates — use the dedicated endpoint
+
 ### Get SPC Reports
 ```
 GET /api/spc/reports

@@ -1,0 +1,117 @@
+aha - i understand. 
+
+Please see attached. Add SPC Day support to HailyDB
+
+Objective:
+Implement correct SPC Day support in HailyDB to match SPC official report windows (1200 UTC → 1159 UTC next day).
+Provide both internal visibility and a public API endpoint for clients.
+
+Background:
+SPC defines its "storm day" as:
+
+From 1200 UTC on day N
+
+To 1159 UTC on day N+1
+
+Example: spc_day = 2025-06-06 → includes reports from 2025-06-06T12:00Z to 2025-06-07T11:59Z.
+
+This does NOT match a normal calendar day (midnight → midnight).
+
+Required Changes:
+
+1️⃣ Implement get_current_spc_day_utc() utility function:
+
+Returns current SPC day string: YYYY-MM-DD
+
+Logic:
+
+If current UTC time >= 12:00Z, SPC day is today (UTC date).
+
+If current UTC time < 12:00Z, SPC day is yesterday (UTC date - 1).
+
+2️⃣ Add current_spc_day info to /internal/status API:
+
+Example addition:
+
+json
+Copy
+Edit
+"current_spc_day": "2025-06-06",
+"current_spc_day_window_utc": "2025-06-06T12:00Z → 2025-06-07T11:59Z"
+3️⃣ Add public endpoint /api/spc/reports/today:
+
+Accepts no parameters.
+
+Uses get_current_spc_day_utc() to compute spc_day.
+
+Returns SPC reports where report_date = spc_day.
+
+Response format:
+
+json
+Copy
+Edit
+{
+  "spc_day": "2025-06-06",
+  "reports": [ /* SPC reports matching that SPC day */ ]
+}
+4️⃣ Update API Guide / README:
+
+Add short paragraph in SPC section explaining that SPC day differs from calendar day.
+
+Explain that clients should use /api/spc/reports/today for "current SPC day reports."
+
+Notes:
+
+No changes required to spc_reports table schema.
+
+No changes required to ingestion — reports already store report_date in SPC day format.
+
+This is purely an API-layer and utility enhancement.
+
+Priority: Medium-High.
+Reason: Prevents client-side errors and ensures SPC dashboard parity.
+
+When done, confirm completion and include an example response for /api/spc/reports/today.
+
+
+### 
+
+Here is the exact paragraph to add to your API Guide / README (ENDPOINTS.md) — ideally right before or after /api/spc/reports):
+
+SPC Day Reporting Window 🚨
+The Storm Prediction Center (SPC) defines its storm reporting day based on UTC time:
+
+SPC Day runs from 1200 UTC (12:00Z) on the current day → 1159 UTC (11:59Z) the next day.
+
+This is different from a standard calendar day (midnight to midnight).
+
+Example:
+For spc_day = 2025-06-06, SPC reports cover:
+
+yaml
+Copy
+Edit
+From: 2025-06-06T12:00Z  
+To:   2025-06-07T11:59Z
+This is why the /api/spc/reports/today endpoint is provided:
+
+Get SPC Reports for Current SPC Day
+GET /api/spc/reports/today
+
+Returns SPC reports for the current active SPC reporting window.
+
+Example:
+
+json
+Copy
+Edit
+{
+  "spc_day": "2025-06-06",
+  "reports": [ /* SPC reports for current SPC day */ ]
+}
+Client Guidance:
+If you want to show "today’s SPC reports" matching the SPC’s official window, always use /api/spc/reports/today.
+Do not try to calculate this with calendar dates — use the dedicated endpoint.
+
+If you want, I can also write the exact code block the Agent should add to your README.md SPC section — fully formatted in markdown — so you can just paste it. Would you like that too? (It will be precise, with section heading + block ready to paste.)

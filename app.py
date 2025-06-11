@@ -825,6 +825,32 @@ def get_unenriched_counts():
             'error': str(e)
         }), 500
 
+@app.route('/api/spc/reports/today')
+def get_spc_reports_today():
+    """Get SPC reports for the current SPC day"""
+    try:
+        from spc_utils import get_current_spc_day_utc
+        
+        # Get current SPC day
+        current_spc_day = get_current_spc_day_utc()
+        
+        # Query reports for current SPC day
+        reports = SPCReport.query.filter(
+            SPCReport.report_date == current_spc_day
+        ).order_by(SPCReport.time_utc.desc()).all()
+        
+        # Format reports using the existing to_dict method
+        formatted_reports = [report.to_dict() for report in reports]
+        
+        return jsonify({
+            'spc_day': current_spc_day,
+            'reports': formatted_reports
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching SPC reports for today: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/spc/reports')
 def get_spc_reports():
     """Get SPC storm reports with filtering"""
@@ -999,6 +1025,11 @@ def internal_status():
         except Exception as e:
             db_status = f"error: {str(e)}"
         
+        # SPC Day information
+        from spc_utils import get_current_spc_day_utc, get_spc_day_window_description
+        current_spc_day = get_current_spc_day_utc()
+        spc_day_window = get_spc_day_window_description(current_spc_day)
+        
         return jsonify({
             'status': 'healthy' if len(failed_jobs) == 0 and db_status == "healthy" else 'warning',
             'timestamp': datetime.utcnow().isoformat(),
@@ -1029,7 +1060,9 @@ def internal_status():
                 'enrich_batch_size': int(os.getenv("ENRICH_BATCH_SIZE", "25")),
                 'spc_match_batch_size': int(os.getenv("SPC_MATCH_BATCH_SIZE", "200"))
             },
-            'scheduler_operations': scheduler_stats
+            'scheduler_operations': scheduler_stats,
+            'current_spc_day': current_spc_day,
+            'current_spc_day_window_utc': spc_day_window
         })
         
     except Exception as e:
