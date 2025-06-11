@@ -316,6 +316,18 @@ function initializeDashboard() {
         return;
     }
     
+    // Add event listeners for toggle buttons
+    const toggleButtons = document.querySelectorAll('input[name="alertTypeFilter"]');
+    toggleButtons.forEach(button => {
+        button.addEventListener('change', function() {
+            console.log('Filter changed to:', this.value);
+            // Re-display alerts with new filter
+            if (window.currentAlerts) {
+                displayAlerts(window.currentAlerts);
+            }
+        });
+    });
+    
     console.log('Starting initial alert load...');
     
     // Test immediate call
@@ -369,8 +381,11 @@ async function loadLiveAlerts() {
             return;
         }
         
-        console.log('Calling displayAlerts with:', data.alerts || []);
-        displayAlerts(data.alerts || []);
+        // Store alerts globally for filter toggling
+        window.currentAlerts = data.alerts || [];
+        
+        console.log('Calling displayAlerts with:', window.currentAlerts);
+        displayAlerts(window.currentAlerts);
         updateStatistics(data.statistics || {});
         updateLastRefreshTime();
         
@@ -395,53 +410,67 @@ function displayAlerts(alerts) {
         return;
     }
     
-    console.log('Processing alerts for filtering...');
-    // Filter for alerts with radar data and wind/hail information
-    const radarAlerts = alerts.filter(alert => {
+    console.log('Processing alerts for display...');
+    
+    // Get current filter selection
+    const selectedFilter = document.querySelector('input[name="alertTypeFilter"]:checked')?.value || 'all';
+    
+    // Apply filter based on toggle selection
+    const filteredAlerts = alerts.filter(alert => {
         // Extract radar data from the alert structure
         const radarData = alert.radar_data || alert.radar_indicated || {};
-        const hailInches = radarData.hail_inches || radarData.hail_size_inches || 0;
-        const windMph = radarData.wind_mph || radarData.wind_speed_mph || 0;
+        let hailSize = radarData.hail_inches || radarData.hail_size_inches || 0;
+        let windSpeed = radarData.wind_mph || radarData.wind_speed_mph || 0;
         
-        // Check for wind/hail in description if not in radar data
-        let detectedHail = hailInches;
-        let detectedWind = windMph;
-        
-        if (!detectedHail && !detectedWind && alert.description) {
-            // Parse wind from description (e.g., "60 mph wind")
+        // Parse from description if not in radar data
+        if (!hailSize && !windSpeed && alert.description) {
+            // Parse wind from description
             const windMatch = alert.description.match(/(\d+)\s*mph/i);
             if (windMatch) {
-                detectedWind = parseInt(windMatch[1]);
+                windSpeed = parseInt(windMatch[1]);
             }
             
-            // Parse hail from description (e.g., "quarter size hail")
-            const hailMatch = alert.description.match(/(quarter|half dollar|ping pong|golf ball|tennis ball|baseball|softball)\s*size/i);
+            // Parse hail from description
+            const hailMatch = alert.description.match(/(pea|penny|nickel|quarter|half dollar|ping pong|golf ball|tennis ball|baseball|softball)\s*size/i);
             if (hailMatch) {
                 const hailSizes = {
-                    'quarter': 1.0, 'half dollar': 1.25, 'ping pong': 1.5,
-                    'golf ball': 1.75, 'tennis ball': 2.5, 'baseball': 2.75, 'softball': 4.0
+                    'pea': 0.25, 'penny': 0.75, 'nickel': 0.88, 'quarter': 1.0, 'half dollar': 1.25, 
+                    'ping pong': 1.5, 'golf ball': 1.75, 'tennis ball': 2.5, 'baseball': 2.75, 'softball': 4.0
                 };
-                detectedHail = hailSizes[hailMatch[1].toLowerCase()] || 0;
+                hailSize = hailSizes[hailMatch[1].toLowerCase()] || 0;
             }
         }
         
-        const hasHail = detectedHail > 0;
-        const hasWind = detectedWind >= 50;
-        console.log(`Alert ${alert.id}: hail=${detectedHail}, wind=${detectedWind}, hasHail=${hasHail}, hasWind=${hasWind}`);
-        return hasHail || hasWind;
+        const hasHail = hailSize > 0;
+        const hasWind = windSpeed > 0;
+        
+        console.log(`Alert ${alert.id}: hail=${hailSize}, wind=${windSpeed}, hasHail=${hasHail}, hasWind=${hasWind}`);
+        
+        // Apply filter based on toggle selection
+        switch(selectedFilter) {
+            case 'hail':
+                return hasHail;
+            case 'wind':
+                return hasWind;
+            case 'all':
+            default:
+                return true; // Show all alerts
+        }
     });
     
-    console.log(`Filtered results: ${radarAlerts.length} alerts meet criteria (hail > 0 OR wind >= 50)`);
+    console.log(`Filtered results: ${filteredAlerts.length} alerts after applying '${selectedFilter}' filter`);
     
-    if (radarAlerts.length === 0) {
-        console.log('No alerts meet radar criteria, showing no radar alerts message');
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No radar-detected wind/hail alerts currently active.</td></tr>';
+    if (filteredAlerts.length === 0) {
+        const message = selectedFilter === 'all' ? 
+            'No live radar alerts currently active.' :
+            `No ${selectedFilter} alerts currently active.`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">${message}</td></tr>`;
         return;
     }
     
-    console.log('Building table rows for', radarAlerts.length, 'alerts...');
+    console.log('Building table rows for', filteredAlerts.length, 'alerts...');
     
-    tbody.innerHTML = radarAlerts.map(alert => {
+    tbody.innerHTML = filteredAlerts.map(alert => {
         // Extract radar data using the same logic as filtering
         const radarData = alert.radar_data || alert.radar_indicated || {};
         let hailSize = radarData.hail_inches || radarData.hail_size_inches || 0;
