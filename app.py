@@ -2402,6 +2402,7 @@ def webhook_management():
     """View webhook management interface"""
     return render_template('webhook_management.html')
 
+@app.route('/live-radar')
 @app.route('/live-radar-dashboard')
 def live_radar_dashboard():
     """Live Radar Alerts Dashboard"""
