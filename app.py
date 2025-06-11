@@ -1039,6 +1039,33 @@ def view_spc_report_detail(report_id):
     """View detailed information for a specific SPC report"""
     try:
         report = SPCReport.query.get_or_404(report_id)
+        
+        # Get verified alerts that match this SPC report
+        verified_alerts = Alert.query.filter(
+            Alert.spc_verified == True,
+            Alert.spc_reports.isnot(None)
+        ).all()
+        
+        # Filter alerts that actually reference this specific report
+        matching_alerts = []
+        for alert in verified_alerts:
+            if alert.spc_reports:
+                # Check if this report ID is referenced in the alert's SPC reports
+                alert_report_ids = []
+                try:
+                    if isinstance(alert.spc_reports, list):
+                        for spc_rep in alert.spc_reports:
+                            if isinstance(spc_rep, dict) and 'id' in spc_rep:
+                                alert_report_ids.append(spc_rep['id'])
+                except:
+                    pass
+                
+                if report_id in alert_report_ids:
+                    matching_alerts.append(alert)
+        
+        # Add the verified alerts to the report object
+        report.verified_alerts = matching_alerts
+        
         return render_template('spc_report_detail.html', report=report)
     except Exception as e:
         logger.error(f"Error viewing SPC report {report_id}: {e}")
