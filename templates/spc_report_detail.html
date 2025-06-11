@@ -117,6 +117,99 @@
                 </div>
             </div>
             {% endif %}
+
+            <!-- SPC Report Enrichment Section -->
+            {% if report.spc_enrichment %}
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-success">Location Enrichment</h6>
+                    <span class="badge bg-success">Enhanced</span>
+                </div>
+                <div class="card-body">
+                    <!-- Enriched Summary -->
+                    {% if report.spc_enrichment.enriched_summary %}
+                    <div class="alert alert-light border-left-success mb-3">
+                        <div class="text-success font-weight-bold small mb-1">AI-Generated Summary</div>
+                        <p class="mb-0">{{ report.spc_enrichment.enriched_summary }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Radar Polygon Match Status -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-2">Radar Detection Status</h6>
+                            {% if report.spc_enrichment.radar_polygon_match %}
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-check-circle text-success me-2"></i>
+                                    <span class="text-success">Confirmed inside radar-detected polygon</span>
+                                </div>
+                                {% if report.spc_enrichment.radar_polygon_id %}
+                                <small class="text-muted d-block mt-1">
+                                    Radar Alert ID: {{ report.spc_enrichment.radar_polygon_id }}
+                                </small>
+                                {% endif %}
+                                {% if report.spc_enrichment.radar_event_type %}
+                                <small class="text-muted d-block">
+                                    Event Type: {{ report.spc_enrichment.radar_event_type.title() }}
+                                </small>
+                                {% endif %}
+                            {% else %}
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-times-circle text-warning me-2"></i>
+                                    <span class="text-warning">No radar polygon detected at this location</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Nearby Places -->
+                    {% if report.spc_enrichment.nearby_places and report.spc_enrichment.nearby_places|length > 0 %}
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-2">Nearby Places (within ~5 miles)</h6>
+                            <div class="row">
+                                {% for place in report.spc_enrichment.nearby_places[:6] %}
+                                <div class="col-6 mb-2">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-map-pin text-primary me-2 small"></i>
+                                        <span class="small">{{ place.name }}</span>
+                                    </div>
+                                    {% if place.approx_lat and place.approx_lon %}
+                                    <small class="text-muted ms-3 d-block">
+                                        {{ "%.3f"|format(place.approx_lat) }}, {{ "%.3f"|format(place.approx_lon) }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-2">Nearby Places</h6>
+                            <p class="text-muted small mb-0">No nearby places identified within 5 miles</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <!-- Enrichment Not Available -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-muted">Location Enrichment</h6>
+                    <span class="badge bg-secondary">Not Enhanced</span>
+                </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-map-marked-alt text-muted mb-3" style="font-size: 2rem;"></i>
+                    <p class="text-muted mb-3">This report has not been enriched with location context yet.</p>
+                    <button class="btn btn-outline-primary btn-sm" onclick="enrichSingleReport({{ report.id }})">
+                        <i class="fas fa-sync-alt me-1"></i>Enrich Now
+                    </button>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <div class="col-lg-4">
@@ -179,4 +272,51 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+async function enrichSingleReport(reportId) {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Enriching...';
+    button.disabled = true;
+    
+    try {
+        const response = await fetch('/api/spc-reports/enrich', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                'report_id': reportId
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.successful_enrichments > 0) {
+            // Show success and reload page to show enrichment
+            button.innerHTML = '<i class="fas fa-check me-1"></i>Success!';
+            button.className = 'btn btn-success btn-sm';
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            throw new Error(result.error || 'Enrichment failed');
+        }
+    } catch (error) {
+        console.error('Enrichment error:', error);
+        button.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Error';
+        button.className = 'btn btn-danger btn-sm';
+        
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.className = 'btn btn-outline-primary btn-sm';
+            button.disabled = false;
+        }, 3000);
+    }
+}
+</script>
 {% endblock %}
