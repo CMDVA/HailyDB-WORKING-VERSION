@@ -143,7 +143,7 @@ class SPCEnrichmentService:
     
     def _generate_nearby_places(self, lat: float, lon: float, county: str, state: str) -> List[Dict[str, Any]]:
         """
-        Generate nearby place names using OpenAI with geographic context
+        Generate nearby place names using OpenAI with enhanced geographic accuracy
         
         Args:
             lat: Latitude of SPC report
@@ -155,23 +155,30 @@ class SPCEnrichmentService:
             List of nearby places with name and approximate coordinates
         """
         try:
-            # Use OpenAI to generate contextual nearby places
+            # Improved prompt for better accuracy with real places
             prompt = f"""
-            Generate 3-6 nearby place names within approximately 5 miles of coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
+            You are a local geography expert for {county} County, {state}. Find real places within 5 miles of coordinates {lat:.4f}, {lon:.4f}.
             
-            Use authentic local naming conventions like:
-            - Small towns, neighborhoods, or communities
-            - Geographic features (lakes, rivers, hills)
-            - Well-known local landmarks
-            - Major roads or intersections
+            Research what actually exists near these coordinates and include:
+            - Cities, towns, villages, unincorporated communities
+            - Neighborhoods, subdivisions, or local areas
+            - Geographic features (lakes, rivers, mountains, creeks, parks)
+            - Major roads, highways, intersections
+            - Schools, churches, post offices, or community centers
+            - Rural crossroads or local landmarks
             
-            Respond with JSON array only:
-            [
-                {{"name": "Place Name", "approx_lat": lat, "approx_lon": lon}},
-                ...
-            ]
+            For the location {lat:.4f}, {lon:.4f} in {county} County, {state}, identify real places that exist.
             
-            If no suitable places exist within 5 miles, return empty array [].
+            Return JSON in this exact format:
+            {{
+                "places": [
+                    {{"name": "Real Place Name", "approx_lat": {lat:.4f}, "approx_lon": {lon:.4f}}},
+                    {{"name": "Another Real Place", "approx_lat": {lat:.4f}, "approx_lon": {lon:.4f}}}
+                ]
+            }}
+            
+            Only include places that actually exist. If uncertain about a place, don't include it.
+            If no real places exist within 5 miles, return: {{"places": []}}
             """
             
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
@@ -181,12 +188,13 @@ class SPCEnrichmentService:
                 messages=[
                     {
                         "role": "system", 
-                        "content": "You are a geographic information expert. Provide accurate, locally-relevant place names based on real geographic data. Respond only with valid JSON."
+                        "content": "You are an expert in US geography with detailed knowledge of local place names, roads, and landmarks. Only provide real places that actually exist. Never invent fictional locations."
                     },
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=500
+                max_tokens=600,
+                temperature=0.1  # Lower temperature for more factual responses
             )
             
             # Parse OpenAI response
@@ -194,10 +202,12 @@ class SPCEnrichmentService:
             places_data = json.loads(content)
             
             # Validate and format response
-            if isinstance(places_data, list):
-                return places_data[:6]  # Limit to 6 places max
-            elif isinstance(places_data, dict) and 'places' in places_data:
-                return places_data['places'][:6]
+            if isinstance(places_data, dict) and 'places' in places_data:
+                places_list = places_data['places']
+                if isinstance(places_list, list):
+                    return places_list[:6]  # Limit to 6 places max
+            elif isinstance(places_data, list):
+                return places_data[:6]  # Direct array format
             else:
                 logger.warning(f"Unexpected OpenAI response format for nearby places: {content}")
                 return []
