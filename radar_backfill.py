@@ -161,10 +161,10 @@ class RadarBackfillProcessor:
                 detected_time=detected_time,
                 hail_inches=hail_inches,
                 wind_mph=None,
-                city_names=city_names,
-                county_names=county_names,
-                fips_codes=fips_codes,
-                affected_states=affected_states,
+                city_names=json.dumps(city_names),
+                county_names=json.dumps(county_names),
+                fips_codes=json.dumps(fips_codes),
+                affected_states=json.dumps(affected_states),
                 geometry=geometry_json,
                 geometry_bounds=geometry_bounds_json
             )
@@ -180,10 +180,10 @@ class RadarBackfillProcessor:
                 detected_time=detected_time,
                 hail_inches=None,
                 wind_mph=wind_mph,
-                city_names=city_names,
-                county_names=county_names,
-                fips_codes=fips_codes,
-                affected_states=affected_states,
+                city_names=json.dumps(city_names),
+                county_names=json.dumps(county_names),
+                fips_codes=json.dumps(fips_codes),
+                affected_states=json.dumps(affected_states),
                 geometry=geometry_json,
                 geometry_bounds=geometry_bounds_json
             )
@@ -199,10 +199,10 @@ class RadarBackfillProcessor:
                 detected_time=detected_time,
                 hail_inches=None,
                 wind_mph=wind_mph,
-                city_names=city_names,
-                county_names=county_names,
-                fips_codes=fips_codes,
-                affected_states=affected_states,
+                city_names=json.dumps(city_names),
+                county_names=json.dumps(county_names),
+                fips_codes=json.dumps(fips_codes),
+                affected_states=json.dumps(affected_states),
                 geometry=geometry_json,
                 geometry_bounds=geometry_bounds_json
             )

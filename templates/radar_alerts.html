@@ -233,52 +233,52 @@ document.addEventListener('DOMContentLoaded', function() {
 function loadRadarAlerts(page = 1) {
     currentPage = page;
     
-    // Build query parameters for individual radar alerts
+    // Build query parameters
     const params = new URLSearchParams({
+        has_radar_data: 'true',
         page: page,
-        limit: 25,
-        start_date: '2025-06-02',
-        end_date: '2025-06-07'
+        limit: 25
     });
     
     // Add filters
-    if (currentFilters.min_hail) params.append('min_hail_inches', currentFilters.min_hail);
-    if (currentFilters.min_wind) params.append('min_wind_mph', currentFilters.min_wind);
-    if (currentFilters.state) params.append('state', currentFilters.state);
+    Object.entries(currentFilters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+    });
     
     // Show loading state
     document.getElementById('radarAlertsTableBody').innerHTML = 
-        '<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0 text-muted">Loading radar-detected alerts...</p></td></tr>';
+        '<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0 text-muted">Loading radar-detected alerts...</p></td></tr>';
     
-    fetch(`/api/radar-alerts/list?${params.toString()}`)
+    fetch(`/api/alerts/search?${params.toString()}`)
         .then(response => response.json())
         .then(data => {
-            const radarEvents = data.alerts || [];
-            updateRadarStatistics(radarEvents);
-            updateRadarAlertsTable(radarEvents);
-            updateRadarPagination(data.pagination, page);
+            updateStatistics(data.alerts || []);
+            updateAlertsTable(data.alerts || []);
+            updatePagination(data);
         })
         .catch(error => {
             console.error('Error loading alerts:', error);
             document.getElementById('radarAlertsTableBody').innerHTML = 
-                '<tr><td colspan="8" class="text-center text-danger py-4">Error loading alerts. Please try again.</td></tr>';
+                '<tr><td colspan="7" class="text-center text-danger py-4">Error loading alerts. Please try again.</td></tr>';
         });
 }
 
-function updateRadarStatistics(alerts) {
+function updateStatistics(alerts) {
     let hailAlerts = 0;
     let windAlerts = 0;
     let maxHail = 0;
     let maxWind = 0;
     
     alerts.forEach(alert => {
-        if (alert.hail_inches && alert.hail_inches > 0) {
-            hailAlerts++;
-            maxHail = Math.max(maxHail, alert.hail_inches);
-        }
-        if (alert.wind_mph && alert.wind_mph > 0) {
-            windAlerts++;
-            maxWind = Math.max(maxWind, alert.wind_mph);
+        if (alert.radar_indicated) {
+            if (alert.radar_indicated.hail_inches > 0) {
+                hailAlerts++;
+                maxHail = Math.max(maxHail, alert.radar_indicated.hail_inches);
+            }
+            if (alert.radar_indicated.wind_mph > 0) {
+                windAlerts++;
+                maxWind = Math.max(maxWind, alert.radar_indicated.wind_mph);
+            }
         }
     });
     
@@ -288,17 +288,18 @@ function updateRadarStatistics(alerts) {
     document.getElementById('max-wind-speed').textContent = maxWind + ' mph';
 }
 
-function updateRadarAlertsTable(alerts) {
+function updateAlertsTable(alerts) {
     const tbody = document.getElementById('radarAlertsTableBody');
     
     if (alerts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No radar-detected alerts found for the current filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No radar-detected alerts found for the current filters.</td></tr>';
         return;
     }
     
     tbody.innerHTML = alerts.map(alert => {
-        const hailSize = alert.hail_inches || 0;
-        const windSpeed = alert.wind_mph || 0;
+        const radarData = alert.radar_indicated || {};
+        const hailSize = radarData.hail_inches || 0;
+        const windSpeed = radarData.wind_mph || 0;
         
         const hailDisplay = hailSize > 0 ? 
             `<span class="badge bg-danger">${hailSize.toFixed(2)}"</span><br><small>${getHailDescription(hailSize)}</small>` :
@@ -309,169 +310,132 @@ function updateRadarAlertsTable(alerts) {
             '<span class="text-muted">-</span>';
         
         const severityBadge = getSeverityBadge(hailSize, windSpeed);
-        const eventDate = new Date(alert.event_date).toLocaleString();
-        
-        // Get city names display
-        const cityNames = alert.city_names && alert.city_names.length > 0 ? 
-            alert.city_names.slice(0, 3).join(', ') + (alert.city_names.length > 3 ? ` +${alert.city_names.length - 3} more` : '') :
-            'Location data unavailable';
-            
-        // Get state from city_names array (usually last element)
-        let stateDisplay = 'N/A';
-        if (alert.city_names && alert.city_names.length > 0) {
-            const lastElement = alert.city_names[alert.city_names.length - 1];
-            if (lastElement && lastElement.length === 2 && lastElement.toUpperCase() === lastElement) {
-                stateDisplay = lastElement;
-            }
-        }
+        const effectiveTime = new Date(alert.effective).toLocaleString();
         
         return `
-            <tr>
+            <tr class="clickable-row" onclick="window.location.href='/alerts/${alert.id}'" style="cursor: pointer;">
                 <td>
-                    <div>${eventDate}</div>
-                    <small class="text-muted">${alert.alert_id.substring(0, 8)}...</small>
+                    <div>${effectiveTime}</div>
+                    <small class="text-muted">${alert.id.substring(0, 8)}...</small>
                 </td>
                 <td>
-                    <span class="badge bg-secondary">${alert.event_type.toUpperCase()}</span>
+                    <span class="badge bg-secondary">${alert.event}</span>
                 </td>
-                <td>${cityNames}</td>
-                <td>${stateDisplay}</td>
+                <td>
+                    ${formatLocationInfo(alert)}
+                </td>
+                <td>
+                    ${formatStateInfo(alert)}
+                </td>
                 <td>${hailDisplay}</td>
                 <td>${windDisplay}</td>
                 <td>${severityBadge}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary" onclick="showRadarEventDetails('${alert.alert_id}', '${alert.event_type}', ${hailSize}, ${windSpeed}, '${cityNames}', '${eventDate}')" title="View Details">
+                    <a href="/alerts/${alert.id}" class="btn btn-sm btn-outline-primary" title="View Details" onclick="event.stopPropagation();">
                         <i class="fas fa-eye"></i>
-                    </button>
+                    </a>
                 </td>
             </tr>
         `;
     }).join('');
 }
 
-function updateRadarPagination(pagination, currentPage) {
-    const container = document.getElementById('paginationContainer');
-    const paginationEl = document.getElementById('pagination');
+// Add hover effects for clickable rows
+document.addEventListener('DOMContentLoaded', function() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .clickable-row:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s ease-in-out;
+        }
+        .clickable-row {
+            transition: all 0.2s ease-in-out;
+        }
+    `;
+    document.head.appendChild(style);
+});
+
+function formatLocationInfo(alert) {
+    const parts = [];
     
-    if (!pagination || pagination.total_pages <= 1) {
-        container.style.display = 'none';
-        return;
+    // Extract cities from city_names array
+    if (alert.city_names && Array.isArray(alert.city_names) && alert.city_names.length > 0) {
+        const cities = alert.city_names.slice(0, 3); // Show first 3 cities
+        parts.push(cities.join(', '));
+        if (alert.city_names.length > 3) {
+            parts.push(`+${alert.city_names.length - 3} more`);
+        }
+        return parts.join(' ');
     }
     
-    container.style.display = 'block';
-    
-    let paginationHTML = '';
-    
-    // Previous button
-    paginationHTML += `
-        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-            <a class="page-link" href="#" onclick="loadRadarAlerts(${currentPage - 1}); return false;">Previous</a>
-        </li>
-    `;
-    
-    // Page numbers
-    for (let i = 1; i <= Math.min(pagination.total_pages, 10); i++) {
-        paginationHTML += `
-            <li class="page-item ${i === currentPage ? 'active' : ''}">
-                <a class="page-link" href="#" onclick="loadRadarAlerts(${i}); return false;">${i}</a>
-            </li>
-        `;
+    // Fallback to county names if no cities
+    if (alert.county_names) {
+        let counties = [];
+        
+        // Handle county_names as an object with state keys
+        if (typeof alert.county_names === 'object' && !Array.isArray(alert.county_names)) {
+            for (const [state, countyList] of Object.entries(alert.county_names)) {
+                if (Array.isArray(countyList)) {
+                    counties = counties.concat(countyList);
+                }
+            }
+        } else if (Array.isArray(alert.county_names)) {
+            counties = alert.county_names;
+        }
+        
+        if (counties.length > 0) {
+            const displayCounties = counties.slice(0, 3);
+            parts.push(displayCounties.join(', '));
+            if (counties.length > 3) {
+                parts.push(`+${counties.length - 3} more`);
+            }
+            return parts.join(' ');
+        }
     }
     
-    // Next button
-    paginationHTML += `
-        <li class="page-item ${currentPage === pagination.total_pages ? 'disabled' : ''}">
-            <a class="page-link" href="#" onclick="loadRadarAlerts(${currentPage + 1}); return false;">Next</a>
-        </li>
-    `;
-    
-    paginationEl.innerHTML = paginationHTML;
-}
-
-function showRadarEventDetails(alertId, eventType, hailSize, windSpeed, cities, date) {
-    // Create modal content for radar event details
-    const modalContent = `
-        <div class="modal fade" id="radarEventModal" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Radar Event Details</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p><strong>Alert ID:</strong><br><small>${alertId}</small></p>
-                        <p><strong>Date:</strong> ${date}</p>
-                        <p><strong>Event Type:</strong> ${eventType.toUpperCase()}</p>
-                        <p><strong>Cities:</strong> ${cities}</p>
-                        ${hailSize > 0 ? `<p><strong>Hail Size:</strong> ${hailSize}" diameter</p>` : ''}
-                        ${windSpeed > 0 ? `<p><strong>Wind Speed:</strong> ${windSpeed} mph</p>` : ''}
-                        <hr>
-                        <p><em>Detailed analysis coming soon!</em></p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Remove existing modal if present
-    const existingModal = document.getElementById('radarEventModal');
-    if (existingModal) {
-        existingModal.remove();
+    // Final fallback to area description
+    if (alert.areaDesc) {
+        const shortArea = alert.areaDesc.length > 50 ? 
+            alert.areaDesc.substring(0, 50) + '...' : alert.areaDesc;
+        return shortArea;
     }
     
-    // Add modal to page and show it
-    document.body.insertAdjacentHTML('beforeend', modalContent);
-    const modal = new bootstrap.Modal(document.getElementById('radarEventModal'));
-    modal.show();
+    return 'Location data unavailable';
 }
 
-function applyFilters() {
-    currentFilters = {};
+function formatStateInfo(alert) {
+    // Try to get states from affected_states first
+    if (alert.affected_states && Array.isArray(alert.affected_states) && alert.affected_states.length > 0) {
+        return alert.affected_states.join(', ');
+    }
     
-    const minHail = document.getElementById('minHailSize').value;
-    const minWind = document.getElementById('minWindSpeed').value;
-    const state = document.getElementById('stateFilter').value.trim();
-    const timeRange = document.getElementById('timeRange').value;
+    // Fallback to extracting states from county_names object keys
+    if (alert.county_names && typeof alert.county_names === 'object' && !Array.isArray(alert.county_names)) {
+        const states = Object.keys(alert.county_names);
+        if (states.length > 0) {
+            return states.join(', ');
+        }
+    }
     
-    if (minHail) currentFilters.min_hail = minHail;
-    if (minWind) currentFilters.min_wind = minWind;
-    if (state) currentFilters.state = state;
+    // Final fallback to geocode UGC parsing
+    if (alert.geocode && alert.geocode.UGC && Array.isArray(alert.geocode.UGC)) {
+        const states = new Set();
+        alert.geocode.UGC.forEach(ugc => {
+            if (ugc.includes('C')) {
+                const parts = ugc.split('C');
+                if (parts.length === 2) {
+                    states.add(parts[0]);
+                }
+            }
+        });
+        if (states.size > 0) {
+            return Array.from(states).join(', ');
+        }
+    }
     
-    // For now, ignore time range since we're working with historical data
-    // The API already filters to June 2-7, 2025
-    
-    loadRadarAlerts(1);
-}
-
-function clearFilters() {
-    document.getElementById('minHailSize').value = '';
-    document.getElementById('minWindSpeed').value = '';
-    document.getElementById('stateFilter').value = '';
-    document.getElementById('timeRange').value = '24';
-    currentFilters = {};
-    loadRadarAlerts(1);
-}
-
-function refreshAlerts() {
-    loadRadarAlerts(currentPage);
-}
-
-function exportData() {
-    const params = new URLSearchParams({
-        start_date: '2025-06-02',
-        end_date: '2025-06-07',
-        limit: 1000,
-        format: 'csv'
-    });
-    
-    Object.entries(currentFilters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
-    });
-    
-    window.open(`/api/radar-alerts/list?${params.toString()}`, '_blank');
+    return 'N/A';
 }
 
 function getHailDescription(size) {
@@ -515,6 +479,94 @@ function getSeverityBadge(hailSize, windSpeed) {
                       severity === 'moderate' ? 'bg-info' : 'bg-secondary';
     
     return `<span class="badge ${badgeClass}">${label}</span>`;
+}
+
+function updatePagination(data) {
+    const container = document.getElementById('paginationContainer');
+    const pagination = document.getElementById('pagination');
+    
+    if (data.pages <= 1) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    container.style.display = 'block';
+    
+    let paginationHTML = '';
+    
+    // Previous button
+    paginationHTML += `
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadRadarAlerts(${currentPage - 1}); return false;">Previous</a>
+        </li>
+    `;
+    
+    // Page numbers
+    for (let i = 1; i <= Math.min(data.pages, 10); i++) {
+        paginationHTML += `
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="loadRadarAlerts(${i}); return false;">${i}</a>
+            </li>
+        `;
+    }
+    
+    // Next button
+    paginationHTML += `
+        <li class="page-item ${currentPage === data.pages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadRadarAlerts(${currentPage + 1}); return false;">Next</a>
+        </li>
+    `;
+    
+    pagination.innerHTML = paginationHTML;
+}
+
+function applyFilters() {
+    currentFilters = {};
+    
+    const minHail = document.getElementById('minHailSize').value;
+    const minWind = document.getElementById('minWindSpeed').value;
+    const state = document.getElementById('stateFilter').value.trim();
+    const timeRange = document.getElementById('timeRange').value;
+    
+    if (minHail) currentFilters.min_hail = minHail;
+    if (minWind) currentFilters.min_wind = minWind;
+    if (state) currentFilters.state = state;
+    
+    // Calculate start time based on time range
+    if (timeRange) {
+        const hoursAgo = parseInt(timeRange);
+        const startTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+        currentFilters.start_time = startTime.toISOString();
+    }
+    
+    loadRadarAlerts(1);
+}
+
+function clearFilters() {
+    document.getElementById('minHailSize').value = '';
+    document.getElementById('minWindSpeed').value = '';
+    document.getElementById('stateFilter').value = '';
+    document.getElementById('timeRange').value = '24';
+    currentFilters = {};
+    loadRadarAlerts(1);
+}
+
+function refreshAlerts() {
+    loadRadarAlerts(currentPage);
+}
+
+function exportData() {
+    const params = new URLSearchParams({
+        has_radar_data: 'true',
+        limit: 1000,
+        format: 'csv'
+    });
+    
+    Object.entries(currentFilters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+    });
+    
+    window.open(`/alerts/search?${params.toString()}`, '_blank');
 }
 </script>
 {% endblock %}
