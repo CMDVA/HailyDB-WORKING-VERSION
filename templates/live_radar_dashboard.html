@@ -430,10 +430,36 @@ function displayAlerts(alerts) {
     console.log('Processing alerts for filtering...');
     // Filter for alerts with radar data and wind/hail information
     const radarAlerts = alerts.filter(alert => {
-        const radarData = alert.radar_data || {};
-        const hasHail = radarData.hail_inches > 0;
-        const hasWind = radarData.wind_mph >= 50;
-        console.log(`Alert ${alert.id}: hail=${radarData.hail_inches}, wind=${radarData.wind_mph}, hasHail=${hasHail}, hasWind=${hasWind}`);
+        // Extract radar data from the alert structure
+        const radarData = alert.radar_data || alert.radar_indicated || {};
+        const hailInches = radarData.hail_inches || radarData.hail_size_inches || 0;
+        const windMph = radarData.wind_mph || radarData.wind_speed_mph || 0;
+        
+        // Check for wind/hail in description if not in radar data
+        let detectedHail = hailInches;
+        let detectedWind = windMph;
+        
+        if (!detectedHail && !detectedWind && alert.description) {
+            // Parse wind from description (e.g., "60 mph wind")
+            const windMatch = alert.description.match(/(\d+)\s*mph/i);
+            if (windMatch) {
+                detectedWind = parseInt(windMatch[1]);
+            }
+            
+            // Parse hail from description (e.g., "quarter size hail")
+            const hailMatch = alert.description.match(/(quarter|half dollar|ping pong|golf ball|tennis ball|baseball|softball)\s*size/i);
+            if (hailMatch) {
+                const hailSizes = {
+                    'quarter': 1.0, 'half dollar': 1.25, 'ping pong': 1.5,
+                    'golf ball': 1.75, 'tennis ball': 2.5, 'baseball': 2.75, 'softball': 4.0
+                };
+                detectedHail = hailSizes[hailMatch[1].toLowerCase()] || 0;
+            }
+        }
+        
+        const hasHail = detectedHail > 0;
+        const hasWind = detectedWind >= 50;
+        console.log(`Alert ${alert.id}: hail=${detectedHail}, wind=${detectedWind}, hasHail=${hasHail}, hasWind=${hasWind}`);
         return hasHail || hasWind;
     });
     
@@ -448,9 +474,27 @@ function displayAlerts(alerts) {
     console.log('Building table rows for', radarAlerts.length, 'alerts...');
     
     tbody.innerHTML = radarAlerts.map(alert => {
-        const radarData = alert.radar_data || {};
-        const hailSize = radarData.hail_inches || 0;
-        const windSpeed = radarData.wind_mph || 0;
+        // Extract radar data using the same logic as filtering
+        const radarData = alert.radar_data || alert.radar_indicated || {};
+        let hailSize = radarData.hail_inches || radarData.hail_size_inches || 0;
+        let windSpeed = radarData.wind_mph || radarData.wind_speed_mph || 0;
+        
+        // Parse from description if not in radar data
+        if (!hailSize && !windSpeed && alert.description) {
+            const windMatch = alert.description.match(/(\d+)\s*mph/i);
+            if (windMatch) {
+                windSpeed = parseInt(windMatch[1]);
+            }
+            
+            const hailMatch = alert.description.match(/(quarter|half dollar|ping pong|golf ball|tennis ball|baseball|softball)\s*size/i);
+            if (hailMatch) {
+                const hailSizes = {
+                    'quarter': 1.0, 'half dollar': 1.25, 'ping pong': 1.5,
+                    'golf ball': 1.75, 'tennis ball': 2.5, 'baseball': 2.75, 'softball': 4.0
+                };
+                hailSize = hailSizes[hailMatch[1].toLowerCase()] || 0;
+            }
+        }
         
         const hailDisplay = hailSize > 0 ? 
             `<span class="badge ${getHailSizeClass(hailSize)}">${hailSize}"</span><br><small class="text-muted">${getHailSizeName(hailSize)}</small>` : 
