@@ -532,12 +532,21 @@ function formatStateInfo(alert) {
 }
 
 function getHailDescription(size) {
-    if (size >= 2.0) return 'Softball+';
+    // Use centralized NWS hail size chart
+    if (size >= 4.5) return 'Grapefruit (Record)';
+    if (size >= 4.0) return 'Softball';
+    if (size >= 3.0) return 'Large Apple';
+    if (size >= 2.75) return 'Baseball';
+    if (size >= 2.5) return 'Tennis Ball';
+    if (size >= 2.0) return 'Egg';
     if (size >= 1.75) return 'Golf Ball';
-    if (size >= 1.5) return 'Ping Pong';
+    if (size >= 1.5) return 'Ping Pong Ball';
     if (size >= 1.25) return 'Half Dollar';
     if (size >= 1.0) return 'Quarter';
+    if (size >= 0.88) return 'Nickel';
     if (size >= 0.75) return 'Penny';
+    if (size >= 0.5) return 'Peanut';
+    if (size >= 0.25) return 'Pea';
     return 'Small';
 }
 
@@ -550,21 +559,34 @@ function getWindDescription(speed) {
 }
 
 function getSeverityBadge(hailSize, windSpeed) {
-    let severity = 'moderate';
-    let label = 'Moderate';
+    // Use centralized severity logic matching Config.get_hail_severity
+    let severity = 'minor';
+    let label = 'Minor';
     
-    if (hailSize >= 2.0 || windSpeed >= 90) {
+    if (hailSize >= 4.0) {
         severity = 'extreme';
-        label = 'Extreme';
-    } else if (hailSize >= 1.5 || windSpeed >= 80) {
+        label = 'Extremely Severe';
+    } else if (hailSize >= 3.0) {
+        severity = 'severe';
+        label = 'Very Severe';
+    } else if (hailSize >= 2.0) {
         severity = 'severe';
         label = 'Severe';
-    } else if (hailSize >= 1.0 || windSpeed >= 70) {
+    } else if (hailSize >= 1.0) {
         severity = 'moderate';
-        label = 'Moderate';
-    } else {
+        label = 'Significant';
+    } else if (hailSize >= 0.5) {
         severity = 'minor';
-        label = 'Minor';
+        label = 'Notable';
+    } else if (windSpeed >= 90) {
+        severity = 'extreme';
+        label = 'Extreme Wind';
+    } else if (windSpeed >= 80) {
+        severity = 'severe';
+        label = 'High Wind';
+    } else if (windSpeed >= 70) {
+        severity = 'moderate';
+        label = 'Strong Wind';
     }
     
     const badgeClass = severity === 'extreme' ? 'bg-danger' : 

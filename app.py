@@ -44,6 +44,16 @@ def number_format(value):
     except (ValueError, TypeError):
         return value
 
+@app.template_filter()
+def hail_display_name(size_inches):
+    """Get display name for hail size using centralized configuration"""
+    return Config.get_hail_display_name(size_inches)
+
+@app.template_filter()
+def hail_severity(size_inches):
+    """Get severity category for hail size using centralized configuration"""
+    return Config.get_hail_severity(size_inches)
+
 def determine_enhanced_status(log_row):
     """Determine enhanced status display and color coding for operation logs"""
     import json
@@ -3469,6 +3479,29 @@ def parse_single_alert_city_names(alert_id):
             'success': False,
             'error': str(e)
         }), 500
+
+@app.route('/api/hail-size-chart')
+def get_hail_size_chart():
+    """
+    Get centralized NWS hail size chart and categories
+    Provides official size mappings and display names for client applications
+    """
+    return jsonify({
+        'hail_size_chart': Config.NWS_HAIL_SIZE_CHART,
+        'hail_size_categories': Config.HAIL_SIZE_CATEGORIES,
+        'severity_thresholds': {
+            'extremely_severe': 4.0,
+            'very_severe': 3.0,
+            'severe': 2.0,
+            'significant': 1.0,
+            'notable': 0.5,
+            'minor': 0.25
+        },
+        'example_usage': {
+            'get_display_name': 'Use Config.get_hail_display_name(size_inches)',
+            'get_severity': 'Use Config.get_hail_severity(size_inches)'
+        }
+    })
 
 def geocode_address(address):
     """
