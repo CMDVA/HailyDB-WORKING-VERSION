@@ -316,11 +316,15 @@ function updateRadarStatistics(radarEvents) {
     radarEvents.forEach(event => {
         hailAlerts += parseInt(event.hail_count) || 0;
         windAlerts += parseInt(event.wind_count) || 0;
-        if (event.max_hail_inches > maxHail) {
-            maxHail = parseFloat(event.max_hail_inches) || 0;
+        
+        const eventMaxHail = event.max_hail_inches ? parseFloat(event.max_hail_inches) : 0;
+        const eventMaxWind = event.max_wind_mph ? parseInt(event.max_wind_mph) : 0;
+        
+        if (eventMaxHail > maxHail) {
+            maxHail = eventMaxHail;
         }
-        if (event.max_wind_mph > maxWind) {
-            maxWind = parseInt(event.max_wind_mph) || 0;
+        if (eventMaxWind > maxWind) {
+            maxWind = eventMaxWind;
         }
     });
     
@@ -339,43 +343,46 @@ function updateRadarAlertsTable(radarEvents) {
     }
     
     tbody.innerHTML = radarEvents.map(event => {
-        const maxHail = parseFloat(event.max_hail_inches) || 0;
-        const maxWind = parseInt(event.max_wind_mph) || 0;
+        // Safely handle null values
+        const maxHail = event.max_hail_inches ? parseFloat(event.max_hail_inches) : 0;
+        const maxWind = event.max_wind_mph ? parseInt(event.max_wind_mph) : 0;
         const hailCount = parseInt(event.hail_count) || 0;
         const windCount = parseInt(event.wind_count) || 0;
+        const city = event.city || 'Unknown';
+        const state = event.state || 'Unknown';
+        const eventDate = event.date ? new Date(event.date).toLocaleDateString() : 'Unknown Date';
         
-        const hailDisplay = hailCount > 0 ? 
+        const hailDisplay = hailCount > 0 && maxHail > 0 ? 
             `<span class="badge bg-danger">${maxHail.toFixed(2)}"</span><br><small>${hailCount} events</small>` :
             '<span class="text-muted">-</span>';
             
-        const windDisplay = windCount > 0 ? 
+        const windDisplay = windCount > 0 && maxWind > 0 ? 
             `<span class="badge bg-warning text-dark">${maxWind} mph</span><br><small>${windCount} events</small>` :
             '<span class="text-muted">-</span>';
         
         const severityBadge = getSeverityBadge(maxHail, maxWind);
-        const eventDate = new Date(event.date).toLocaleDateString();
         
         return `
             <tr style="cursor: pointer;">
                 <td>
                     <div>${eventDate}</div>
-                    <small class="text-muted">${event.city}, ${event.state}</small>
+                    <small class="text-muted">${city}, ${state}</small>
                 </td>
                 <td>
                     <span class="badge bg-secondary">Severe Thunderstorm Warning</span>
                 </td>
                 <td>
-                    <strong>${event.city}</strong><br>
-                    <small class="text-muted">${event.state}</small>
+                    <strong>${city}</strong><br>
+                    <small class="text-muted">${state}</small>
                 </td>
                 <td>
-                    <span class="badge bg-primary">${event.state}</span>
+                    <span class="badge bg-primary">${state}</span>
                 </td>
                 <td>${hailDisplay}</td>
                 <td>${windDisplay}</td>
                 <td>${severityBadge}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-info" onclick="showEventDetails('${event.city}', '${event.state}', '${event.date}')" title="View Details">
+                    <button class="btn btn-sm btn-outline-info" onclick="showEventDetails('${city}', '${state}', '${eventDate}')" title="View Details">
                         <i class="fas fa-eye"></i>
                     </button>
                 </td>
