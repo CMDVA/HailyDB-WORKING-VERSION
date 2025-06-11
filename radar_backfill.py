@@ -280,3 +280,12 @@ def get_radar_backfill_stats() -> Dict[str, Any]:
         stats['events_created_today'] = recent_events
         
         return stats
+
+# Module-level functions for API integration
+def process_date_range(start_date: str, end_date: str, batch_size: int = 100) -> Dict[str, Any]:
+    """
+    Module-level function for processing radar alerts date range
+    Used by API endpoints
+    """
+    processor = RadarBackfillProcessor()
+    return processor.process_date_range(start_date, end_date, batch_size)

@@ -248,7 +248,7 @@ function loadRadarAlerts(page = 1) {
     document.getElementById('radarAlertsTableBody').innerHTML = 
         '<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0 text-muted">Loading radar-detected alerts...</p></td></tr>';
     
-    fetch(`/alerts/search?${params.toString()}`)
+    fetch(`/api/alerts/search?${params.toString()}`)
         .then(response => response.json())
         .then(data => {
             updateStatistics(data.alerts || []);
