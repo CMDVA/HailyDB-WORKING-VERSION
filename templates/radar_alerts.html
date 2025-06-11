@@ -42,29 +42,115 @@
     </div>
 </div>
 
-<!-- Filter Controls -->
+<!-- Search & Filter -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">
-                    <i class="fas fa-filter me-1"></i>Filter Controls
+                    <i class="fas fa-search me-1"></i>
+                    Search & Filter
                 </h5>
             </div>
             <div class="card-body">
                 <div class="row g-3">
+                    <!-- Search -->
+                    <div class="col-md-6">
+                        <label for="searchQuery" class="form-label">Search</label>
+                        <input type="text" class="form-control" id="searchQuery" placeholder="Search by location, event type, or description...">
+                    </div>
+                    
+                    <!-- State -->
+                    <div class="col-md-3">
+                        <label for="stateFilter" class="form-label">State</label>
+                        <input type="text" class="form-control" id="stateFilter" placeholder="TX, OK, etc." list="statesList">
+                        <datalist id="statesList">
+                            <option value="Alabama - AL">AL</option>
+                            <option value="Alaska - AK">AK</option>
+                            <option value="Arizona - AZ">AZ</option>
+                            <option value="Arkansas - AR">AR</option>
+                            <option value="California - CA">CA</option>
+                            <option value="Colorado - CO">CO</option>
+                            <option value="Connecticut - CT">CT</option>
+                            <option value="Delaware - DE">DE</option>
+                            <option value="Florida - FL">FL</option>
+                            <option value="Georgia - GA">GA</option>
+                            <option value="Hawaii - HI">HI</option>
+                            <option value="Idaho - ID">ID</option>
+                            <option value="Illinois - IL">IL</option>
+                            <option value="Indiana - IN">IN</option>
+                            <option value="Iowa - IA">IA</option>
+                            <option value="Kansas - KS">KS</option>
+                            <option value="Kentucky - KY">KY</option>
+                            <option value="Louisiana - LA">LA</option>
+                            <option value="Maine - ME">ME</option>
+                            <option value="Maryland - MD">MD</option>
+                            <option value="Massachusetts - MA">MA</option>
+                            <option value="Michigan - MI">MI</option>
+                            <option value="Minnesota - MN">MN</option>
+                            <option value="Mississippi - MS">MS</option>
+                            <option value="Missouri - MO">MO</option>
+                            <option value="Montana - MT">MT</option>
+                            <option value="Nebraska - NE">NE</option>
+                            <option value="Nevada - NV">NV</option>
+                            <option value="New Hampshire - NH">NH</option>
+                            <option value="New Jersey - NJ">NJ</option>
+                            <option value="New Mexico - NM">NM</option>
+                            <option value="New York - NY">NY</option>
+                            <option value="North Carolina - NC">NC</option>
+                            <option value="North Dakota - ND">ND</option>
+                            <option value="Ohio - OH">OH</option>
+                            <option value="Oklahoma - OK">OK</option>
+                            <option value="Oregon - OR">OR</option>
+                            <option value="Pennsylvania - PA">PA</option>
+                            <option value="Rhode Island - RI">RI</option>
+                            <option value="South Carolina - SC">SC</option>
+                            <option value="South Dakota - SD">SD</option>
+                            <option value="Tennessee - TN">TN</option>
+                            <option value="Texas - TX">TX</option>
+                            <option value="Utah - UT">UT</option>
+                            <option value="Vermont - VT">VT</option>
+                            <option value="Virginia - VA">VA</option>
+                            <option value="Washington - WA">WA</option>
+                            <option value="West Virginia - WV">WV</option>
+                            <option value="Wisconsin - WI">WI</option>
+                            <option value="Wyoming - WY">WY</option>
+                        </datalist>
+                    </div>
+                    
+                    <!-- Event Type -->
+                    <div class="col-md-3">
+                        <label for="eventTypeFilter" class="form-label">Event Type</label>
+                        <select class="form-select" id="eventTypeFilter">
+                            <option value="">All Events</option>
+                            <option value="Severe Thunderstorm Warning">Severe Thunderstorm Warning</option>
+                            <option value="Tornado Warning">Tornado Warning</option>
+                            <option value="Tornado Watch">Tornado Watch</option>
+                            <option value="Severe Thunderstorm Watch">Severe Thunderstorm Watch</option>
+                            <option value="Severe Weather Statement">Severe Weather Statement</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row g-3 mt-1">
+                    <!-- Minimum Hail Size -->
                     <div class="col-md-3">
                         <label for="minHailSize" class="form-label">Minimum Hail Size</label>
                         <select class="form-select" id="minHailSize">
                             <option value="">All Sizes</option>
+                            <option value="0.25">0.25" (Pea)</option>
+                            <option value="0.5">0.5" (Marble)</option>
                             <option value="0.75">0.75" (Penny)</option>
                             <option value="1.0">1.0" (Quarter)</option>
                             <option value="1.25">1.25" (Half Dollar)</option>
                             <option value="1.5">1.5" (Ping Pong)</option>
                             <option value="1.75">1.75" (Golf Ball)</option>
-                            <option value="2.0">2.0"+ (Softball)</option>
+                            <option value="2.0">2.0" (Softball)</option>
+                            <option value="2.5">2.5"+ (Large)</option>
                         </select>
                     </div>
+                    
+                    <!-- Minimum Wind Speed -->
                     <div class="col-md-3">
                         <label for="minWindSpeed" class="form-label">Minimum Wind Speed</label>
                         <select class="form-select" id="minWindSpeed">
@@ -77,27 +163,27 @@
                             <option value="100">100+ mph</option>
                         </select>
                     </div>
+                    
+                    <!-- Start Date -->
                     <div class="col-md-3">
-                        <label for="stateFilter" class="form-label">State</label>
-                        <input type="text" class="form-control" id="stateFilter" placeholder="TX, OK, etc.">
+                        <label for="startDate" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="startDate" value="2025-06-02">
                     </div>
+                    
+                    <!-- End Date -->
                     <div class="col-md-3">
-                        <label for="timeRange" class="form-label">Time Range</label>
-                        <select class="form-select" id="timeRange">
-                            <option value="">All Time</option>
-                            <option value="24">Last 24 Hours</option>
-                            <option value="48">Last 48 Hours</option>
-                            <option value="168">Last Week</option>
-                        </select>
+                        <label for="endDate" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="endDate" value="2025-06-07">
                     </div>
                 </div>
+                
                 <div class="row mt-3">
                     <div class="col-12">
                         <button type="button" class="btn btn-primary" onclick="applyFilters()">
-                            <i class="fas fa-search me-1"></i>Apply Filters
+                            <i class="fas fa-search me-1"></i>Search & Filter
                         </button>
                         <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
-                            <i class="fas fa-times me-1"></i>Clear
+                            <i class="fas fa-times me-1"></i>Clear All
                         </button>
                     </div>
                 </div>
@@ -524,33 +610,38 @@ function updatePagination(data) {
 function applyFilters() {
     currentFilters = {};
     
+    const search = document.getElementById('searchQuery').value;
+    const state = document.getElementById('stateFilter').value;
+    const eventType = document.getElementById('eventTypeFilter').value;
     const minHail = document.getElementById('minHailSize').value;
     const minWind = document.getElementById('minWindSpeed').value;
-    const state = document.getElementById('stateFilter').value.trim();
-    const timeRange = document.getElementById('timeRange').value;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
     
+    // Apply new filters
+    if (search) currentFilters.q = search;
+    if (state) {
+        // Extract state code from format "State Name - XX"
+        const stateCode = state.includes(' - ') ? state.split(' - ')[1] : state;
+        currentFilters.state = stateCode;
+    }
+    if (eventType) currentFilters.event_type = eventType;
     if (minHail) currentFilters.min_hail = minHail;
     if (minWind) currentFilters.min_wind = minWind;
-    if (state) currentFilters.state = state;
-    
-    // Calculate start time based on time range (only if a specific range is selected)
-    if (timeRange && timeRange !== '') {
-        const hoursAgo = parseInt(timeRange);
-        const startTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
-        currentFilters.start_time = startTime.toISOString();
-    } else {
-        // Remove any existing time filter when "All Time" is selected
-        delete currentFilters.start_time;
-    }
+    if (startDate) currentFilters.start_date = startDate;
+    if (endDate) currentFilters.end_date = endDate;
     
     loadRadarAlerts(1);
 }
 
 function clearFilters() {
+    document.getElementById('searchQuery').value = '';
+    document.getElementById('stateFilter').value = '';
+    document.getElementById('eventTypeFilter').value = '';
     document.getElementById('minHailSize').value = '';
     document.getElementById('minWindSpeed').value = '';
-    document.getElementById('stateFilter').value = '';
-    document.getElementById('timeRange').value = '';
+    document.getElementById('startDate').value = '2025-06-02';
+    document.getElementById('endDate').value = '2025-06-07';
     currentFilters = {};
     loadRadarAlerts(1);
 }
