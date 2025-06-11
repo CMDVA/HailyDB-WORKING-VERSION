@@ -457,22 +457,26 @@ function getWindDescription(speed) {
 }
 
 function getSeverityBadge(hailSize, windSpeed) {
-    let severity = 'low';
+    let severity = 'moderate';
     let label = 'Moderate';
     
     if (hailSize >= 2.0 || windSpeed >= 90) {
-        severity = 'high';
+        severity = 'extreme';
         label = 'Extreme';
     } else if (hailSize >= 1.5 || windSpeed >= 80) {
-        severity = 'high';
-        label = 'High';
+        severity = 'severe';
+        label = 'Severe';
     } else if (hailSize >= 1.0 || windSpeed >= 70) {
-        severity = 'medium';
-        label = 'Significant';
+        severity = 'moderate';
+        label = 'Moderate';
+    } else {
+        severity = 'minor';
+        label = 'Minor';
     }
     
-    const badgeClass = severity === 'high' ? 'bg-danger' : 
-                      severity === 'medium' ? 'bg-warning text-dark' : 'bg-info';
+    const badgeClass = severity === 'extreme' ? 'bg-danger' : 
+                      severity === 'severe' ? 'bg-warning text-dark' : 
+                      severity === 'moderate' ? 'bg-info' : 'bg-secondary';
     
     return `<span class="badge ${badgeClass}">${label}</span>`;
 }
