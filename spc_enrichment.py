@@ -181,45 +181,41 @@ class SPCEnrichmentService:
             List of nearby places with name and approximate coordinates
         """
         try:
-            # Enhanced prompt with distance-aware geographic search and nearest city identification
+            # Community-focused search with high geographic precision
             prompt = f"""
-            You are a precision mapping system. Search for places within a 3-mile radius of coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
+            You are a specialized community locator with expert knowledge of small towns and settlements. Search within 2 miles of coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
             
-            CONSTRAINT: You must find places within 3 miles. If no places exist within 3 miles (which is extremely rare), then and only then expand to 5 miles.
+            PRIMARY TARGET: Find small communities, villages, crossroads, and unincorporated places.
             
-            SEARCH RADIUS ENFORCEMENT:
-            - Start with a 1-mile radius around {lat:.4f}, {lon:.4f}
-            - Expand to 2-mile radius
-            - Expand to 3-mile radius
-            - DO NOT include any place beyond 3 miles unless absolutely no places exist closer
+            PRIORITY SEARCH ORDER:
+            1. Historic community names (Mt Pleasant, Millingport, etc.)
+            2. Crossroads communities and rural settlements  
+            3. Unincorporated places and districts
+            4. Village centers and hamlets
+            5. Only if no communities found: landmarks, churches, schools
             
-            REQUIRED PLACE TYPES (search in this order):
-            1. Small towns, communities, villages, crossroads
-            2. Unincorporated places, settlements, districts
-            3. Churches, schools, fire stations, post offices
-            4. Geographic features (creeks, lakes, hills, parks)
-            5. Road intersections, bridges, landmarks
+            GEOGRAPHIC CONSTRAINTS:
+            - STRICT 2-mile maximum radius from {lat:.4f}, {lon:.4f}
+            - Find the 3 absolutely closest places
+            - Prioritize communities over landmarks
+            - Provide exact coordinates within 0.01 degree accuracy
             
-            STRICT DISTANCE VALIDATION:
-            - Calculate straight-line distance from {lat:.4f}, {lon:.4f} to each place
-            - Reject any suggestion over 3 miles unless no closer places exist
-            - Prioritize the 3 closest places found
+            VALIDATION RULES:
+            - Every place must be a real location within 2 miles
+            - Communities take priority over landmarks
+            - Distance calculated as straight-line from {lat:.4f}, {lon:.4f}
             
-            COORDINATE PRECISION:
-            Provide exact latitude/longitude for each place within 0.01 degree accuracy.
-            
-            For {lat:.4f}, {lon:.4f}, find the 3 closest real places and return as JSON:
-            
+            Return JSON with the closest places found:
             {{
-                "nearest_city": {{"name": "Closest Major City", "distance_miles": 8.2, "approx_lat": 35.4088, "approx_lon": -80.5795}},
+                "nearest_city": {{"name": "Closest Major City", "distance_miles": 12.0, "approx_lat": 35.4088, "approx_lon": -80.5795}},
                 "places": [
-                    {{"name": "Closest Place Within 3 Miles", "distance_miles": 1.2, "approx_lat": 35.3968, "approx_lon": -80.3456}},
-                    {{"name": "Second Closest Within 3 Miles", "distance_miles": 2.1, "approx_lat": 35.4032, "approx_lon": -80.4356}},
-                    {{"name": "Third Closest Within 3 Miles", "distance_miles": 2.8, "approx_lat": 35.3800, "approx_lon": -80.3700}}
+                    {{"name": "Closest Community or Place", "distance_miles": 1.2, "approx_lat": 35.3968, "approx_lon": -80.3456}},
+                    {{"name": "Second Closest", "distance_miles": 1.8, "approx_lat": 35.4032, "approx_lon": -80.4356}},
+                    {{"name": "Third Closest", "distance_miles": 2.0, "approx_lat": 35.3800, "approx_lon": -80.3700}}
                 ]
             }}
             
-            VALIDATION: Every place must be within 3 miles of {lat:.4f}, {lon:.4f}. No exceptions. Return only valid JSON format.
+            REQUIREMENT: Focus on finding small communities first. Return valid JSON only.
             """
             
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
