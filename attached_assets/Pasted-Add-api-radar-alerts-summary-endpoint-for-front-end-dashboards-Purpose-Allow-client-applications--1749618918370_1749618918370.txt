@@ -1,0 +1,98 @@
+Add /api/radar-alerts/summary endpoint for front-end dashboards
+
+Purpose: Allow client applications (IDOLCheck and others) to quickly query city+date heatmap summaries of radar-detected hail and wind events.
+
+Requirements:
+
+1️⃣ Endpoint:
+GET /api/radar-alerts/summary
+
+2️⃣ Query Parameters:
+
+start_date (required, format YYYY-MM-DD)
+
+end_date (required, format YYYY-MM-DD)
+
+state (optional, 2-letter state code, e.g. "FL")
+
+min_hail_inches (optional, float, default = 0) → only count hail events ≥ this size
+
+min_wind_mph (optional, int, default = 50) → only count wind events ≥ this speed
+
+city (optional, string, partial match, to filter one city if desired)
+
+3️⃣ Query Logic:
+
+Group radar_alerts table by:
+
+city
+
+state
+
+date (extract from detected_time timestamp)
+
+For each (city, state, date), return:
+
+hail_count: count of distinct hail events ≥ min_hail_inches
+
+max_hail_inches: largest hail_inches value detected that day for that city
+
+wind_count: count of distinct wind events ≥ min_wind_mph
+
+max_wind_mph: largest wind_mph value detected that day for that city
+
+4️⃣ Response Format:
+
+json
+Copy
+Edit
+{
+  "summary": [
+    {
+      "city": "Tampa",
+      "state": "FL",
+      "date": "2025-06-10",
+      "hail_count": 3,
+      "max_hail_inches": 1.25,
+      "wind_count": 1,
+      "max_wind_mph": 60
+    },
+    {
+      "city": "Orlando",
+      "state": "FL",
+      "date": "2025-06-09",
+      "hail_count": 0,
+      "wind_count": 2,
+      "max_wind_mph": 70
+    },
+    ...
+  ]
+}
+5️⃣ Performance Considerations:
+
+Implement with indexed query → use existing indexes on detected_time, hail_inches, wind_mph, city, state
+
+Make sure query is efficient for 30-day spans across large states
+
+6️⃣ Test Cases to Validate:
+
+Summary for FL for last 10 days
+
+Summary for entire US for 7-day span
+
+Summary for 1 city across 30 days → verify city filter works
+
+Summary with high min_hail_inches (e.g. ≥1.5) → filters correctly
+
+Summary with high min_wind_mph (e.g. ≥80) → filters correctly
+
+7️⃣ Deployment Steps:
+
+Add /api/radar-alerts/summary route to main.py
+
+Add to API documentation (api/radar-alerts section)
+
+Test in Postman and verify output matches radar_alerts table data
+
+Important:
+This endpoint is read-only, pure summary → no writes. Must be safe for heavy front-end use (IDOLCheck dashboards and mobile clients).

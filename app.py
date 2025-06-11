@@ -2836,6 +2836,142 @@ def test_webhook_evaluation():
         }), 500
 
 # City Names and Point-in-Polygon API Endpoints
+@app.route('/api/radar-alerts/backfill', methods=['POST'])
+def trigger_radar_backfill():
+    """
+    Trigger systematic radar alerts backfill for specified date range
+    """
+    try:
+        data = request.get_json() or {}
+        start_date = data.get('start_date', '2025-06-10')
+        end_date = data.get('end_date', '2025-06-11')
+        batch_size = data.get('batch_size', 100)
+        
+        # Import here to avoid circular imports
+        from radar_backfill import RadarBackfillProcessor
+        
+        processor = RadarBackfillProcessor()
+        stats = processor.process_date_range(start_date, end_date, batch_size)
+        
+        return jsonify({
+            "success": True,
+            "message": f"Radar backfill completed for {start_date} to {end_date}",
+            "stats": stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Radar backfill failed: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/radar-alerts/available-dates')
+def get_radar_available_dates():
+    """
+    Get list of dates with radar-detected alerts available for backfill
+    """
+    try:
+        from radar_backfill import get_available_dates
+        dates = get_available_dates()
+        
+        return jsonify({
+            "dates": dates,
+            "total_dates": len(dates)
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get available dates: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/radar-alerts/stats')
+def get_radar_alerts_stats():
+    """
+    Get radar_alerts table statistics
+    """
+    try:
+        from radar_backfill import get_radar_backfill_stats
+        stats = get_radar_backfill_stats()
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Failed to get radar alerts stats: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/radar-alerts/summary')
+def get_radar_alerts_summary():
+    """
+    Get summary of radar alerts grouped by city, state, date
+    Query parameters:
+    - start_date (required, YYYY-MM-DD)
+    - end_date (required, YYYY-MM-DD)
+    - state (optional, 2-letter state code)
+    - min_hail_inches (optional, float, default=0)
+    - min_wind_mph (optional, int, default=50)
+    - city (optional, string, partial match)
+    """
+    try:
+        from models import RadarAlert
+        from sqlalchemy import func, and_
+        
+        # Get query parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        state_filter = request.args.get('state')
+        min_hail_inches = float(request.args.get('min_hail_inches', 0))
+        min_wind_mph = int(request.args.get('min_wind_mph', 50))
+        city_filter = request.args.get('city')
+        
+        if not start_date or not end_date:
+            return jsonify({"error": "start_date and end_date are required"}), 400
+        
+        # Base query
+        query = db.session.query(
+            func.unnest(RadarAlert.city_names).label('city'),
+            func.unnest(RadarAlert.affected_states).label('state'),
+            RadarAlert.event_date.label('date'),
+            func.count(func.case([(RadarAlert.event_type == 'hail', 1)])).label('hail_count'),
+            func.max(func.case([(RadarAlert.event_type == 'hail', RadarAlert.hail_inches)])).label('max_hail_inches'),
+            func.count(func.case([(RadarAlert.event_type == 'wind', 1)])).label('wind_count'),
+            func.max(func.case([(RadarAlert.event_type == 'wind', RadarAlert.wind_mph)])).label('max_wind_mph')
+        ).filter(
+            RadarAlert.event_date >= start_date,
+            RadarAlert.event_date <= end_date
+        )
+        
+        # Apply filters
+        if state_filter:
+            query = query.filter(func.array_position(RadarAlert.affected_states, state_filter) > 0)
+        
+        if city_filter:
+            query = query.having(func.lower(func.unnest(RadarAlert.city_names)).like(f'%{city_filter.lower()}%'))
+        
+        # Apply min thresholds in HAVING clause
+        query = query.group_by('city', 'state', 'date').having(
+            and_(
+                func.max(func.case([(RadarAlert.event_type == 'hail', RadarAlert.hail_inches)])) >= min_hail_inches,
+                func.max(func.case([(RadarAlert.event_type == 'wind', RadarAlert.wind_mph)])) >= min_wind_mph
+            )
+        ).order_by('date', 'state', 'city')
+        
+        results = query.all()
+        
+        summary = []
+        for row in results:
+            summary.append({
+                "city": row.city,
+                "state": row.state,
+                "date": row.date.isoformat() if row.date else None,
+                "hail_count": int(row.hail_count or 0),
+                "max_hail_inches": float(row.max_hail_inches) if row.max_hail_inches else None,
+                "wind_count": int(row.wind_count or 0),
+                "max_wind_mph": int(row.max_wind_mph) if row.max_wind_mph else None
+            })
+        
+        return jsonify({"summary": summary})
+        
+    except Exception as e:
+        logger.error(f"Radar alerts summary failed: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/radar-alerts/contains-address')
 def contains_address():
     """

@@ -1,0 +1,71 @@
+Task:
+Execute a one-time backfill of all historical NWS radar-detected events already present in the HailyDB database to fully populate our enhanced radar_alerts data pipeline in line with IDOLCheck product needs.
+
+Scope:
+
+Include ALL radar-detected hail events → any size
+
+Include ALL radar-detected wind events → wind speed ≥ 50 mph
+
+Process all historical dates currently stored in our alerts table (not just 6/10/25), but begin by processing 6/10/25 first as validation test.
+
+Processing requirements:
+
+For each eligible alert:
+
+Extract hail_inches and wind_mph from radar_indicated field
+
+Store full geometry (polygon) as GeoJSON
+
+Compute and store geometry_bounds (min/max lat/lon)
+
+Parse city_names from area_desc field
+
+If possible, extract multiple cities (split by ";", ",")
+
+Normalize city names (title case, remove extraneous words)
+
+Store county_names and fips_codes as provided
+
+Store affected_states
+
+Add city_names as a distinct field for webhook matching and future address-based queries
+
+Record each parsed radar event in radar_alerts or appropriate table for API and webhook use
+
+Webhook logic:
+
+Populate radar_alerts so that the webhook system can now:
+
+Trigger at city granularity (based on city_names)
+
+Trigger at county granularity (based on county_names)
+
+Trigger for address proximity queries → address lookup will use geometry / polygon data
+
+Execution notes:
+
+Start with 6/10/25 date first → run full backfill for this date → report results.
+
+Upon success, execute the full historical backfill across all available radar-detected data already in HailyDB.
+
+Do not overwrite alerts — use separate radar_alerts table or enhanced fields to enable these lookups.
+
+Ensure this pipeline is now active for ongoing ingestion as well (future alerts).
+
+Goal:
+Enable IDOLCheck to query any address for radar-detected hail/wind events with:
+
+Full polygon awareness
+
+Clean city/county targeting
+
+Historical + future coverage
+
+Important:
+
+No fake data
+
+Do not generate synthetic radar data → only use actual radar_indicated values parsed from NWS alerts.
+
+Ensure this process does not cause downtime or delay in live HailyDB ingestion.

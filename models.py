@@ -637,3 +637,71 @@ class HurricaneCountyImpact(db.Model):
             'track_points_in_county': self.track_points_in_county,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
+class RadarAlert(db.Model):
+    """
+    Processed radar-detected events for enhanced targeting and API access
+    Extracted from NWS alerts with radar_indicated data
+    """
+    __tablename__ = 'radar_alerts'
+    
+    id = Column(db.Integer, primary_key=True)
+    alert_id = Column(String(255), db.ForeignKey('alerts.id'), nullable=False)
+    
+    # Event classification
+    event_type = Column(String(10), nullable=False)  # 'hail' or 'wind'
+    event_date = Column(Date, nullable=False)
+    detected_time = Column(DateTime, nullable=False)
+    
+    # Radar measurements
+    hail_inches = Column(db.Numeric(4,2))
+    wind_mph = Column(db.Integer)
+    
+    # Geographic data
+    city_names = Column(ARRAY(String))  # Parsed from area_desc
+    county_names = Column(ARRAY(String))
+    fips_codes = Column(ARRAY(String))
+    affected_states = Column(ARRAY(String))
+    
+    # Geometry (stored as GeoJSON for compatibility)
+    geometry = Column(JSONB)
+    geometry_bounds = Column(JSONB)  # {min_lat, max_lat, min_lon, max_lon}
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relations
+    alert = db.relationship('Alert', backref=db.backref('radar_alerts', lazy='dynamic'))
+    
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_radar_alerts_event_date', 'event_date'),
+        Index('idx_radar_alerts_event_type', 'event_type'),
+        Index('idx_radar_alerts_detected_time', 'detected_time'),
+        Index('idx_radar_alerts_hail_inches', 'hail_inches'),
+        Index('idx_radar_alerts_wind_mph', 'wind_mph'),
+        Index('idx_radar_alerts_city_names', 'city_names', postgresql_using='gin'),
+        Index('idx_radar_alerts_county_names', 'county_names', postgresql_using='gin'),
+        Index('idx_radar_alerts_fips_codes', 'fips_codes', postgresql_using='gin'),
+    )
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'alert_id': self.alert_id,
+            'event_type': self.event_type,
+            'event_date': self.event_date.isoformat() if self.event_date else None,
+            'detected_time': self.detected_time.isoformat() if self.detected_time else None,
+            'hail_inches': float(self.hail_inches) if self.hail_inches else None,
+            'wind_mph': self.wind_mph,
+            'city_names': self.city_names or [],
+            'county_names': self.county_names or [],
+            'fips_codes': self.fips_codes or [],
+            'affected_states': self.affected_states or [],
+            'geometry': self.geometry,
+            'geometry_bounds': self.geometry_bounds,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+    
+    def __repr__(self):
+        return f'<RadarAlert {self.id}: {self.event_type} on {self.event_date}>'

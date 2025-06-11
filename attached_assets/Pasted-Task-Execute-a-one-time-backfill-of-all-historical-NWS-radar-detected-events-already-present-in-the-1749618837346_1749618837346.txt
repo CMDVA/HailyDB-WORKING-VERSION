@@ -1,0 +1,147 @@
+Task:
+Execute a one-time backfill of all historical NWS radar-detected events already present in the HailyDB database to fully populate our enhanced radar_alerts pipeline to serve IDOLCheck and future webhook/API users.
+
+Scope:
+
+Include ALL radar-detected hail events → any size
+
+Include ALL radar-detected wind events → wind speed ≥ 50 mph
+
+Process all historical dates currently stored in our alerts table (but begin with 6/10/25 as validation test).
+
+Processing requirements:
+
+For each eligible alert:
+
+Extract hail_inches and wind_mph from radar_indicated field
+
+Store full geometry (polygon) as GeoJSON
+
+Compute and store geometry_bounds (min/max lat/lon)
+
+Parse city_names from area_desc field
+
+Extract multiple cities where present (split by ";", ",")
+
+Normalize city names (title case, no extraneous words or county references)
+
+Store county_names and fips_codes
+
+Store affected_states
+
+Store event_type ("hail" or "wind")
+
+Store alert_id reference for cross-linking back to alerts table
+
+Store event_date (UTC date of event)
+
+Add city_names as a distinct array field for webhook matching and address-based queries
+
+Record each parsed radar event in radar_alerts table (new if not already created) for API and webhook use.
+
+radar_alerts Suggested Table Schema:
+
+pgsql
+Copy
+Edit
+CREATE TABLE radar_alerts (
+    id SERIAL PRIMARY KEY,
+    alert_id VARCHAR(255) NOT NULL REFERENCES alerts(id),
+    event_type VARCHAR(10) NOT NULL CHECK (event_type IN ('hail', 'wind')),
+    hail_inches DECIMAL(4,2),
+    wind_mph INTEGER,
+    event_date DATE NOT NULL,
+    city_names TEXT[],  -- Array of clean city names parsed from area_desc
+    county_names TEXT[],
+    fips_codes TEXT[],
+    affected_states TEXT[],
+    geometry GEOMETRY(POLYGON, 4326),
+    geometry_bounds JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+Notes:
+
+Ensure geometry is stored as real PostGIS polygon (for spatial queries).
+
+geometry_bounds can be min/max lat/lon JSON.
+
+Webhook logic:
+
+After backfill, the webhook system should support:
+
+Triggering by exact city (city_names match)
+
+Triggering by county (county_names match)
+
+Triggering by FIPS (fips_codes match)
+
+Triggering by point-in-polygon match for address proximity lookups (IDOLCheck API consumer).
+
+API Endpoint for IDOLCheck Consumers (Suggested):
+
+bash
+Copy
+Edit
+GET /api/radar-alerts/address-lookup?address=...&radius_miles=5
+Inputs:
+
+address (string → geocoded to lat/lon)
+
+radius_miles (optional → default 5 miles)
+
+Response:
+
+csharp
+Copy
+Edit
+{
+    "address": "123 Main St, Dallas, TX",
+    "coordinates": { "lat": ..., "lon": ... },
+    "matches": [
+        {
+            "event_date": "2025-06-10",
+            "event_type": "hail",
+            "hail_inches": 1.25,
+            "wind_mph": null,
+            "city_names": ["Dallas"],
+            "county_names": ["Dallas County"],
+            "fips_codes": ["48113"],
+            "geometry_bounds": { "min_lat": ..., "max_lat": ..., "min_lon": ..., "max_lon": ... },
+            "polygon_match": true,
+            "distance_miles": 2.1,
+            "alert_id": "urn:oid:..."
+        },
+        ...
+    ]
+}
+Notes:
+
+If a radar_alert polygon contains the point for the input address → polygon_match: true
+
+If nearby (within radius_miles), show distance_miles.
+
+This enables IDOLCheck to show per-address historical radar-detected events, not just city-wide.
+
+Execution notes:
+
+Run on 6/10/25 first → report results (number of events processed, how many got valid city_names, polygon_match test success).
+
+If success, execute full historical backfill.
+
+Ensure new pipeline remains active moving forward for all new NWS radar-detected events.
+
+Important:
+
+No fake data — use only actual radar_indicated values.
+
+Do not delay or disrupt live HailyDB ingestion.
+
+DO enable this data for IDOLCheck consumer API endpoint.
+
+This will feed damage probability scoring and will be a core feature.
+
+✅ Summary of Deliverables:
+1️⃣ radar_alerts table backfilled + active
+2️⃣ city_names array field populated
+3️⃣ API endpoint for IDOLCheck → /api/radar-alerts/address-lookup
+4️⃣ Webhook system enhanced to trigger by city/county/polygon
