@@ -3742,7 +3742,7 @@ def api_live_radar_alerts():
     try:
         import requests
         from config import Config
-        from historical_radar_parser import RadarIndicatedParser
+        from historical_radar_parser import HistoricalRadarParser
         from city_parser import CityNameParser
         import re
         
@@ -3758,7 +3758,7 @@ def api_live_radar_alerts():
         raw_alerts = nws_data.get('features', [])
         
         # Initialize parsers
-        radar_parser = RadarIndicatedParser()
+        radar_parser = HistoricalRadarParser()
         city_parser = CityNameParser()
         
         # Process and enrich alerts
@@ -3775,9 +3775,9 @@ def api_live_radar_alerts():
             props = feature.get('properties', {})
             
             # Filter for wind/hail alerts
-            event = props.get('event', '').lower()
-            description = props.get('description', '').lower()
-            headline = props.get('headline', '').lower()
+            event = (props.get('event') or '').lower()
+            description = (props.get('description') or '').lower()
+            headline = (props.get('headline') or '').lower()
             
             # Check if this is a wind/hail related alert
             is_wind_hail = any(keyword in event or keyword in description or keyword in headline 
@@ -3788,8 +3788,13 @@ def api_live_radar_alerts():
                 
             stats['wind_hail_alerts'] += 1
             
-            # Extract radar indication
-            radar_data = radar_parser.parse_radar_indicated(props)
+            # Extract radar indication using properties as a mock alert object
+            class MockAlert:
+                def __init__(self, properties):
+                    self.raw = {'properties': properties}
+                    
+            mock_alert = MockAlert(props)
+            radar_data = radar_parser._extract_radar_data(mock_alert)
             is_radar_detected = bool(radar_data)
             
             if is_radar_detected:
