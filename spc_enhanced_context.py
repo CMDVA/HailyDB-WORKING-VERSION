@@ -489,11 +489,15 @@ Focus on locations that would be relevant for insurance, restoration, or emergen
     def enrich_all_reports(self, batch_size: int = 50, unenriched_only: bool = True) -> Dict[str, int]:
         """Enrich ALL SPC reports with enhanced context (verified and unverified)"""
         try:
+            # Import here to avoid circular imports
+            from models import SPCReport
+            from sqlalchemy import or_
+            
             # Get all SPC reports that need enrichment
             if unenriched_only:
                 # Only enrich reports without enhanced_context or with empty enhanced_context
                 query = self.db.query(SPCReport).filter(
-                    db.or_(
+                    or_(
                         SPCReport.enhanced_context.is_(None),
                         SPCReport.enhanced_context == {}
                     )
