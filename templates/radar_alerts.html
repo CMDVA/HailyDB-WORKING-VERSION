@@ -42,17 +42,36 @@
     </div>
 </div>
 
-<!-- Filter Controls -->
+<!-- Search Bar -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">
-                    <i class="fas fa-filter me-1"></i>Filter Controls
+                    <i class="fas fa-search me-1"></i>Search & Filter
                 </h5>
             </div>
             <div class="card-body">
                 <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="searchQuery" class="form-label">Search</label>
+                        <input type="text" class="form-control" id="searchQuery" placeholder="Search by location, event type, or description...">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="stateFilter" class="form-label">State</label>
+                        <input type="text" class="form-control" id="stateFilter" placeholder="TX, OK, etc.">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="eventFilter" class="form-label">Event Type</label>
+                        <select class="form-select" id="eventFilter">
+                            <option value="">All Events</option>
+                            <option value="Severe Thunderstorm Warning">Severe Thunderstorm Warning</option>
+                            <option value="Tornado Warning">Tornado Warning</option>
+                            <option value="Severe Weather Statement">Severe Weather Statement</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-3 mt-2">
                     <div class="col-md-3">
                         <label for="minHailSize" class="form-label">Minimum Hail Size</label>
                         <select class="form-select" id="minHailSize">
@@ -78,25 +97,21 @@
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <label for="stateFilter" class="form-label">State</label>
-                        <input type="text" class="form-control" id="stateFilter" placeholder="TX, OK, etc.">
+                        <label for="startDate" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="startDate">
                     </div>
                     <div class="col-md-3">
-                        <label for="timeRange" class="form-label">Time Range</label>
-                        <select class="form-select" id="timeRange">
-                            <option value="24">Last 24 Hours</option>
-                            <option value="48">Last 48 Hours</option>
-                            <option value="168">Last Week</option>
-                        </select>
+                        <label for="endDate" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="endDate">
                     </div>
                 </div>
                 <div class="row mt-3">
                     <div class="col-12">
                         <button type="button" class="btn btn-primary" onclick="applyFilters()">
-                            <i class="fas fa-search me-1"></i>Apply Filters
+                            <i class="fas fa-search me-1"></i>Search & Filter
                         </button>
                         <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
-                            <i class="fas fa-times me-1"></i>Clear
+                            <i class="fas fa-times me-1"></i>Clear All
                         </button>
                     </div>
                 </div>
@@ -228,6 +243,24 @@ let currentFilters = {};
 
 document.addEventListener('DOMContentLoaded', function() {
     loadRadarAlerts();
+    
+    // Add enter key support for search
+    document.getElementById('searchQuery').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            applyFilters();
+        }
+    });
+    
+    // Set default date range to last 7 days
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7);
+    
+    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+    document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+    
+    // Apply default filters
+    applyFilters();
 });
 
 function loadRadarAlerts(page = 1) {
@@ -523,30 +556,42 @@ function updatePagination(data) {
 function applyFilters() {
     currentFilters = {};
     
+    const searchQuery = document.getElementById('searchQuery').value.trim();
     const minHail = document.getElementById('minHailSize').value;
     const minWind = document.getElementById('minWindSpeed').value;
     const state = document.getElementById('stateFilter').value.trim();
-    const timeRange = document.getElementById('timeRange').value;
+    const eventFilter = document.getElementById('eventFilter').value.trim();
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
     
+    if (searchQuery) currentFilters.search = searchQuery;
     if (minHail) currentFilters.min_hail = minHail;
     if (minWind) currentFilters.min_wind = minWind;
     if (state) currentFilters.state = state;
+    if (eventFilter) currentFilters.event_type = eventFilter;
     
-    // Calculate start time based on time range
-    if (timeRange) {
-        const hoursAgo = parseInt(timeRange);
-        const startTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
-        currentFilters.start_time = startTime.toISOString();
+    // Handle date filters
+    if (startDate) {
+        const startDateTime = new Date(startDate);
+        currentFilters.effective_start = startDateTime.toISOString();
+    }
+    if (endDate) {
+        const endDateTime = new Date(endDate);
+        endDateTime.setHours(23, 59, 59, 999); // Set to end of day
+        currentFilters.effective_end = endDateTime.toISOString();
     }
     
     loadRadarAlerts(1);
 }
 
 function clearFilters() {
+    document.getElementById('searchQuery').value = '';
     document.getElementById('minHailSize').value = '';
     document.getElementById('minWindSpeed').value = '';
     document.getElementById('stateFilter').value = '';
-    document.getElementById('timeRange').value = '24';
+    document.getElementById('eventFilter').value = '';
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
     currentFilters = {};
     loadRadarAlerts(1);
 }
