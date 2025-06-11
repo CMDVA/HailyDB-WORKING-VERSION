@@ -199,14 +199,19 @@ class SPCEnrichmentService:
             
             # Parse OpenAI response
             content = response.choices[0].message.content
+            logger.info(f"OpenAI raw response for nearby places: {content}")
+            
             places_data = json.loads(content)
+            logger.info(f"Parsed OpenAI response: {places_data}")
             
             # Validate and format response
             if isinstance(places_data, dict) and 'places' in places_data:
                 places_list = places_data['places']
                 if isinstance(places_list, list):
+                    logger.info(f"Found {len(places_list)} places in response")
                     return places_list[:6]  # Limit to 6 places max
             elif isinstance(places_data, list):
+                logger.info(f"Found direct array with {len(places_data)} places")
                 return places_data[:6]  # Direct array format
             else:
                 logger.warning(f"Unexpected OpenAI response format for nearby places: {content}")

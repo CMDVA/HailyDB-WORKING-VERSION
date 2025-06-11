@@ -123,7 +123,12 @@
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
                     <h6 class="m-0 font-weight-bold text-success">Location Enrichment</h6>
-                    <span class="badge bg-success">Enhanced</span>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary me-2" onclick="reEnrichReport({{ report.id }})" id="reEnrichBtn">
+                            <i class="fas fa-sync-alt me-1"></i>Re-enrich
+                        </button>
+                        <span class="badge bg-success">Enhanced</span>
+                    </div>
                 </div>
                 <div class="card-body">
                     <!-- Enriched Summary -->
@@ -274,12 +279,12 @@
 </div>
 
 <script>
-async function enrichSingleReport(reportId) {
-    const button = event.target;
+async function reEnrichReport(reportId) {
+    const button = document.getElementById('reEnrichBtn');
     const originalText = button.innerHTML;
     
     // Show loading state
-    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Enriching...';
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Re-enriching...';
     button.disabled = true;
     
     try {
@@ -292,6 +297,34 @@ async function enrichSingleReport(reportId) {
                 'report_id': reportId
             })
         });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.successful_enrichments > 0) {
+            // Show success message and reload page to show updated data
+            button.innerHTML = '<i class="fas fa-check me-1"></i>Success!';
+            button.className = 'btn btn-sm btn-success me-2';
+            
+            // Reload page after 1 second to show updated enrichment
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            throw new Error(result.error || 'Enrichment failed');
+        }
+        
+    } catch (error) {
+        console.error('Re-enrichment failed:', error);
+        button.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Failed';
+        button.className = 'btn btn-sm btn-danger me-2';
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.className = 'btn btn-sm btn-outline-primary me-2';
+            button.disabled = false;
+        }, 3000);
+    }
         
         const result = await response.json();
         
