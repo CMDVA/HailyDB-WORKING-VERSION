@@ -324,7 +324,6 @@ function loadRadarAlerts(page = 1) {
     
     // Build query parameters
     const params = new URLSearchParams({
-        has_radar_data: 'true',
         page: page,
         limit: 25
     });
@@ -655,11 +654,11 @@ function updateDirectRadarTable(alerts) {
         const windSpeed = radarData.wind_mph || 0;
         
         const hailDisplay = hailSize > 0 ? 
-            `<span class="badge bg-danger">${hailSize.toFixed(2)}"</span>` :
+            `<span class="badge bg-danger">${parseFloat(hailSize).toFixed(2)}"</span>` :
             '<span class="text-muted">-</span>';
             
         const windDisplay = windSpeed > 0 ? 
-            `<span class="badge bg-warning text-dark">${windSpeed} mph</span>` :
+            `<span class="badge bg-warning text-dark">${parseInt(windSpeed)} mph</span>` :
             '<span class="text-muted">-</span>';
         
         const severityBadge = getSeverityBadge(hailSize, windSpeed);
@@ -701,7 +700,7 @@ function updateDirectPagination() {
 function applyFilters() {
     currentFilters = {};
     
-    const search = document.getElementById('searchQuery').value;
+    const search = document.getElementById('searchFilter').value;
     const state = document.getElementById('stateFilter').value;
     const eventType = document.getElementById('eventTypeFilter').value;
     const minHail = document.getElementById('minHailSize').value;
@@ -711,23 +710,18 @@ function applyFilters() {
     
     // Apply new filters
     if (search) currentFilters.q = search;
-    if (state) {
-        // Extract state code from format "State Name - XX"
-        const stateCode = state.includes(' - ') ? state.split(' - ')[1] : state;
-        currentFilters.state = stateCode;
-    }
-    if (eventType) currentFilters.event_type = eventType;
-    if (minHail) currentFilters.min_hail = minHail;
-    if (minWind) currentFilters.min_wind = minWind;
+    if (state) currentFilters.state = state;
+    if (eventType) currentFilters.event = eventType;
+    if (minHail) currentFilters.min_hail = parseFloat(minHail);
+    if (minWind) currentFilters.min_wind = parseInt(minWind);
     if (startDate) currentFilters.start_date = startDate;
     if (endDate) currentFilters.end_date = endDate;
     
     loadRadarAlerts(1);
-    loadDirectRadarAlerts(1);
 }
 
 function clearFilters() {
-    document.getElementById('searchQuery').value = '';
+    document.getElementById('searchFilter').value = '';
     document.getElementById('stateFilter').value = '';
     document.getElementById('eventTypeFilter').value = '';
     document.getElementById('minHailSize').value = '';
@@ -736,12 +730,10 @@ function clearFilters() {
     document.getElementById('endDate').value = '2025-06-07';
     currentFilters = {};
     loadRadarAlerts(1);
-    loadDirectRadarAlerts(1);
 }
 
 function refreshAlerts() {
     loadRadarAlerts(currentPage);
-    loadDirectRadarAlerts(directCurrentPage);
 }
 
 function exportData() {
@@ -764,9 +756,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('startDate').value = '2025-06-02';
     document.getElementById('endDate').value = '2025-06-07';
     
-    // Load both tables
+    // Load radar alerts table
     loadRadarAlerts(1);
-    loadDirectRadarAlerts(1);
 });
 </script>
 {% endblock %}
