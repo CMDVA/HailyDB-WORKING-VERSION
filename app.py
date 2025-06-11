@@ -1066,6 +1066,16 @@ def view_spc_report_detail(report_id):
         # Add the verified alerts to the report object
         report.verified_alerts = matching_alerts
         
+        # Parse enhanced_context JSON if it exists
+        if hasattr(report, 'enhanced_context') and report.enhanced_context:
+            try:
+                import json
+                if isinstance(report.enhanced_context, str):
+                    report.enhanced_context = json.loads(report.enhanced_context)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Failed to parse enhanced_context for report {report_id}")
+                report.enhanced_context = None
+        
         return render_template('spc_report_detail.html', report=report)
     except Exception as e:
         logger.error(f"Error viewing SPC report {report_id}: {e}")
