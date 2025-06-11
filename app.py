@@ -2402,6 +2402,11 @@ def webhook_management():
     """View webhook management interface"""
     return render_template('webhook_management.html')
 
+@app.route('/live-radar-dashboard')
+def live_radar_dashboard():
+    """Live Radar Alerts Dashboard"""
+    return render_template('live_radar_dashboard.html')
+
 @app.route('/spc-matches/data')
 def spc_matches_data():
     """API endpoint for SPC verified matches data"""

@@ -1,0 +1,566 @@
+{% extends "base.html" %}
+
+{% block title %}Live Radar Alerts Dashboard - HailyDB{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3 mb-0">
+                    <span class="badge bg-danger me-2 animate-pulse">LIVE</span>
+                    Radar-Detected Weather Events
+                </h1>
+                <div class="d-flex gap-2">
+                    <button id="refreshAlerts" class="btn btn-primary">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>
+                    <button id="toggleService" class="btn btn-success">
+                        <i class="fas fa-play me-1"></i>Start Service
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Status Banner -->
+    <div id="serviceStatusBanner" class="alert alert-info" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-info-circle me-2"></i>
+            <span id="serviceStatusText">Checking service status...</span>
+            <div class="ms-auto">
+                <small id="lastUpdateTime" class="text-muted"></small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="searchInput" class="form-label">Search Location</label>
+                            <input type="text" class="form-control" id="searchInput" placeholder="Enter city, state, or county...">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="stateFilter" class="form-label">State</label>
+                            <select class="form-select" id="stateFilter">
+                                <option value="">All States</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="typeFilter" class="form-label">Alert Type</label>
+                            <select class="form-select" id="typeFilter">
+                                <option value="">All Types</option>
+                                <option value="tornado">Tornado</option>
+                                <option value="severe">Severe Storm</option>
+                                <option value="wind">High Wind</option>
+                                <option value="hail">Hail</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="urgencyFilter" class="form-label">Urgency</label>
+                            <select class="form-select" id="urgencyFilter">
+                                <option value="">All Urgency</option>
+                                <option value="Immediate">Immediate</option>
+                                <option value="Expected">Expected</option>
+                                <option value="Future">Future</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="clearFilters" class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-outline-secondary d-block w-100" id="clearFilters">
+                                <i class="fas fa-times me-1"></i>Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Row -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h5 mb-0" id="totalAlertsCount">0</div>
+                            <div class="small">Active Alerts</div>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h5 mb-0" id="radarConfirmedCount">0</div>
+                            <div class="small">Radar Confirmed</div>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-satellite-dish fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h5 mb-0" id="statesAffectedCount">0</div>
+                            <div class="small">States Affected</div>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-map-marked-alt fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h5 mb-0" id="webhooksTriggeredCount">0</div>
+                            <div class="small">Webhooks Sent</div>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-paper-plane fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Alerts Container -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-broadcast-tower me-2 text-danger"></i>
+                        Live Radar Alerts
+                    </h5>
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-secondary me-2" id="filteredCount">0 alerts</span>
+                        <div class="form-check form-switch ms-2">
+                            <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                            <label class="form-check-label" for="autoRefresh">
+                                Auto-refresh
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="alertsContainer">
+                        <div class="text-center p-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="mt-2">Loading live radar alerts...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: .5;
+    }
+}
+
+.alert-card {
+    transition: all 0.3s ease;
+    border-left: 4px solid;
+}
+
+.alert-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+
+.alert-immediate { border-left-color: #dc3545; }
+.alert-expected { border-left-color: #fd7e14; }
+.alert-future { border-left-color: #ffc107; }
+
+.radar-badge {
+    background: linear-gradient(45deg, #28a745, #20c997);
+    animation: radar-pulse 3s ease-in-out infinite;
+}
+
+@keyframes radar-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.message-template {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+}
+</style>
+
+<script>
+let autoRefreshInterval;
+let serviceRunning = false;
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDashboard();
+    checkServiceStatus();
+    loadLiveAlerts();
+    
+    // Set up auto-refresh
+    if (document.getElementById('autoRefresh').checked) {
+        startAutoRefresh();
+    }
+});
+
+// Service management
+document.getElementById('toggleService').addEventListener('click', function() {
+    if (serviceRunning) {
+        stopLiveService();
+    } else {
+        startLiveService();
+    }
+});
+
+// Filter and search handlers
+document.getElementById('searchInput').addEventListener('input', debounce(filterAlerts, 300));
+document.getElementById('stateFilter').addEventListener('change', filterAlerts);
+document.getElementById('typeFilter').addEventListener('change', filterAlerts);
+document.getElementById('urgencyFilter').addEventListener('change', filterAlerts);
+document.getElementById('clearFilters').addEventListener('click', clearAllFilters);
+document.getElementById('refreshAlerts').addEventListener('click', loadLiveAlerts);
+
+// Auto-refresh toggle
+document.getElementById('autoRefresh').addEventListener('change', function() {
+    if (this.checked) {
+        startAutoRefresh();
+    } else {
+        stopAutoRefresh();
+    }
+});
+
+function initializeDashboard() {
+    // Populate state filter
+    const states = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'];
+    const stateSelect = document.getElementById('stateFilter');
+    states.forEach(state => {
+        const option = document.createElement('option');
+        option.value = state;
+        option.textContent = state;
+        stateSelect.appendChild(option);
+    });
+}
+
+async function checkServiceStatus() {
+    try {
+        const response = await fetch('/api/live-radar-alerts');
+        const data = await response.json();
+        
+        if (data.error && data.error.includes('not initialized')) {
+            serviceRunning = false;
+            updateServiceStatus('Service Stopped', 'warning');
+        } else {
+            serviceRunning = true;
+            updateServiceStatus('Service Running', 'success');
+        }
+    } catch (error) {
+        console.error('Error checking service status:', error);
+        updateServiceStatus('Service Error', 'danger');
+    }
+}
+
+function updateServiceStatus(message, type) {
+    const banner = document.getElementById('serviceStatusBanner');
+    const text = document.getElementById('serviceStatusText');
+    const button = document.getElementById('toggleService');
+    
+    banner.className = `alert alert-${type}`;
+    text.textContent = message;
+    
+    if (serviceRunning) {
+        button.className = 'btn btn-danger';
+        button.innerHTML = '<i class="fas fa-stop me-1"></i>Stop Service';
+    } else {
+        button.className = 'btn btn-success';
+        button.innerHTML = '<i class="fas fa-play me-1"></i>Start Service';
+    }
+    
+    document.getElementById('lastUpdateTime').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+}
+
+async function startLiveService() {
+    try {
+        const response = await fetch('/api/live-radar-alerts/start', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            serviceRunning = true;
+            updateServiceStatus('Service Started', 'success');
+            setTimeout(loadLiveAlerts, 2000); // Load alerts after service starts
+        }
+    } catch (error) {
+        console.error('Error starting service:', error);
+        updateServiceStatus('Failed to Start Service', 'danger');
+    }
+}
+
+async function stopLiveService() {
+    try {
+        const response = await fetch('/api/live-radar-alerts/stop', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            serviceRunning = false;
+            updateServiceStatus('Service Stopped', 'warning');
+        }
+    } catch (error) {
+        console.error('Error stopping service:', error);
+        updateServiceStatus('Failed to Stop Service', 'danger');
+    }
+}
+
+async function loadLiveAlerts() {
+    try {
+        const response = await fetch('/api/live-radar-alerts');
+        const data = await response.json();
+        
+        if (data.error) {
+            displayError(data.error);
+            return;
+        }
+        
+        displayAlerts(data.alerts || []);
+        updateStatistics(data.alerts || []);
+        
+    } catch (error) {
+        console.error('Error loading live alerts:', error);
+        displayError('Failed to load live radar alerts');
+    }
+}
+
+function displayAlerts(alerts) {
+    const container = document.getElementById('alertsContainer');
+    
+    if (!alerts || alerts.length === 0) {
+        container.innerHTML = `
+            <div class="text-center p-4">
+                <i class="fas fa-satellite-dish fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No Live Radar Alerts</h5>
+                <p class="text-muted">No radar-detected weather events are currently active.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const alertsHtml = alerts.map(alert => createAlertCard(alert)).join('');
+    container.innerHTML = alertsHtml;
+    
+    document.getElementById('filteredCount').textContent = `${alerts.length} alert${alerts.length !== 1 ? 's' : ''}`;
+}
+
+function createAlertCard(alert) {
+    const urgencyClass = `alert-${alert.urgency?.toLowerCase() || 'future'}`;
+    const isRadarConfirmed = alert.radar_indicated || alert.certainty === 'Observed';
+    
+    return `
+        <div class="alert-card ${urgencyClass} border-0 border-bottom p-3" data-alert='${JSON.stringify(alert)}'>
+            <div class="row align-items-start">
+                <div class="col-md-8">
+                    <div class="d-flex align-items-center mb-2">
+                        <h6 class="mb-0 me-2">${alert.event || 'Weather Alert'}</h6>
+                        ${isRadarConfirmed ? '<span class="badge radar-badge text-white me-2">RADAR CONFIRMED</span>' : ''}
+                        <span class="badge bg-${getUrgencyColor(alert.urgency)} me-2">${alert.urgency || 'Unknown'}</span>
+                        <span class="badge bg-secondary">${alert.certainty || 'Unknown'}</span>
+                    </div>
+                    
+                    <div class="message-template p-2 mb-2">
+                        <small class="text-muted d-block mb-1">📱 Message Template:</small>
+                        <strong>${alert.message_template || 'Alert message not available'}</strong>
+                    </div>
+                    
+                    <div class="text-muted small">
+                        <i class="fas fa-map-marker-alt me-1"></i>
+                        ${alert.area_desc || 'Location not specified'}
+                    </div>
+                    
+                    ${alert.states ? `
+                        <div class="text-muted small mt-1">
+                            <i class="fas fa-flag me-1"></i>
+                            States: ${alert.states.join(', ')}
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div class="col-md-4 text-end">
+                    <div class="text-muted small mb-1">
+                        <i class="fas fa-clock me-1"></i>
+                        ${alert.effective ? new Date(alert.effective).toLocaleString() : 'Time unknown'}
+                    </div>
+                    
+                    ${alert.expires ? `
+                        <div class="text-muted small mb-1">
+                            <i class="fas fa-hourglass-end me-1"></i>
+                            Expires: ${new Date(alert.expires).toLocaleString()}
+                        </div>
+                    ` : ''}
+                    
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="viewAlertDetails('${alert.id}')">
+                            <i class="fas fa-eye me-1"></i>Details
+                        </button>
+                        ${alert.webhook_triggered ? '<span class="badge bg-success"><i class="fas fa-paper-plane me-1"></i>Webhook Sent</span>' : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function getUrgencyColor(urgency) {
+    switch(urgency?.toLowerCase()) {
+        case 'immediate': return 'danger';
+        case 'expected': return 'warning';
+        case 'future': return 'info';
+        default: return 'secondary';
+    }
+}
+
+function updateStatistics(alerts) {
+    document.getElementById('totalAlertsCount').textContent = alerts.length;
+    
+    const radarConfirmed = alerts.filter(a => a.radar_indicated || a.certainty === 'Observed').length;
+    document.getElementById('radarConfirmedCount').textContent = radarConfirmed;
+    
+    const statesSet = new Set();
+    alerts.forEach(alert => {
+        if (alert.states) {
+            alert.states.forEach(state => statesSet.add(state));
+        }
+    });
+    document.getElementById('statesAffectedCount').textContent = statesSet.size;
+    
+    const webhooksTriggered = alerts.filter(a => a.webhook_triggered).length;
+    document.getElementById('webhooksTriggeredCount').textContent = webhooksTriggered;
+}
+
+function filterAlerts() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const stateFilter = document.getElementById('stateFilter').value;
+    const typeFilter = document.getElementById('typeFilter').value.toLowerCase();
+    const urgencyFilter = document.getElementById('urgencyFilter').value;
+    
+    const alertCards = document.querySelectorAll('.alert-card');
+    let visibleCount = 0;
+    
+    alertCards.forEach(card => {
+        const alertData = JSON.parse(card.dataset.alert);
+        let visible = true;
+        
+        // Search filter
+        if (searchTerm && !alertData.area_desc?.toLowerCase().includes(searchTerm)) {
+            visible = false;
+        }
+        
+        // State filter
+        if (stateFilter && (!alertData.states || !alertData.states.includes(stateFilter))) {
+            visible = false;
+        }
+        
+        // Type filter
+        if (typeFilter && !alertData.event?.toLowerCase().includes(typeFilter)) {
+            visible = false;
+        }
+        
+        // Urgency filter
+        if (urgencyFilter && alertData.urgency !== urgencyFilter) {
+            visible = false;
+        }
+        
+        card.style.display = visible ? 'block' : 'none';
+        if (visible) visibleCount++;
+    });
+    
+    document.getElementById('filteredCount').textContent = `${visibleCount} alert${visibleCount !== 1 ? 's' : ''}`;
+}
+
+function clearAllFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('stateFilter').value = '';
+    document.getElementById('typeFilter').value = '';
+    document.getElementById('urgencyFilter').value = '';
+    filterAlerts();
+}
+
+function startAutoRefresh() {
+    stopAutoRefresh(); // Clear any existing interval
+    autoRefreshInterval = setInterval(loadLiveAlerts, 30000); // Refresh every 30 seconds
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+}
+
+function viewAlertDetails(alertId) {
+    // This would open alert details - you can customize based on your needs
+    window.open(`/alerts/${alertId}`, '_blank');
+}
+
+function displayError(message) {
+    const container = document.getElementById('alertsContainer');
+    container.innerHTML = `
+        <div class="text-center p-4">
+            <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+            <h5 class="text-warning">Error Loading Alerts</h5>
+            <p class="text-muted">${message}</p>
+            <button class="btn btn-primary" onclick="loadLiveAlerts()">
+                <i class="fas fa-sync-alt me-1"></i>Try Again
+            </button>
+        </div>
+    `;
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+</script>
+{% endblock %}
