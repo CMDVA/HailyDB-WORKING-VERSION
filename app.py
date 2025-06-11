@@ -3106,7 +3106,7 @@ def get_radar_alerts_stats():
 @app.route('/api/radar-alerts/direct')
 def get_direct_radar_alerts():
     """
-    Direct query of radar-detected alerts with minimal filtering
+    Direct query combining both alerts table and radar_alerts table for complete historical data
     """
     try:
         # Get query parameters
@@ -3120,22 +3120,84 @@ def get_direct_radar_alerts():
         start_date = request.args.get('start_date', '').strip()
         end_date = request.args.get('end_date', '').strip()
         
-        # Build base query for alerts with legitimate radar-detected data
-        # Must have "radar indicated" in description AND qualifying hail/wind data
+        from models import RadarAlert
+        from datetime import datetime, timedelta
+        
+        # Combine results from both tables
+        combined_results = []
+        
+        # Query radar_alerts table (historical backfill data)
+        radar_query = RadarAlert.query
+        
+        # Apply filters to radar_alerts
+        if search:
+            search_pattern = f'%{search}%'
+            radar_query = radar_query.filter(
+                db.or_(
+                    db.func.array_to_string(RadarAlert.city_names, ',').ilike(search_pattern),
+                    db.func.array_to_string(RadarAlert.county_names, ',').ilike(search_pattern)
+                )
+            )
+        
+        if state:
+            radar_query = radar_query.filter(
+                db.func.array_to_string(RadarAlert.city_names, ',').ilike(f'%{state}%')
+            )
+        
+        if min_hail:
+            radar_query = radar_query.filter(RadarAlert.hail_inches >= min_hail)
+            
+        if min_wind:
+            radar_query = radar_query.filter(RadarAlert.wind_mph >= min_wind)
+        
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                radar_query = radar_query.filter(RadarAlert.detected_time >= start_dt)
+            except ValueError:
+                pass
+        
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+                radar_query = radar_query.filter(RadarAlert.detected_time < end_dt)
+            except ValueError:
+                pass
+        
+        # Get radar_alerts results
+        radar_alerts = radar_query.order_by(RadarAlert.detected_time.desc()).all()
+        
+        # Convert radar_alerts to common format
+        for ra in radar_alerts:
+            combined_results.append({
+                'id': ra.alert_id,
+                'event': 'Severe Thunderstorm Warning',
+                'effective': ra.detected_time.isoformat() if ra.detected_time else None,
+                'area_desc': ', '.join(ra.city_names) if ra.city_names else '',
+                'radar_indicated': {
+                    'hail_inches': ra.hail_inches or 0,
+                    'wind_mph': ra.wind_mph or 0
+                },
+                'city_names': ra.city_names or [],
+                'severity': 'Severe',
+                'source': 'radar_alerts_table'
+            })
+        
+        # Query main alerts table for current events
         hail_condition = Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0
         wind_condition = Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50
         radar_source_condition = Alert.properties['description'].astext.ilike('%radar indicated%')
         
-        query = Alert.query.filter(
+        alerts_query = Alert.query.filter(
             Alert.radar_indicated.isnot(None),
             radar_source_condition,
             db.or_(hail_condition, wind_condition)
         )
         
-        # Apply search filter
+        # Apply same filters to alerts table
         if search:
             search_pattern = f'%{search}%'
-            query = query.filter(
+            alerts_query = alerts_query.filter(
                 db.or_(
                     Alert.event.ilike(search_pattern),
                     Alert.area_desc.ilike(search_pattern),
@@ -3143,50 +3205,54 @@ def get_direct_radar_alerts():
                 )
             )
         
-        # Apply state filter
         if state:
-            query = query.filter(Alert.area_desc.ilike(f'%{state}%'))
+            alerts_query = alerts_query.filter(Alert.area_desc.ilike(f'%{state}%'))
         
-        # Apply event type filter
         if event_type:
-            query = query.filter(Alert.event.ilike(f'%{event_type}%'))
+            alerts_query = alerts_query.filter(Alert.event.ilike(f'%{event_type}%'))
         
-        # Apply hail size filter
         if min_hail:
-            query = query.filter(Alert.radar_indicated['hail_inches'].astext.cast(db.Float) >= min_hail)
+            alerts_query = alerts_query.filter(Alert.radar_indicated['hail_inches'].astext.cast(db.Float) >= min_hail)
         
-        # Apply wind speed filter
         if min_wind:
-            query = query.filter(Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= min_wind)
+            alerts_query = alerts_query.filter(Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= min_wind)
         
-        # Apply date range filters
         if start_date:
             try:
-                from datetime import datetime
                 start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-                query = query.filter(Alert.effective >= start_dt)
+                alerts_query = alerts_query.filter(Alert.effective >= start_dt)
             except ValueError:
                 pass
         
         if end_date:
             try:
-                from datetime import datetime, timedelta
                 end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
-                query = query.filter(Alert.effective < end_dt)
+                alerts_query = alerts_query.filter(Alert.effective < end_dt)
             except ValueError:
                 pass
         
-        # Get total count
-        total = query.count()
+        # Get current alerts
+        current_alerts = alerts_query.order_by(Alert.effective.desc()).all()
         
-        # Apply pagination and ordering
-        alerts = query.order_by(Alert.effective.desc()).offset((page - 1) * limit).limit(limit).all()
+        # Add current alerts to combined results
+        for alert in current_alerts:
+            alert_dict = alert.to_dict()
+            alert_dict['source'] = 'alerts_table'
+            combined_results.append(alert_dict)
         
-        # Calculate pagination info
+        # Sort combined results by effective time
+        combined_results.sort(key=lambda x: x.get('effective', ''), reverse=True)
+        
+        # Apply pagination
+        total = len(combined_results)
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        paginated_results = combined_results[start_idx:end_idx]
+        
         pages = (total + limit - 1) // limit
         
         return jsonify({
-            'alerts': [alert.to_dict() for alert in alerts],
+            'alerts': paginated_results,
             'total': total,
             'page': page,
             'limit': limit,
