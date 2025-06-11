@@ -383,3 +383,142 @@ class WebhookService:
         except Exception as e:
             logger.error(f"Failed to log webhook dispatch: {e}")
             # Don't raise - webhook logging failure shouldn't break the webhook system
+    
+    def evaluate_live_radar_alert(self, live_alert_data: Dict[str, Any]) -> Dict[str, int]:
+        """
+        Evaluate webhook rules against a single live radar alert
+        
+        Args:
+            live_alert_data: Dictionary containing live radar alert information
+            
+        Returns:
+            Dictionary with evaluation statistics
+        """
+        try:
+            from models import WebhookRule
+            
+            # Get all active webhook rules
+            rules = self.db.session.query(WebhookRule).filter_by(is_active=True).all()
+            
+            dispatched = 0
+            failed = 0
+            rules_evaluated = 0
+            
+            for rule in rules:
+                rules_evaluated += 1
+                if self._evaluate_live_radar_condition(rule, live_alert_data):
+                    success = self._dispatch_live_radar_webhook(rule, live_alert_data)
+                    if success:
+                        dispatched += 1
+                    else:
+                        failed += 1
+            
+            logger.info(f"Live radar webhook evaluation: {dispatched} dispatched, {failed} failed")
+            
+            return {
+                'dispatched': dispatched,
+                'failed': failed,
+                'rules_evaluated': rules_evaluated
+            }
+            
+        except Exception as e:
+            logger.error(f"Error evaluating live radar webhooks: {e}")
+            return {'dispatched': 0, 'failed': 1, 'rules_evaluated': 0, 'error': str(e)}
+    
+    def _evaluate_live_radar_condition(self, rule: WebhookRule, live_alert_data: Dict[str, Any]) -> bool:
+        """
+        Evaluate if a webhook rule condition is met for a live radar alert
+        """
+        try:
+            # Check location filter
+            if rule.location_filter:
+                alert_states = live_alert_data.get('affected_states', [])
+                counties = live_alert_data.get('county_names', [])
+                if not self._location_matches_live_alert(rule.location_filter, alert_states, counties):
+                    return False
+            
+            # Evaluate based on event type and thresholds
+            if rule.event_type == 'hail':
+                hail_size = live_alert_data.get('maxHailSize', 0)
+                return hail_size and hail_size >= rule.threshold_value
+                
+            elif rule.event_type == 'wind':
+                wind_gust = live_alert_data.get('maxWindGust', 0)
+                return wind_gust and wind_gust >= rule.threshold_value
+                
+            elif rule.event_type == 'damage_probability':
+                # For live alerts, use radar indication as proxy for damage probability
+                return live_alert_data.get('radar_indicated_event', False)
+                
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error evaluating live radar condition for rule {rule.id}: {e}")
+            return False
+    
+    def _location_matches_live_alert(self, location_filter: str, affected_states: list, counties: list) -> bool:
+        """Check if location filter matches live radar alert location data"""
+        filter_upper = location_filter.upper()
+        
+        # Check states
+        for state in affected_states:
+            if state.upper() in filter_upper:
+                return True
+        
+        # Check counties
+        for county in counties:
+            if county.upper() in filter_upper:
+                return True
+                
+        return False
+    
+    def _dispatch_live_radar_webhook(self, rule: WebhookRule, live_alert_data: Dict[str, Any]) -> bool:
+        """
+        Dispatch webhook for live radar alert
+        """
+        try:
+            import requests
+            from datetime import datetime
+            
+            # Prepare webhook payload with live radar alert data
+            payload = {
+                'rule_id': rule.id,
+                'rule_name': rule.name,
+                'alert_type': 'live_radar',
+                'timestamp': datetime.utcnow().isoformat(),
+                'alert_data': {
+                    'id': live_alert_data.get('id'),
+                    'event': live_alert_data.get('event'),
+                    'maxHailSize': live_alert_data.get('maxHailSize'),
+                    'maxWindGust': live_alert_data.get('maxWindGust'),
+                    'area_desc': live_alert_data.get('area_desc'),
+                    'affected_states': live_alert_data.get('affected_states'),
+                    'county_names': live_alert_data.get('county_names'),
+                    'certainty': live_alert_data.get('certainty'),
+                    'urgency': live_alert_data.get('urgency'),
+                    'severity': live_alert_data.get('severity'),
+                    'radar_indicated_event': live_alert_data.get('radar_indicated_event'),
+                    'alert_message_template': live_alert_data.get('alert_message_template'),
+                    'effective_time': live_alert_data.get('effective_time'),
+                    'expires_time': live_alert_data.get('expires_time')
+                }
+            }
+            
+            # Send webhook
+            response = requests.post(
+                rule.webhook_url,
+                json=payload,
+                headers={'Content-Type': 'application/json'},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Live radar webhook dispatched successfully to {rule.webhook_url}")
+                return True
+            else:
+                logger.warning(f"Live radar webhook failed with status {response.status_code}: {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error dispatching live radar webhook for rule {rule.id}: {e}")
+            return False

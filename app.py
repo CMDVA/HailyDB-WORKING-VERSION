@@ -3784,7 +3784,12 @@ if __name__ == '__main__':
         # Initialize live radar alert service
         try:
             from live_radar_service import init_live_radar_service, start_live_radar_service
-            init_live_radar_service(db.session)
+            # Use a fresh session for the service
+            from sqlalchemy.orm import sessionmaker
+            Session = sessionmaker(bind=db.engine)
+            service_session = Session()
+            
+            init_live_radar_service(service_session)
             start_live_radar_service()
             print("Live radar alert service initialized and started")
         except Exception as e:
