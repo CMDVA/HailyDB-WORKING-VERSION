@@ -657,6 +657,26 @@ def search_alerts():
             Alert.expires > now
         )
     
+    # Date range filters
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    if start_date:
+        try:
+            from datetime import datetime
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            query = query.filter(Alert.effective >= start_dt)
+        except ValueError:
+            pass  # Invalid date format, ignore
+    
+    if end_date:
+        try:
+            from datetime import datetime, timedelta
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Alert.effective < end_dt)
+        except ValueError:
+            pass  # Invalid date format, ignore
+    
     # Radar-detected filters
     has_radar_data = request.args.get('has_radar_data', 'false').lower() == 'true'
     min_hail = request.args.get('min_hail', type=float)
