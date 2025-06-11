@@ -1139,7 +1139,27 @@ def internal_dashboard():
     except Exception as e:
         logger.error(f"Error loading dashboard: {e}")
         flash(f'Error loading dashboard: {str(e)}', 'error')
-        return render_template('dashboard.html', stats={})
+        # Provide default values for error case
+        default_stats = {
+            'total_alerts': 0,
+            'enriched_alerts': 0,
+            'recent_alerts_24h': 0,
+            'spc_total_reports': 0,
+            'db_metrics': {
+                'ingestion_rate_per_minute': 0,
+                'storage_efficiency': 0,
+                'data_freshness_hours': 0,
+                'processing_queue_size': 0,
+                'error_rate_percent': 0,
+                'uptime_hours': 0,
+                'cost_per_alert': 0,
+                'monthly_cost_estimate': 0
+            }
+        }
+        return render_template('dashboard.html', 
+                             stats=default_stats, 
+                             todays_alerts=[], 
+                             todays_spc_reports=[])
 
 @app.route('/internal/cron', methods=['POST'])
 def internal_cron():

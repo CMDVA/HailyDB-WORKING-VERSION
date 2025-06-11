@@ -361,25 +361,25 @@
                                     {% for report in todays_spc_reports[:10] %}
                                     <tr>
                                         <td class="text-nowrap">
-                                            <small>{{ report.time.strftime('%H:%M') if report.time else '--' }}</small>
+                                            <small>{{ report.time_utc[:2] + ':' + report.time_utc[2:] if report.time_utc else '--' }}</small>
                                         </td>
                                         <td>
                                             <span class="badge 
-                                                {% if report.type == 'Tornado' %}badge-danger
-                                                {% elif report.type == 'Hail' %}badge-info
-                                                {% elif report.type == 'Wind' %}badge-warning
+                                                {% if report.report_type == 'tornado' %}badge-danger
+                                                {% elif report.report_type == 'hail' %}badge-info
+                                                {% elif report.report_type == 'wind' %}badge-warning
                                                 {% else %}badge-secondary{% endif %}">
-                                                {{ report.type }}
+                                                {{ report.report_type|title }}
                                             </span>
                                         </td>
                                         <td class="small">{{ report.location[:20] }}...</td>
                                         <td class="small">
-                                            {% if report.type == 'Hail' and report.size %}
-                                                {{ report.size }}"
-                                            {% elif report.type == 'Wind' and report.speed %}
-                                                {{ report.speed }} mph
-                                            {% elif report.magnitude %}
-                                                {{ report.magnitude }}
+                                            {% if report.report_type == 'hail' and report.magnitude and report.magnitude.size %}
+                                                {{ report.magnitude.size }}"
+                                            {% elif report.report_type == 'wind' and report.magnitude and report.magnitude.speed %}
+                                                {{ report.magnitude.speed }} mph
+                                            {% elif report.magnitude and report.magnitude.f_scale %}
+                                                F{{ report.magnitude.f_scale }}
                                             {% else %}
                                                 --
                                             {% endif %}
@@ -426,12 +426,78 @@
 </div>
 
 <script>
-// Dashboard data initialization
-const dashboardData = {{ stats|tojson }};
-
 // Initialize dashboard when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    initializeDashboard();
+    console.log('Dashboard loaded successfully');
+    
+    // Load SPC verification calendar if container exists
+    const spcContainer = document.getElementById('spc-verification-table');
+    if (spcContainer) {
+        loadSPCVerificationCalendar();
+    }
 });
+
+function loadSPCVerificationCalendar() {
+    fetch('/spc-calendar-verification')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('spc-verification-table');
+            if (container && data.calendar_html) {
+                container.innerHTML = data.calendar_html;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading SPC verification:', error);
+            const container = document.getElementById('spc-verification-table');
+            if (container) {
+                container.innerHTML = '<p class="text-muted">Unable to load SPC verification data</p>';
+            }
+        });
+}
+
+function refreshDashboard() {
+    location.reload();
+}
+
+function onPlayScheduler() {
+    fetch('/start-autonomous-scheduler', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('play-scheduler').classList.add('d-none');
+                document.getElementById('pause-scheduler').classList.remove('d-none');
+            }
+        });
+}
+
+function onPauseScheduler() {
+    fetch('/stop-autonomous-scheduler', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('pause-scheduler').classList.add('d-none');
+                document.getElementById('play-scheduler').classList.remove('d-none');
+            }
+        });
+}
+
+function triggerIngestion() {
+    const button = document.getElementById('trigger-nws');
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+    
+    fetch('/trigger-nws-poll', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            setTimeout(() => {
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-sync"></i> Trigger Now';
+            }, 2000);
+        })
+        .catch(error => {
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-sync"></i> Trigger Now';
+        });
+}
 </script>
 {% endblock %}
