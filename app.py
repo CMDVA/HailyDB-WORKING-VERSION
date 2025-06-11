@@ -2163,6 +2163,11 @@ def view_radar_alerts():
     """View radar-detected alerts interface"""
     return render_template('radar_alerts.html')
 
+@app.route('/address-targeting')
+def address_targeting():
+    """Address-specific weather event targeting interface"""
+    return render_template('address_targeting.html')
+
 @app.route('/webhook-management')
 def webhook_management():
     """View webhook management interface"""
@@ -2865,10 +2870,13 @@ def contains_address():
         if end_date:
             query = query.filter(Alert.effective <= end_date)
         
-        # Use PostGIS ST_Contains for point-in-polygon test
-        point_wkt = f"POINT({lon} {lat})"
+        # Filter by bounding box first for performance, then do precise point-in-polygon test
+        bbox_margin = 0.1  # ~11km margin for initial filtering
         query = query.filter(
-            db.text("ST_Contains(ST_GeomFromGeoJSON(geometry), ST_GeomFromText(:point, 4326))").params(point=point_wkt)
+            db.text("geometry_bounds->>'min_lat' <= :max_lat").params(max_lat=str(lat + bbox_margin)),
+            db.text("geometry_bounds->>'max_lat' >= :min_lat").params(min_lat=str(lat - bbox_margin)),
+            db.text("geometry_bounds->>'min_lon' <= :max_lon").params(max_lon=str(lon + bbox_margin)),
+            db.text("geometry_bounds->>'max_lon' >= :min_lon").params(min_lon=str(lon - bbox_margin))
         )
         
         alerts = query.order_by(Alert.effective.desc()).all()
