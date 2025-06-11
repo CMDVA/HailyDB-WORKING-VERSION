@@ -1,0 +1,162 @@
+"Enhance HailyDB Hurricane Ingestion and API for Actionable Insurance & Restoration Use Cases — v1"
+
+OBJECTIVE:
+Current hurricane track ingestion is too thin to support real-world insurance/restoration applications.
+We need full ingestion and serving of data necessary for:
+
+✅ IDOLCheck lead targeting
+✅ Adjuster reports
+✅ Marketing segmentation
+✅ Damage probability scoring
+
+REQUIRED CHANGES:
+1️⃣ Ingestion Improvements
+Source: NOAA HURDAT2 full dataset
+
+✅ Fully parse ALL track points for each storm:
+
+timestamp
+
+lat
+
+lon
+
+wind_mph (max sustained winds)
+
+pressure_mb
+
+storm status (TD/TS/Cat1/2/3/4/5)
+
+landfall flag per point (if available — or compute based on US land intersection)
+
+✅ For each storm, compute and store:
+
+first landfall location and time (if any)
+
+max category achieved
+
+closest approach to US land
+
+total number of landfall points
+
+✅ If available in source:
+
+34kt/50kt/64kt wind radii per quadrant at each timestamp → ingest these
+(highly valuable for per-county impact scoring)
+
+2️⃣ Per-County Impact Analysis
+For each storm:
+
+✅ Compute which US counties were affected by:
+
+direct landfall
+
+within X miles of storm track center
+
+within storm wind field (>34kt, >50kt, >64kt if data available)
+
+✅ Store:
+
+storm_id
+
+county_fips
+
+min_distance_to_center_miles
+
+max_wind_mph_observed
+
+in_landfall_zone (bool)
+
+wind_field_category (highest quadrant category intersecting county)
+
+3️⃣ Database Changes
+✅ Add table:
+
+sql
+Copy
+Edit
+CREATE TABLE hurricane_county_impacts (
+    id SERIAL PRIMARY KEY,
+    storm_id VARCHAR(20) NOT NULL,
+    county_fips VARCHAR(5) NOT NULL,
+    min_distance_to_center_miles DECIMAL(6,2),
+    max_wind_mph_observed INTEGER,
+    in_landfall_zone BOOLEAN DEFAULT FALSE,
+    wind_field_category VARCHAR(10),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+✅ Add full track_points JSONB field to hurricane_tracks table:
+
+sql
+Copy
+Edit
+ALTER TABLE hurricane_tracks ADD COLUMN track_points JSONB;
+4️⃣ API Enhancements
+✅ Add endpoint:
+
+GET /api/hurricane-tracks/{storm_id}/track
+
+Returns:
+
+json
+Copy
+Edit
+{
+  storm_id: "...",
+  name: "...",
+  track_points: [
+    {
+      timestamp: "...",
+      lat: ...,
+      lon: ...,
+      wind_mph: ...,
+      pressure_mb: ...,
+      status: "...",
+      is_landfall: true/false
+    },
+    ...
+  ]
+}
+✅ Add endpoint:
+
+GET /api/hurricane-tracks/{storm_id}/affected-counties
+
+Returns:
+
+json
+Copy
+Edit
+{
+  storm_id: "...",
+  name: "...",
+  affected_counties: [
+    {
+      county_fips: "...",
+      min_distance_to_center_miles: ...,
+      max_wind_mph_observed: ...,
+      in_landfall_zone: true/false,
+      wind_field_category: "64kt"/"50kt"/"34kt"/"TS"/null
+    },
+    ...
+  ]
+}
+ADDITIONAL GUIDANCE:
+✅ Use PostGIS where possible for distance calculations and polygon intersection
+✅ Use FEMA or Census TIGER/Line county boundaries for US counties (already present in project)
+✅ For landfall detection:
+
+Use intersection of storm track with US land polygon OR
+
+Use landfall flag from source if available
+
+RESULTING BUSINESS VALUE:
+Insurance & adjusters: Can target claims by county / storm impact
+
+IDOLCheck: Can run filters "homes affected by Hurricane X in county Y"
+
+Restoration marketing: Can segment by wind field exposure
+
+HailyAI: Can build damage probability scoring per county
+
+AGENT TASK PRIORITY:
+This is a PRIORITY TASK for HailyDB ingestion pipeline v2.1

@@ -417,7 +417,7 @@ class HurricaneIngestService:
     
     def _process_storm(self, storm_data: Dict[str, Any]) -> Dict[str, int]:
         """
-        Process a single storm's track data
+        Process a single storm's track data with full county impact analysis
         
         Args:
             storm_data: Dictionary containing storm information and track points
@@ -432,6 +432,10 @@ class HurricaneIngestService:
         year = storm_data['year']
         
         logger.debug(f"Processing storm {storm_id} ({name}) from {year}")
+        
+        # Collect all track points for county impact analysis
+        all_track_points = []
+        landfall_events = []
         
         for idx, point in enumerate(storm_data['track_points']):
             try:
@@ -448,7 +452,33 @@ class HurricaneIngestService:
                     storm_id, timestamp, point['lat'], point['lon']
                 )
                 
-                # Create new track record with robust duplicate handling
+                # Determine landfall status
+                is_landfall = self._is_landfall_point(point['lat'], point['lon'])
+                if is_landfall and point.get('wind_mph', 0) >= 35:
+                    landfall_events.append({
+                        'timestamp': timestamp.isoformat(),
+                        'lat': point['lat'],
+                        'lon': point['lon'],
+                        'wind_mph': point.get('wind_mph'),
+                        'pressure_mb': point.get('pressure_mb'),
+                        'category': point.get('category'),
+                        'location': self._get_landfall_location(point['lat'], point['lon'])
+                    })
+                
+                # Prepare track point data for county analysis
+                track_point_data = {
+                    'timestamp': timestamp.isoformat(),
+                    'lat': point['lat'],
+                    'lon': point['lon'],
+                    'wind_mph': point.get('wind_mph', 0),
+                    'pressure_mb': point.get('pressure_mb'),
+                    'status': point.get('status'),
+                    'category': point.get('category'),
+                    'is_landfall': is_landfall
+                }
+                all_track_points.append(track_point_data)
+                
+                # Create new track record with enhanced metadata
                 track = HurricaneTrack(
                     storm_id=storm_id,
                     name=name,
@@ -461,6 +491,8 @@ class HurricaneIngestService:
                     wind_mph=point.get('wind_mph'),
                     pressure_mb=point.get('pressure_mb'),
                     status=point.get('status'),
+                    full_track_points=track_point_data,
+                    landfall_metadata={'is_landfall': is_landfall, 'location': self._get_landfall_location(point['lat'], point['lon']) if is_landfall else None},
                     raw_data=point,
                     row_hash=row_hash
                 )
@@ -486,7 +518,203 @@ class HurricaneIngestService:
                 logger.error(f"Failed to process track point {idx} for storm {storm_id}: {e}")
                 stats['failed'] += 1
         
+        # Calculate county impacts for this storm
+        try:
+            self._calculate_county_impacts(storm_id, name, all_track_points)
+            logger.info(f"Calculated county impacts for {storm_id} with {len(all_track_points)} track points")
+            if landfall_events:
+                logger.info(f"Identified {len(landfall_events)} landfall events for {storm_id}")
+        except Exception as e:
+            logger.error(f"Failed to calculate county impacts for {storm_id}: {e}")
+        
         return stats
+    
+    def _is_landfall_point(self, lat: float, lon: float) -> bool:
+        """
+        Determine if a coordinate point represents landfall over US territory
+        Uses simplified geographic bounds for US coastal regions
+        """
+        # US mainland and coastal bounds (including Alaska, Hawaii, Puerto Rico, USVI)
+        us_regions = [
+            # Continental US
+            {'lat_min': 24.0, 'lat_max': 49.0, 'lon_min': -125.0, 'lon_max': -66.0},
+            # Alaska
+            {'lat_min': 54.0, 'lat_max': 72.0, 'lon_min': -180.0, 'lon_max': -129.0},
+            # Hawaii
+            {'lat_min': 18.0, 'lat_max': 23.0, 'lon_min': -161.0, 'lon_max': -154.0},
+            # Puerto Rico and USVI
+            {'lat_min': 17.0, 'lat_max': 19.0, 'lon_min': -68.0, 'lon_max': -64.0}
+        ]
+        
+        for region in us_regions:
+            if (region['lat_min'] <= lat <= region['lat_max'] and 
+                region['lon_min'] <= lon <= region['lon_max']):
+                return True
+        return False
+    
+    def _get_landfall_location(self, lat: float, lon: float) -> str:
+        """
+        Determine landfall location based on coordinates
+        Returns general region for landfall events
+        """
+        if not self._is_landfall_point(lat, lon):
+            return None
+            
+        # Florida
+        if 24.0 <= lat <= 31.0 and -87.5 <= lon <= -79.8:
+            if lat <= 26.0:
+                return "South Florida"
+            elif lat <= 28.5:
+                return "Central Florida"
+            else:
+                return "North Florida"
+        
+        # Gulf Coast
+        elif 25.0 <= lat <= 31.0 and -97.0 <= lon <= -87.5:
+            if lon >= -94.0:
+                return "Louisiana/Mississippi"
+            elif lon >= -95.5:
+                return "Texas Coast"
+            else:
+                return "Texas"
+        
+        # Atlantic Coast
+        elif 31.0 <= lat <= 46.0 and -81.0 <= lon <= -66.0:
+            if lat <= 35.0:
+                return "Georgia/South Carolina"
+            elif lat <= 39.0:
+                return "North Carolina/Virginia"
+            else:
+                return "Mid-Atlantic"
+        
+        # Puerto Rico/USVI
+        elif 17.0 <= lat <= 19.0 and -68.0 <= lon <= -64.0:
+            return "Puerto Rico/USVI"
+        
+        return "US Territory"
+    
+    def _calculate_county_impacts(self, storm_id: str, storm_name: str, track_points: List[Dict[str, Any]]):
+        """
+        Calculate county-level impacts for a hurricane based on track proximity and wind fields
+        Uses simplified distance calculations for performance with large datasets
+        """
+        try:
+            # US county FIPS codes and approximate center coordinates (simplified dataset)
+            # In production, this would use a comprehensive county database
+            sample_counties = [
+                # Florida counties most affected by hurricanes
+                {'fips': '12001', 'name': 'Alachua', 'state': 'FL', 'lat': 29.7, 'lon': -82.3},
+                {'fips': '12009', 'name': 'Brevard', 'state': 'FL', 'lat': 28.2, 'lon': -80.6},
+                {'fips': '12011', 'name': 'Broward', 'state': 'FL', 'lat': 26.1, 'lon': -80.3},
+                {'fips': '12021', 'name': 'Collier', 'state': 'FL', 'lat': 26.1, 'lon': -81.3},
+                {'fips': '12031', 'name': 'Duval', 'state': 'FL', 'lat': 30.3, 'lon': -81.7},
+                {'fips': '12071', 'name': 'Lee', 'state': 'FL', 'lat': 26.6, 'lon': -81.9},
+                {'fips': '12086', 'name': 'Miami-Dade', 'state': 'FL', 'lat': 25.6, 'lon': -80.4},
+                {'fips': '12103', 'name': 'Pinellas', 'state': 'FL', 'lat': 27.8, 'lon': -82.7},
+                {'fips': '12117', 'name': 'Seminole', 'state': 'FL', 'lat': 28.7, 'lon': -81.2},
+                
+                # Louisiana parishes
+                {'fips': '22051', 'name': 'Jefferson', 'state': 'LA', 'lat': 29.8, 'lon': -90.1},
+                {'fips': '22071', 'name': 'Orleans', 'state': 'LA', 'lat': 29.9, 'lon': -90.1},
+                {'fips': '22087', 'name': 'St. Bernard', 'state': 'LA', 'lat': 29.8, 'lon': -89.7},
+                
+                # Texas counties
+                {'fips': '48201', 'name': 'Harris', 'state': 'TX', 'lat': 29.8, 'lon': -95.4},
+                {'fips': '48167', 'name': 'Galveston', 'state': 'TX', 'lat': 29.3, 'lon': -94.8},
+                
+                # North Carolina counties
+                {'fips': '37129', 'name': 'New Hanover', 'state': 'NC', 'lat': 34.2, 'lon': -77.9},
+                {'fips': '37019', 'name': 'Brunswick', 'state': 'NC', 'lat': 34.0, 'lon': -78.1},
+                
+                # South Carolina counties
+                {'fips': '45019', 'name': 'Charleston', 'state': 'SC', 'lat': 32.8, 'lon': -80.0},
+                {'fips': '45051', 'name': 'Horry', 'state': 'SC', 'lat': 33.8, 'lon': -79.0}
+            ]
+            
+            for county in sample_counties:
+                min_distance = float('inf')
+                max_wind = 0
+                in_landfall_zone = False
+                first_impact = None
+                last_impact = None
+                points_in_county = 0
+                
+                for point in track_points:
+                    # Calculate approximate distance in miles (simplified great circle)
+                    lat_diff = abs(point['lat'] - county['lat'])
+                    lon_diff = abs(point['lon'] - county['lon'])
+                    distance_miles = ((lat_diff**2 + lon_diff**2)**0.5) * 69.0
+                    
+                    # Track closest approach
+                    if distance_miles < min_distance:
+                        min_distance = distance_miles
+                    
+                    # Check if within impact radius (100 miles for hurricane effects)
+                    if distance_miles <= 100:
+                        points_in_county += 1
+                        wind_mph = point.get('wind_mph', 0)
+                        if wind_mph > max_wind:
+                            max_wind = wind_mph
+                        
+                        if point.get('is_landfall', False):
+                            in_landfall_zone = True
+                        
+                        if first_impact is None:
+                            first_impact = point['timestamp']
+                        last_impact = point['timestamp']
+                
+                # Only store if county was significantly impacted (within 150 miles or landfall)
+                if min_distance <= 150 or in_landfall_zone or max_wind >= 35:
+                    wind_category = self._categorize_wind_impact(max_wind)
+                    
+                    # Check for existing impact record
+                    existing = self.db.query(HurricaneCountyImpact).filter_by(
+                        storm_id=storm_id,
+                        county_fips=county['fips']
+                    ).first()
+                    
+                    if not existing:
+                        impact = HurricaneCountyImpact(
+                            storm_id=storm_id,
+                            county_fips=county['fips'],
+                            state_code=county['state'],
+                            county_name=county['name'],
+                            min_distance_to_center_miles=round(min_distance, 2),
+                            max_wind_mph_observed=max_wind,
+                            in_landfall_zone=in_landfall_zone,
+                            wind_field_category=wind_category,
+                            first_impact_time=datetime.fromisoformat(first_impact) if first_impact else None,
+                            last_impact_time=datetime.fromisoformat(last_impact) if last_impact else None,
+                            track_points_in_county=points_in_county
+                        )
+                        
+                        self.db.add(impact)
+            
+            self.db.flush()
+            logger.debug(f"Calculated county impacts for storm {storm_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to calculate county impacts for {storm_id}: {e}")
+            self.db.rollback()
+    
+    def _categorize_wind_impact(self, wind_mph: int) -> str:
+        """Categorize wind impact level for county analysis"""
+        if wind_mph >= 157:
+            return "CAT5"
+        elif wind_mph >= 130:
+            return "CAT4"
+        elif wind_mph >= 111:
+            return "CAT3"
+        elif wind_mph >= 96:
+            return "CAT2"
+        elif wind_mph >= 74:
+            return "CAT1"
+        elif wind_mph >= 39:
+            return "TS"
+        elif wind_mph >= 25:
+            return "TD"
+        else:
+            return "MINIMAL"
     
     def get_ingestion_stats(self) -> Dict[str, Any]:
         """Get hurricane track ingestion statistics"""

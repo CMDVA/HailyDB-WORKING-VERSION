@@ -1,0 +1,81 @@
+What this does NOT show (and should):
+✅ Full list of track points:
+
+json
+Copy
+Edit
+[
+  { "timestamp": ..., "lat": ..., "lon": ..., "wind_mph": ..., "pressure_mb": ..., "status": ... },
+  ...
+]
+✅ Closest approach to U.S. land
+
+✅ County FIPS codes affected (derived geometry intersection → you want this badly for insurance)
+
+✅ Rainfall totals (if available in source — some HURDAT2 enriched datasets include this)
+
+✅ Wind radii (quadrant-based — in good datasets you can get 34kt/50kt/64kt wind radii in each quadrant — valuable for estimating which counties were in damaging wind fields)
+
+✅ Landfall metadata:
+
+json
+Copy
+Edit
+{
+  "location": "...",
+  "timestamp": "...",
+  "category": "...",
+  "wind_mph": ...
+}
+✅ Flags for TS vs Cat1 vs Cat2+ impacting land
+
+Why this matters:
+👉 Just telling IDOLCheck "this storm happened" with a name + dates + 2 points is nearly worthless for claim targeting.
+
+👉 What you want:
+
+1️⃣ Per-county affected FIPS mapping
+→ Ties into IDOLCheck’s ZIP/FIPS filtering for prospect targeting
+
+2️⃣ Per-timestamp wind field data
+→ Which areas saw hurricane-force vs TS-force winds
+
+3️⃣ Landfall metadata
+→ Critical — adjusters LOVE "landfall at X mph in county Y"
+
+4️⃣ Track visualization
+→ Simple endpoint to return full track points → needed for map display in web apps
+
+5️⃣ Impact scoring per county
+→ You can build a simple impact score per county:
+- Proximity to track center
+- Max wind recorded
+- In quadrant with 50kt+ winds
+- Landfall or not
+→ This can feed a "probability of damage" heuristic for marketing / claim work.
+
+Conclusion:
+You are not ingesting enough useful hurricane track data yet.
+That output proves your ingestion is thin → track_points=2 is a red flag.
+No per-county mapping means the data is not actionable for contractors or adjusters.
+
+Recommendation:
+✅ Fix hurricane ingest to fully parse all track points per storm
+
+✅ Compute:
+
+Closest approach per county
+
+Affected counties list per storm
+
+Landfall metadata
+
+Store wind radii per timestamp if available
+
+Provide /api/hurricane-tracks/{storm_id}/track endpoint that returns full track points for map display
+
+✅ Add:
+
+/api/hurricane-tracks/affected-counties?storm_id=...
+→ Returns list of FIPS with impact scoring
+
