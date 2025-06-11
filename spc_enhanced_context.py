@@ -202,33 +202,33 @@ class SPCEnhancedContextService:
             
             # Extract key location references for better context
             event_location = location_context.get('primary_location', report.location)
-            major_city = location_context.get('nearest_major_city', 'Unknown')
+            major_city = location_context.get('nearest_major_city', '')
             major_city_distance = location_context.get('major_city_distance', '')
             nearby_places = location_context.get('nearby_places', [])
             
-            # Build location reference string
-            location_references = []
-            if event_location and event_location != f"{report.location}, {report.county}":
-                location_references.append(f"at {event_location}")
-            if major_city != 'Unknown' and major_city_distance:
-                location_references.append(f"{major_city_distance} from {major_city}")
+            # Build nearby places string with distances
+            nearby_context = ""
             if nearby_places:
-                closest_places = [place.get('name', '') for place in nearby_places[:2] if place.get('name')]
+                closest_places = []
+                for place in nearby_places[:3]:
+                    name = place.get('name', '')
+                    distance = place.get('distance_miles', 0)
+                    if name and distance:
+                        closest_places.append(f"{name} ({distance:.1f}mi)")
                 if closest_places:
-                    location_references.append(f"near {' and '.join(closest_places)}")
+                    nearby_context = f"near {', '.join(closest_places)}"
 
             prompt = f"""Generate a comprehensive 2-3 sentence enhanced summary for this SPC storm report:
 
 SPC Report Details:
 - Type: {report.report_type}
-- Original Location: {report.location}, {report.county}, {report.state}
+- Location: {report.location}, {report.county}, {report.state}
 - Time: {report.time_utc}
 - Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
 
-Enhanced Location Context:
-- Event Location: {event_location}
+Location Context (USE THIS DATA):
 - Nearest Major City: {major_city} ({major_city_distance} away)
-- Nearby Places: {', '.join([place.get('name', '') for place in nearby_places[:3]]) if nearby_places else 'None identified'}
+- Nearby Places: {nearby_context if nearby_context else 'None within close proximity'}
 
 Verified Alerts ({len(verified_alerts)} total):
 {json.dumps(alert_details, indent=2)}
@@ -238,13 +238,13 @@ Counties Affected: {', '.join(sorted(counties_affected))}
 NWS Office: {nws_office}
 
 Create an enhanced professional summary that:
-1. MUST use the event location ({event_location}) instead of the original location ({report.location})
-2. Reference the nearest major city ({major_city}) for geographic context
-3. Emphasize verification by {len(verified_alerts)} NWS alerts spanning {duration_minutes} minutes
-4. Include nearby landmarks when relevant
-5. Make the location meaningful and recognizable
+1. Starts with the SPC report location: "{report.location}, {report.county}, {report.state}"
+2. MUST reference the nearest major city: "{major_city}" at "{major_city_distance}" away
+3. Include nearby places when available: {nearby_context}
+4. Emphasize verification by {len(verified_alerts)} NWS alerts spanning {duration_minutes} minutes
+5. Focus on factual geographic and temporal context
 
-IMPORTANT: Replace "{report.location}" with "{event_location}" in your summary to provide better geographic context."""
+CRITICAL: Use the provided location data exactly as given. Do not add historical context or speculation."""
 
             response = client.chat.completions.create(
                 model="gpt-4o",
@@ -272,28 +272,39 @@ IMPORTANT: Replace "{report.location}" with "{event_location}" in your summary t
             major_city_distance = location_context.get('major_city_distance', '')
             nearby_places = location_context.get('nearby_places', [])
             
+            # Build nearby places string with distances for location-only summary
+            nearby_context = ""
+            if nearby_places:
+                closest_places = []
+                for place in nearby_places[:3]:
+                    name = place.get('name', '')
+                    distance = place.get('distance_miles', 0)
+                    if name and distance:
+                        closest_places.append(f"{name} ({distance:.1f}mi)")
+                if closest_places:
+                    nearby_context = f"near {', '.join(closest_places)}"
+
             prompt = f"""Generate a location-enhanced summary for this SPC storm report:
 
 SPC Report Details:
 - Type: {report.report_type}
-- Original Location: {report.location}, {report.county}, {report.state}
+- Location: {report.location}, {report.county}, {report.state}
 - Time: {report.time_utc}
 - Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
 - Comments: {report.comments}
 
-Enhanced Location Context:
-- Event Location: {event_location}
+Location Context (USE THIS DATA):
 - Nearest Major City: {major_city} ({major_city_distance} away)
-- Nearby Places: {', '.join([place.get('name', '') for place in nearby_places[:3]]) if nearby_places else 'None identified'}
+- Nearby Places: {nearby_context if nearby_context else 'None within close proximity'}
 
 Create a 1-2 sentence enhanced summary that:
-1. MUST use the event location ({event_location}) instead of the original location ({report.location})
-2. Reference the nearest major city ({major_city}) for geographic context when relevant
-3. Describes the SPC report type and measurement clearly
-4. References nearby landmarks when available
+1. Starts with the SPC report location: "{report.location}, {report.county}, {report.state}"
+2. Reference the nearest major city: "{major_city}" at "{major_city_distance}" away when available
+3. Include nearby places when available: {nearby_context}
+4. Describes the SPC report type and measurement clearly
 5. Makes the location meaningful and accessible to readers
 
-IMPORTANT: Replace "{report.location}" with "{event_location}" in your summary to provide better geographic context."""
+CRITICAL: Use the provided location data exactly as given. Do not add historical context or speculation."""
 
             response = client.chat.completions.create(
                 model="gpt-4o",
@@ -321,10 +332,19 @@ IMPORTANT: Replace "{report.location}" with "{event_location}" in your summary t
             try:
                 existing_enrichment = json.loads(report.location_enrichment) if isinstance(report.location_enrichment, str) else report.location_enrichment
                 
-                # Extract location data from enrichment
+                # Extract location data from enrichment with distance validation
+                event_location = existing_enrichment.get('event_location', '')
+                event_location_distance = existing_enrichment.get('event_location_distance_miles', float('inf'))
+                
+                # Only use event location if it's within 2 miles, otherwise use original location
+                if event_location_distance <= 2.0:
+                    primary_location = event_location
+                else:
+                    primary_location = f"{report.location}, {report.county}"
+                
                 location_context = {
-                    'primary_location': existing_enrichment.get('event_location', f"{report.location}, {report.county}"),
-                    'nearest_major_city': existing_enrichment.get('nearest_major_city', {}).get('name', 'Unknown'),
+                    'primary_location': primary_location,
+                    'nearest_major_city': existing_enrichment.get('nearest_major_city', {}).get('name', ''),
                     'nearby_places': existing_enrichment.get('nearby_places', []),
                     'geographic_features': []
                 }

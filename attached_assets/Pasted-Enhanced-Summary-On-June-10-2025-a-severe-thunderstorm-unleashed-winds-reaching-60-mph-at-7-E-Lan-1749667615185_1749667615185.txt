@@ -1,0 +1,12 @@
+Enhanced Summary
+"On June 10, 2025, a severe thunderstorm unleashed winds reaching 60 mph at 7 E Langtry, Val Verde, TX, a remote area in the expansive and rugged terrain of West Texas. Although the nearest major city is not specified, the significance of this event is underscored by eight verified National Weather Service alerts, which spanned 223 minutes and extended across multiple counties, including Val Verde, Kinney, and Edwards. This series of warnings highlights the storm's intensity and the widespread impact across the sparsely populated yet geographically significant region known for its proximity to the Rio Grande and the historic Langtry community, famously associated with Judge Roy Bean."
+
+No sir. We DO NOT need any Judge Roy Bean language for historical context. We should ONLY be referring to the nearby place: Judge Roy Bean Visitor Center (6.5mi away). The MOST relevant nearby should be Eagle Nest Canyon (1.8mi).
+
+We need to add language like. "On June 10, 2025, a severe thunderstorm unleashed winds reaching 60 mph" 7 miles east of Langtry, Val Verde, TX... - the previous prompt was better to this point..."near Eagle Nest Canyon (1.8mi away), Judge Roy Bean Visitor Center (6.5mi away) and Langtry, Texas (6.6 mi away) (cited in the SPC comments). The report occured at or within 1 mile of ("Event location") - let's update event location to ONLY be within 2 mile; or fallback / do not fill in. In this example, Weir Dam should qualify). This COULD technically bump - however, I cannot confirm "Eagle Nest Canyon" location using google maps.
+
+- "nearest major city is not specified..." really?!?!?! see screenshot. Reel it in, man. We have ALL OF THE DATA ON /spc/reports/82489, we just need to tie it into the summary similar to placeholders and no different than we're using AI enrichment elsewhere in our application. 
+
+Now that we're criticizing our AI judgment - it's worth recognizing that "Amistad National Recreation Area" is actually a 35 minute drive away, or 35.5 miles away. How can our "Event Location" marked "at coordinates" be FARTHER AWAY than our nearby places?
+
+For context, specific to this example (/spc/reports/82489), ive uploaded a screenshot of the marker (our coordinates) and a location appearing on google maps (Weir Dam)
