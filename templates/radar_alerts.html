@@ -251,10 +251,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Set default date range to last 7 days
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 7);
+    // Set default date range to include our radar data (June 1-10, 2025)
+    const endDate = new Date('2025-06-10');
+    const startDate = new Date('2025-06-01');
     
     document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
     document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
