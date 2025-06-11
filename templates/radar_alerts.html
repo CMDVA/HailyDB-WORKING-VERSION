@@ -84,6 +84,7 @@
                     <div class="col-md-3">
                         <label for="timeRange" class="form-label">Time Range</label>
                         <select class="form-select" id="timeRange">
+                            <option value="">All Time</option>
                             <option value="24">Last 24 Hours</option>
                             <option value="48">Last 48 Hours</option>
                             <option value="168">Last Week</option>
@@ -532,11 +533,14 @@ function applyFilters() {
     if (minWind) currentFilters.min_wind = minWind;
     if (state) currentFilters.state = state;
     
-    // Calculate start time based on time range
-    if (timeRange) {
+    // Calculate start time based on time range (only if a specific range is selected)
+    if (timeRange && timeRange !== '') {
         const hoursAgo = parseInt(timeRange);
         const startTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
         currentFilters.start_time = startTime.toISOString();
+    } else {
+        // Remove any existing time filter when "All Time" is selected
+        delete currentFilters.start_time;
     }
     
     loadRadarAlerts(1);
@@ -546,7 +550,7 @@ function clearFilters() {
     document.getElementById('minHailSize').value = '';
     document.getElementById('minWindSpeed').value = '';
     document.getElementById('stateFilter').value = '';
-    document.getElementById('timeRange').value = '24';
+    document.getElementById('timeRange').value = '';
     currentFilters = {};
     loadRadarAlerts(1);
 }
