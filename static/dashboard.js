@@ -1210,7 +1210,7 @@ function onPauseScheduler() {
 function updateWorldClock() {
     const now = new Date();
     
-    // Pacific Time (PST/PDT)
+    // All Continental US Time Zones
     const pacificTime = now.toLocaleTimeString('en-US', {
         timeZone: 'America/Los_Angeles',
         hour12: false,
@@ -1218,7 +1218,20 @@ function updateWorldClock() {
         minute: '2-digit'
     });
     
-    // Eastern Time (EST/EDT)
+    const mountainTime = now.toLocaleTimeString('en-US', {
+        timeZone: 'America/Denver',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    const centralTime = now.toLocaleTimeString('en-US', {
+        timeZone: 'America/Chicago',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
     const easternTime = now.toLocaleTimeString('en-US', {
         timeZone: 'America/New_York',
         hour12: false,
@@ -1226,7 +1239,6 @@ function updateWorldClock() {
         minute: '2-digit'
     });
     
-    // UTC Time
     const utcTime = now.toLocaleTimeString('en-US', {
         timeZone: 'UTC',
         hour12: false,
@@ -1234,33 +1246,49 @@ function updateWorldClock() {
         minute: '2-digit'
     });
     
-    // SPC Day calculation
+    // SPC Day calculation and date formatting
     const utcHour = parseInt(now.toLocaleTimeString('en-US', {
         timeZone: 'UTC',
         hour12: false,
         hour: '2-digit'
     }));
     
-    let spcDay;
+    // Get UTC date in DD format
+    const utcDate = now.toLocaleDateString('en-US', { 
+        timeZone: 'UTC',
+        day: '2-digit'
+    });
+    
+    let spcDate;
     if (utcHour >= 12) {
         // Current time is >= 12:00Z, so SPC day is today (UTC date)
-        spcDay = now.toLocaleDateString('en-CA', { timeZone: 'UTC' });
+        spcDate = now.toLocaleDateString('en-US', { 
+            timeZone: 'UTC',
+            day: '2-digit'
+        });
     } else {
         // Current time is < 12:00Z, so SPC day is yesterday (UTC date - 1)
         const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        spcDay = yesterday.toLocaleDateString('en-CA', { timeZone: 'UTC' });
+        spcDate = yesterday.toLocaleDateString('en-US', { 
+            timeZone: 'UTC',
+            day: '2-digit'
+        });
     }
     
     // Update DOM elements
     const pacificElement = document.getElementById('pacific-time');
+    const mountainElement = document.getElementById('mountain-time');
+    const centralElement = document.getElementById('central-time');
     const easternElement = document.getElementById('eastern-time');
     const utcElement = document.getElementById('utc-time');
-    const spcElement = document.getElementById('spc-day');
+    const spcUtcDateElement = document.getElementById('spc-utc-date');
     
     if (pacificElement) pacificElement.textContent = pacificTime;
+    if (mountainElement) mountainElement.textContent = mountainTime;
+    if (centralElement) centralElement.textContent = centralTime;
     if (easternElement) easternElement.textContent = easternTime;
     if (utcElement) utcElement.textContent = utcTime;
-    if (spcElement) spcElement.textContent = spcDay;
+    if (spcUtcDateElement) spcUtcDateElement.textContent = `${spcDate} / ${utcDate}`;
 }
 
 // Time Mode Toggle Functions
