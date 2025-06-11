@@ -3082,36 +3082,42 @@ def get_radar_alerts_summary():
         if not start_date or not end_date:
             return jsonify({"error": "start_date and end_date are required"}), 400
         
-        # Base query
-        query = db.session.query(
-            func.unnest(RadarAlert.city_names).label('city'),
-            func.unnest(RadarAlert.affected_states).label('state'),
-            RadarAlert.event_date.label('date'),
-            func.count(func.case([(RadarAlert.event_type == 'hail', 1)])).label('hail_count'),
-            func.max(func.case([(RadarAlert.event_type == 'hail', RadarAlert.hail_inches)])).label('max_hail_inches'),
-            func.count(func.case([(RadarAlert.event_type == 'wind', 1)])).label('wind_count'),
-            func.max(func.case([(RadarAlert.event_type == 'wind', RadarAlert.wind_mph)])).label('max_wind_mph')
-        ).filter(
-            RadarAlert.event_date >= start_date,
-            RadarAlert.event_date <= end_date
-        )
+        # Use raw SQL to properly handle array fields
+        sql_query = """
+        SELECT 
+            UNNEST(city_names) as city,
+            UNNEST(affected_states) as state,
+            event_date as date,
+            COUNT(CASE WHEN event_type = 'hail' THEN 1 END) as hail_count,
+            MAX(CASE WHEN event_type = 'hail' THEN hail_inches END) as max_hail_inches,
+            COUNT(CASE WHEN event_type = 'wind' THEN 1 END) as wind_count,
+            MAX(CASE WHEN event_type = 'wind' THEN wind_mph END) as max_wind_mph
+        FROM radar_alerts 
+        WHERE event_date >= :start_date AND event_date <= :end_date
+        """
+        
+        params = {'start_date': start_date, 'end_date': end_date}
         
         # Apply filters
         if state_filter:
-            query = query.filter(func.array_position(RadarAlert.affected_states, state_filter) > 0)
+            sql_query += " AND :state_filter = ANY(affected_states)"
+            params['state_filter'] = state_filter
         
         if city_filter:
-            query = query.having(func.lower(func.unnest(RadarAlert.city_names)).like(f'%{city_filter.lower()}%'))
+            sql_query += " AND EXISTS (SELECT 1 FROM UNNEST(city_names) as city WHERE city ILIKE :city_filter)"
+            params['city_filter'] = f'%{city_filter}%'
         
-        # Apply min thresholds in HAVING clause
-        query = query.group_by('city', 'state', 'date').having(
-            and_(
-                func.max(func.case([(RadarAlert.event_type == 'hail', RadarAlert.hail_inches)])) >= min_hail_inches,
-                func.max(func.case([(RadarAlert.event_type == 'wind', RadarAlert.wind_mph)])) >= min_wind_mph
-            )
-        ).order_by('date', 'state', 'city')
+        sql_query += """
+        GROUP BY city, state, date
+        HAVING COALESCE(MAX(CASE WHEN event_type = 'hail' THEN hail_inches END), 0) >= :min_hail_inches
+           AND COALESCE(MAX(CASE WHEN event_type = 'wind' THEN wind_mph END), 0) >= :min_wind_mph
+        ORDER BY date, state, city
+        """
         
-        results = query.all()
+        params['min_hail_inches'] = min_hail_inches
+        params['min_wind_mph'] = min_wind_mph
+        
+        results = db.session.execute(db.text(sql_query), params).fetchall()
         
         summary = []
         for row in results:
