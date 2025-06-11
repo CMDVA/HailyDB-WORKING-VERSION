@@ -104,6 +104,17 @@
                             </table>
                         </div>
                     </div>
+                    
+                    {% if report.comments %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="text-muted">SPC Comments</h6>
+                            <div class="border-start border-3 border-primary ps-3">
+                                <p class="mb-0">{{ report.comments }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -209,18 +220,7 @@
             </div>
             {% endif %}
 
-            {% if report.comments %}
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">
-                        <i class="fas fa-comment me-2"></i>SPC Comments
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <p class="mb-0">{{ report.comments }}</p>
-                </div>
-            </div>
-            {% endif %}
+
 
             <!-- Verified Alerts Section -->
             {% if report.verified_alerts %}
