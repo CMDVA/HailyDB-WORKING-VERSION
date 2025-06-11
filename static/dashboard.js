@@ -6,6 +6,7 @@
 // Global variables
 let dashboardData = {};
 let lastShownResult = null;
+let currentTimeMode = 'spc'; // Track current time mode selection - default to SPC Day
 
 // Initialize dashboard
 function initializeDashboard() {
@@ -29,8 +30,8 @@ function initializeDashboard() {
         // Calculate next poll time
         updateNextPollTime();
         
-        // Load today's data for cron verification
-        loadTodaysAlerts();
+        // Load today's data for cron verification - use current mode
+        loadTodaysAlertsWithMode(currentTimeMode);
         loadSPCVerificationTable();
         
         // Initialize world clock
@@ -42,7 +43,7 @@ function initializeDashboard() {
         
         // Set up automatic refresh every 30 seconds
         setInterval(() => {
-            loadTodaysAlerts();
+            loadTodaysAlertsWithMode(currentTimeMode); // Use current mode instead of default
             loadSPCVerificationTable();
             updateStatusIndicator();
             updateNextPollTime();
@@ -272,252 +273,7 @@ function updateNextPollTime() {
 }
 
 // Load today's alerts for cron verification
-async function loadTodaysAlerts() {
-    try {
-        const today = new Date().toISOString().split('T')[0];
-        const cacheBuster = new Date().getTime();
-        const response = await fetch(`/alerts?format=json&per_page=1000&ingested_date=${today}&_cb=${cacheBuster}`);
-        const data = await response.json();
-        
-        const tableContainer = document.getElementById('todays-alerts-table');
-        if (!tableContainer) return;
-        
-        // Use alerts directly from API response (filtered by ingested_date parameter)
-        const todaysAlerts = data.alerts || [];
-        
-        if (todaysAlerts.length > 0) {
-            // Group by event type for compact breakdown
-            const alertsByType = todaysAlerts.reduce((acc, alert) => {
-                const eventType = alert.event || 'Unknown';
-                acc[eventType] = (acc[eventType] || 0) + 1;
-                return acc;
-            }, {});
-            
-            const totalIngestedToday = data.pagination ? data.pagination.total : todaysAlerts.length;
-            let html = `<div class="mb-3"><strong>${todaysAlerts.length}/${totalIngestedToday} alerts ingested today</strong></div>
-                       <div class="mb-2"><small class="text-muted">Showing alerts by ingestion date (database completeness)</small></div>`;
-            
-            // NWS Alert Category mapping
-            const alertCategories = {
-                'Tornado Watch': 'Severe Weather Alert',
-                'Tornado Warning': 'Severe Weather Alert',
-                'Severe Thunderstorm Watch': 'Severe Weather Alert',
-                'Severe Thunderstorm Warning': 'Severe Weather Alert',
-                'Severe Weather Statement': 'Severe Weather Alert',
-                'Extreme Wind Warning': 'Severe Weather Alert',
-                'Snow Squall Warning': 'Severe Weather Alert',
-                'Winter Storm Watch': 'Winter Weather Alert',
-                'Winter Storm Warning': 'Winter Weather Alert',
-                'Blizzard Warning': 'Winter Weather Alert',
-                'Ice Storm Warning': 'Winter Weather Alert',
-                'Winter Weather Advisory': 'Winter Weather Alert',
-                'Freezing Rain Advisory': 'Winter Weather Alert',
-                'Wind Chill Advisory': 'Winter Weather Alert',
-                'Wind Chill Warning': 'Winter Weather Alert',
-                'Frost Advisory': 'Winter Weather Alert',
-                'Freeze Warning': 'Winter Weather Alert',
-                'Flood Watch': 'Flood Alert',
-                'Flood Warning': 'Flood Alert',
-                'Flash Flood Watch': 'Flood Alert',
-                'Flash Flood Warning': 'Flood Alert',
-                'Flood Advisory': 'Flood Alert',
-                'Coastal Flood Watch': 'Coastal Alert',
-                'Coastal Flood Warning': 'Coastal Alert',
-                'Coastal Flood Advisory': 'Coastal Alert',
-                'Lakeshore Flood Watch': 'Coastal Alert',
-                'Lakeshore Flood Warning': 'Coastal Alert',
-                'Lakeshore Flood Advisory': 'Coastal Alert',
-                'High Wind Watch': 'Wind & Fog Alert',
-                'High Wind Warning': 'Wind & Fog Alert',
-                'Wind Advisory': 'Wind & Fog Alert',
-                'Dense Fog Advisory': 'Wind & Fog Alert',
-                'Freezing Fog Advisory': 'Wind & Fog Alert',
-                'Fire Weather Watch': 'Fire Weather Alert',
-                'Red Flag Warning': 'Fire Weather Alert',
-                'Air Quality Alert': 'Air Quality & Dust Alert',
-                'Air Stagnation Advisory': 'Air Quality & Dust Alert',
-                'Blowing Dust Advisory': 'Air Quality & Dust Alert',
-                'Dust Storm Warning': 'Air Quality & Dust Alert',
-                'Ashfall Advisory': 'Air Quality & Dust Alert',
-                'Ashfall Warning': 'Air Quality & Dust Alert',
-                'Small Craft Advisory': 'Marine Alert',
-                'Gale Watch': 'Marine Alert',
-                'Gale Warning': 'Marine Alert',
-                'Storm Watch': 'Marine Alert',
-                'Storm Warning': 'Marine Alert',
-                'Hurricane Force Wind Warning': 'Marine Alert',
-                'Special Marine Warning': 'Marine Alert',
-                'Low Water Advisory': 'Marine Alert',
-                'Brisk Wind Advisory': 'Marine Alert',
-                'Marine Weather Statement': 'Marine Alert',
-                'Hazardous Seas Warning': 'Marine Alert',
-                'Tropical Storm Watch': 'Tropical Weather Alert',
-                'Tropical Storm Warning': 'Tropical Weather Alert',
-                'Hurricane Watch': 'Tropical Weather Alert',
-                'Hurricane Warning': 'Tropical Weather Alert',
-                'Storm Surge Watch': 'Tropical Weather Alert',
-                'Storm Surge Warning': 'Tropical Weather Alert',
-                'Tsunami Watch': 'Tsunami Alert',
-                'Tsunami Advisory': 'Tsunami Alert',
-                'Tsunami Warning': 'Tsunami Alert',
-                'Special Weather Statement': 'General Weather Info',
-                'Hazardous Weather Outlook': 'General Weather Info',
-                'Short Term Forecast': 'General Weather Info',
-                'Public Information Statement': 'General Weather Info',
-                'Administrative Message': 'General Weather Info',
-                'Test Message': 'General Weather Info',
-                'Beach Hazards Statement': 'Coastal Alert'
-            };
-            
-            // Group alerts by category
-            const alertsByCategory = {};
-            Object.entries(alertsByType).forEach(([alertType, count]) => {
-                const category = alertCategories[alertType] || 'Other Alerts';
-                if (!alertsByCategory[category]) {
-                    alertsByCategory[category] = [];
-                }
-                alertsByCategory[category].push([alertType, count]);
-            });
-            
-            // Create comprehensive table
-            html += '<div class="table-responsive mb-3">';
-            html += '<table class="table table-sm table-striped">';
-            html += '<thead class="table-dark"><tr><th>Category</th><th>Alert Type</th><th class="text-end">Count</th></tr></thead><tbody>';
-            
-            // Sort categories and display
-            const categoryOrder = [
-                'Severe Weather Alert',
-                'Flood Alert', 
-                'Winter Weather Alert',
-                'Marine Alert',
-                'Wind & Fog Alert',
-                'Fire Weather Alert',
-                'Coastal Alert',
-                'Tropical Weather Alert',
-                'Air Quality & Dust Alert',
-                'Tsunami Alert',
-                'General Weather Info',
-                'Other Alerts'
-            ];
-            
-            categoryOrder.forEach(category => {
-                if (alertsByCategory[category]) {
-                    // Sort alerts within category by count descending
-                    alertsByCategory[category].sort((a, b) => b[1] - a[1]);
-                    
-                    alertsByCategory[category].forEach(([alertType, count], index) => {
-                        const categoryCell = index === 0 ? 
-                            `<td rowspan="${alertsByCategory[category].length}" class="align-middle"><strong>${category}</strong></td>` : '';
-                        
-                        html += `<tr>
-                            ${categoryCell}
-                            <td>${alertType}</td>
-                            <td class="text-end"><span class="badge bg-primary">${count}</span></td>
-                        </tr>`;
-                    });
-                }
-            });
-            
-            html += '</tbody></table></div>';
-            
-            // Show recent alerts with Date/Time | Severity | Type | Area | Actions format
-            if (todaysAlerts.length > 0) {
-                // Pagination setup
-                const alertsPerPage = 50;
-                const totalPages = Math.ceil(todaysAlerts.length / alertsPerPage);
-                let currentPage = 1;
-                
-                html += '<div class="table-responsive"><table class="table table-sm small">';
-                html += '<thead><tr><th>Date/Time</th><th>Severity</th><th>Type</th><th>Area</th><th>Actions</th></tr></thead><tbody id="alerts-tbody">';
-                
-                // Sort by effective date descending (most recent first)
-                const sortedAlerts = todaysAlerts.sort((a, b) => new Date(b.effective) - new Date(a.effective));
-                
-                // Function to render alerts for a specific page
-                function renderAlertsPage(page) {
-                    const start = (page - 1) * alertsPerPage;
-                    const end = start + alertsPerPage;
-                    const pageAlerts = sortedAlerts.slice(start, end);
-                    
-                    let pageHtml = '';
-                    pageAlerts.forEach(alert => {
-                        const dateTime = new Date(alert.effective).toLocaleString();
-                        const severityBadge = getSeverityColor(alert.severity);
-                        const shortArea = alert.area_desc ? 
-                            (alert.area_desc.length > 50 ? alert.area_desc.substring(0, 50) + '...' : alert.area_desc) : 
-                            'N/A';
-                        
-                        pageHtml += `<tr>
-                            <td>${dateTime}</td>
-                            <td><span class="severity-badge ${severityBadge}">${alert.severity || 'N/A'}</span></td>
-                            <td>${alert.event}</td>
-                            <td>${shortArea}</td>
-                            <td><a href="/alert/${alert.id}" class="btn btn-sm btn-outline-primary">View Details</a></td>
-                        </tr>`;
-                    });
-                    return pageHtml;
-                }
-                
-                // Initial page load
-                html += renderAlertsPage(currentPage);
-                html += '</tbody></table></div>';
-                
-                // Pagination controls
-                if (totalPages > 1) {
-                    html += '<nav aria-label="Alerts pagination"><ul class="pagination pagination-sm justify-content-center">';
-                    
-                    // Previous button
-                    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-                        <a class="page-link" href="#" onclick="changePage(${currentPage - 1})" aria-label="Previous">
-                            <span aria-hidden="true">&laquo;</span>
-                        </a>
-                    </li>`;
-                    
-                    // Page numbers
-                    for (let i = 1; i <= Math.min(totalPages, 10); i++) {
-                        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
-                            <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
-                        </li>`;
-                    }
-                    
-                    if (totalPages > 10) {
-                        html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
-                        html += `<li class="page-item">
-                            <a class="page-link" href="#" onclick="changePage(${totalPages})">${totalPages}</a>
-                        </li>`;
-                    }
-                    
-                    // Next button
-                    html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-                        <a class="page-link" href="#" onclick="changePage(${currentPage + 1})" aria-label="Next">
-                            <span aria-hidden="true">&raquo;</span>
-                        </a>
-                    </li>`;
-                    
-                    html += '</ul></nav>';
-                }
-                
-                // Store data for pagination
-                window.dashboardAlertsData = {
-                    sortedAlerts: sortedAlerts,
-                    currentPage: currentPage,
-                    totalPages: totalPages,
-                    alertsPerPage: alertsPerPage
-                };
-            }
-            
-            tableContainer.innerHTML = html;
-        } else {
-            tableContainer.innerHTML = '<div class="text-center py-3"><div class="h5 text-warning">0</div><small class="text-muted">No alerts ingested today</small></div>';
-        }
-    } catch (error) {
-        console.error('Error loading today\'s alerts:', error);
-        const tableContainer = document.getElementById('todays-alerts-table');
-        if (tableContainer) {
-            tableContainer.innerHTML = '<p class="text-danger">Error loading today\'s alerts.</p>';
-        }
-    }
-}
+
 
 // Pagination function for dashboard alerts
 function changePage(page) {
@@ -1515,12 +1271,14 @@ function initializeTimeModeToggle() {
     if (utcModeRadio && spcModeRadio) {
         utcModeRadio.addEventListener('change', function() {
             if (this.checked) {
+                currentTimeMode = 'utc';
                 loadTodaysAlertsWithMode('utc');
             }
         });
         
         spcModeRadio.addEventListener('change', function() {
             if (this.checked) {
+                currentTimeMode = 'spc';
                 loadTodaysAlertsWithMode('spc');
             }
         });
@@ -1678,12 +1436,140 @@ function displaySPCReports(reports, spcDay, container) {
 }
 
 function displayNWSAlerts(alerts, existingHtml, container) {
-    // Continue with existing NWS alert display logic from loadTodaysAlerts
-    // This preserves the current functionality for UTC mode
     let html = existingHtml;
     
-    // Add existing table logic here...
     if (alerts.length > 0) {
+        // Group by event type for category breakdown
+        const alertsByType = alerts.reduce((acc, alert) => {
+            const eventType = alert.event || 'Unknown';
+            acc[eventType] = (acc[eventType] || 0) + 1;
+            return acc;
+        }, {});
+        
+        // NWS Alert Category mapping
+        const alertCategories = {
+            'Tornado Watch': 'Severe Weather Alert',
+            'Tornado Warning': 'Severe Weather Alert',
+            'Severe Thunderstorm Watch': 'Severe Weather Alert',
+            'Severe Thunderstorm Warning': 'Severe Weather Alert',
+            'Severe Weather Statement': 'Severe Weather Alert',
+            'Extreme Wind Warning': 'Severe Weather Alert',
+            'Snow Squall Warning': 'Severe Weather Alert',
+            'Winter Storm Watch': 'Winter Weather Alert',
+            'Winter Storm Warning': 'Winter Weather Alert',
+            'Blizzard Warning': 'Winter Weather Alert',
+            'Ice Storm Warning': 'Winter Weather Alert',
+            'Winter Weather Advisory': 'Winter Weather Alert',
+            'Freezing Rain Advisory': 'Winter Weather Alert',
+            'Wind Chill Advisory': 'Winter Weather Alert',
+            'Wind Chill Warning': 'Winter Weather Alert',
+            'Frost Advisory': 'Winter Weather Alert',
+            'Freeze Warning': 'Winter Weather Alert',
+            'Flood Watch': 'Flood Alert',
+            'Flood Warning': 'Flood Alert',
+            'Flash Flood Watch': 'Flood Alert',
+            'Flash Flood Warning': 'Flood Alert',
+            'Flood Advisory': 'Flood Alert',
+            'Coastal Flood Watch': 'Coastal Alert',
+            'Coastal Flood Warning': 'Coastal Alert',
+            'Coastal Flood Advisory': 'Coastal Alert',
+            'Lakeshore Flood Watch': 'Coastal Alert',
+            'Lakeshore Flood Warning': 'Coastal Alert',
+            'Lakeshore Flood Advisory': 'Coastal Alert',
+            'High Wind Watch': 'Wind & Fog Alert',
+            'High Wind Warning': 'Wind & Fog Alert',
+            'Wind Advisory': 'Wind & Fog Alert',
+            'Dense Fog Advisory': 'Wind & Fog Alert',
+            'Freezing Fog Advisory': 'Wind & Fog Alert',
+            'Fire Weather Watch': 'Fire Weather Alert',
+            'Red Flag Warning': 'Fire Weather Alert',
+            'Air Quality Alert': 'Air Quality & Dust Alert',
+            'Air Stagnation Advisory': 'Air Quality & Dust Alert',
+            'Blowing Dust Advisory': 'Air Quality & Dust Alert',
+            'Dust Storm Warning': 'Air Quality & Dust Alert',
+            'Ashfall Advisory': 'Air Quality & Dust Alert',
+            'Ashfall Warning': 'Air Quality & Dust Alert',
+            'Small Craft Advisory': 'Marine Alert',
+            'Gale Watch': 'Marine Alert',
+            'Gale Warning': 'Marine Alert',
+            'Storm Watch': 'Marine Alert',
+            'Storm Warning': 'Marine Alert',
+            'Hurricane Force Wind Warning': 'Marine Alert',
+            'Special Marine Warning': 'Marine Alert',
+            'Low Water Advisory': 'Marine Alert',
+            'Brisk Wind Advisory': 'Marine Alert',
+            'Marine Weather Statement': 'Marine Alert',
+            'Hazardous Seas Warning': 'Marine Alert',
+            'Tropical Storm Watch': 'Tropical Weather Alert',
+            'Tropical Storm Warning': 'Tropical Weather Alert',
+            'Hurricane Watch': 'Tropical Weather Alert',
+            'Hurricane Warning': 'Tropical Weather Alert',
+            'Storm Surge Watch': 'Tropical Weather Alert',
+            'Storm Surge Warning': 'Tropical Weather Alert',
+            'Tsunami Watch': 'Tsunami Alert',
+            'Tsunami Advisory': 'Tsunami Alert',
+            'Tsunami Warning': 'Tsunami Alert',
+            'Special Weather Statement': 'General Weather Info',
+            'Hazardous Weather Outlook': 'General Weather Info',
+            'Short Term Forecast': 'General Weather Info',
+            'Public Information Statement': 'General Weather Info',
+            'Administrative Message': 'General Weather Info',
+            'Test Message': 'General Weather Info',
+            'Beach Hazards Statement': 'Coastal Alert'
+        };
+        
+        // Group alerts by category
+        const alertsByCategory = {};
+        Object.entries(alertsByType).forEach(([alertType, count]) => {
+            const category = alertCategories[alertType] || 'Other Alerts';
+            if (!alertsByCategory[category]) {
+                alertsByCategory[category] = [];
+            }
+            alertsByCategory[category].push([alertType, count]);
+        });
+        
+        // Create comprehensive category table
+        html += '<div class="table-responsive mb-3">';
+        html += '<table class="table table-sm table-striped">';
+        html += '<thead class="table-dark"><tr><th>Category</th><th>Alert Type</th><th class="text-end">Count</th></tr></thead><tbody>';
+        
+        // Sort categories and display
+        const categoryOrder = [
+            'Severe Weather Alert',
+            'Flood Alert', 
+            'Winter Weather Alert',
+            'Marine Alert',
+            'Wind & Fog Alert',
+            'Fire Weather Alert',
+            'Coastal Alert',
+            'Tropical Weather Alert',
+            'Air Quality & Dust Alert',
+            'Tsunami Alert',
+            'General Weather Info',
+            'Other Alerts'
+        ];
+        
+        categoryOrder.forEach(category => {
+            if (alertsByCategory[category]) {
+                // Sort alerts within category by count descending
+                alertsByCategory[category].sort((a, b) => b[1] - a[1]);
+                
+                alertsByCategory[category].forEach(([alertType, count], index) => {
+                    const categoryCell = index === 0 ? 
+                        `<td rowspan="${alertsByCategory[category].length}" class="align-middle"><strong>${category}</strong></td>` : '';
+                    
+                    html += `<tr>
+                        ${categoryCell}
+                        <td>${alertType}</td>
+                        <td class="text-end"><span class="badge bg-primary">${count}</span></td>
+                    </tr>`;
+                });
+            }
+        });
+        
+        html += '</tbody></table></div>';
+        
+        // Pagination setup
         const alertsPerPage = 50;
         const totalPages = Math.ceil(alerts.length / alertsPerPage);
         let currentPage = 1;
@@ -1700,7 +1586,7 @@ function displayNWSAlerts(alerts, existingHtml, container) {
             const effectiveDate = new Date(alert.effective).toLocaleString();
             const severity = alert.severity || 'Unknown';
             const event = alert.event || 'Unknown';
-            const areas = alert.areas_desc || 'Unknown';
+            const areas = alert.area_desc || 'Unknown';
             
             html += `
                 <tr>
@@ -1713,6 +1599,14 @@ function displayNWSAlerts(alerts, existingHtml, container) {
         });
         
         html += '</tbody></table></div>';
+        
+        // Store data for pagination
+        window.dashboardAlertsData = {
+            sortedAlerts: sortedAlerts,
+            currentPage: currentPage,
+            totalPages: totalPages,
+            alertsPerPage: alertsPerPage
+        };
     }
     
     container.innerHTML = html;
