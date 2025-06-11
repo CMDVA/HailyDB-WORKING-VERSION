@@ -208,89 +208,36 @@ class SPCEnrichmentService:
     
     def _generate_enriched_summary(self, spc_report: SPCReport, enrichment: Dict[str, Any]) -> str:
         """
-        Generate contextual summary using OpenAI based on SPC report and enrichment data
+        Generate layman-friendly enrichment text with radar context awareness
         
         Args:
             spc_report: The SPC report to summarize
             enrichment: Enrichment data including radar match and nearby places
             
         Returns:
-            1-2 sentence factual summary string
+            Layman-friendly enrichment text string
         """
         try:
-            # Extract magnitude information
-            magnitude_info = ""
-            if spc_report.magnitude:
-                if spc_report.report_type == 'hail' and 'size_inches' in spc_report.magnitude:
-                    magnitude_info = f"{spc_report.magnitude['size_inches']} inch"
-                elif spc_report.report_type == 'wind' and 'speed' in spc_report.magnitude:
-                    magnitude_info = f"{spc_report.magnitude['speed']} mph"
-                elif spc_report.report_type == 'tornado' and 'f_scale' in spc_report.magnitude:
-                    magnitude_info = f"F{spc_report.magnitude['f_scale']}"
+            radar_matched = enrichment.get('radar_polygon_match', False)
             
-            # Format nearby places
-            nearby_places_text = ""
-            if enrichment.get('nearby_places'):
-                place_names = [place['name'] for place in enrichment['nearby_places'][:3]]
-                if len(place_names) == 1:
-                    nearby_places_text = f" near {place_names[0]}"
-                elif len(place_names) == 2:
-                    nearby_places_text = f" near {place_names[0]} and {place_names[1]}"
+            if radar_matched:
+                # Customize for event type if clear
+                if spc_report.report_type == "wind":
+                    weather_type = "radar-detected damaging winds"
+                elif spc_report.report_type == "hail":
+                    weather_type = "radar-detected hail"
                 else:
-                    nearby_places_text = f" near {', '.join(place_names[:-1])}, and {place_names[-1]}"
-            
-            # Radar polygon status
-            radar_status = ""
-            if enrichment.get('radar_polygon_match'):
-                radar_status = " and was confirmed inside a radar-detected polygon"
+                    weather_type = "radar-detected severe weather"
+                
+                return f"This report occurred in an area where {weather_type} was active during the event — supporting the likelihood of property impact."
             else:
-                radar_status = " but no radar-detected polygon was present at this location"
-            
-            # Build summary prompt
-            prompt = f"""
-            Create a factual 1-2 sentence summary for this weather report:
-            
-            Report Type: {spc_report.report_type}
-            Magnitude: {magnitude_info}
-            Location: {spc_report.county} County, {spc_report.state}
-            Nearby Places: {nearby_places_text if nearby_places_text else "none identified"}
-            Radar Polygon Match: {enrichment.get('radar_polygon_match', False)}
-            
-            Format: "This [magnitude] [type] report in [county] County, [state] occurred[nearby places text][radar status]."
-            
-            Example: "This 1.0 inch hail report in St. Johns County, FL occurred near West Tocoi and Elkton, and was confirmed inside a radar-detected hail polygon."
-            """
-            
-            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
-            # do not change this unless explicitly requested by the user
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a meteorological report writer. Create factual, concise summaries of weather events. Be precise and avoid speculation."
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=150
-            )
-            
-            summary = response.choices[0].message.content.strip()
-            return summary
-            
+                # Neutral, positive phrase focusing on ground truth value
+                return f"This official storm report documents {spc_report.report_type} at this location."
+                
         except Exception as e:
             logger.error(f"Error generating enriched summary for SPC report {spc_report.id}: {e}")
-            # Fallback summary without OpenAI
-            magnitude_text = ""
-            if spc_report.magnitude:
-                if spc_report.report_type == 'hail' and 'size_inches' in spc_report.magnitude:
-                    magnitude_text = f"{spc_report.magnitude['size_inches']} inch "
-                elif spc_report.report_type == 'wind' and 'speed' in spc_report.magnitude:
-                    magnitude_text = f"{spc_report.magnitude['speed']} mph "
-                elif spc_report.report_type == 'tornado':
-                    magnitude_text = ""
-            
-            return f"This {magnitude_text}{spc_report.report_type} report occurred in {spc_report.county} County, {spc_report.state}."
+            # Fallback summary
+            return f"This official storm report documents {spc_report.report_type} at this location."
 
     def enrich_spc_reports_batch(self, batch_size: int = 50, target_report_id: Optional[int] = None) -> Dict[str, Any]:
         """

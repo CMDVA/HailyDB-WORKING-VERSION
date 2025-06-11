@@ -3617,8 +3617,7 @@ def api_spc_enrichment_stats():
         recent_cutoff = datetime.utcnow() - timedelta(hours=24)
         recent_enriched = db.session.query(SPCReport).filter(
             SPCReport.spc_enrichment.isnot(None),
-            SPCReport.spc_enrichment != {},
-            SPCReport.created_at >= recent_cutoff
+            SPCReport.spc_enrichment != {}
         ).count()
         
         return jsonify({
