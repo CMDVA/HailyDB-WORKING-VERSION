@@ -312,7 +312,7 @@ function updateAlertsTable(alerts) {
         const effectiveTime = new Date(alert.effective).toLocaleString();
         
         return `
-            <tr>
+            <tr class="clickable-row" onclick="window.location.href='/alerts/${alert.id}'" style="cursor: pointer;">
                 <td>
                     <div>${effectiveTime}</div>
                     <small class="text-muted">${alert.id.substring(0, 8)}...</small>
@@ -328,7 +328,7 @@ function updateAlertsTable(alerts) {
                 <td>${windDisplay}</td>
                 <td>${severityBadge}</td>
                 <td>
-                    <a href="/alerts/${alert.id}" class="btn btn-sm btn-outline-primary" title="View Details">
+                    <a href="/alerts/${alert.id}" class="btn btn-sm btn-outline-primary" title="View Details" onclick="event.stopPropagation();">
                         <i class="fas fa-eye"></i>
                     </a>
                 </td>
@@ -336,6 +336,23 @@ function updateAlertsTable(alerts) {
         `;
     }).join('');
 }
+
+// Add hover effects for clickable rows
+document.addEventListener('DOMContentLoaded', function() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .clickable-row:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s ease-in-out;
+        }
+        .clickable-row {
+            transition: all 0.2s ease-in-out;
+        }
+    `;
+    document.head.appendChild(style);
+});
 
 function getHailDescription(size) {
     if (size >= 2.0) return 'Softball+';

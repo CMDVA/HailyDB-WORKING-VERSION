@@ -663,7 +663,16 @@ def search_alerts():
     min_wind = request.args.get('min_wind', type=int)
     
     if has_radar_data:
+        # Only show events with hail (any amount) and/or winds ≥50 mph
         query = query.filter(Alert.radar_indicated.isnot(None))
+        
+        # Build conditions for qualifying radar events
+        hail_condition = Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0
+        wind_condition = Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50
+        
+        # Must have either hail or significant wind
+        query = query.filter(db.or_(hail_condition, wind_condition))
+        
     if min_hail:
         query = query.filter(Alert.radar_indicated['hail_inches'].astext.cast(db.Float) >= min_hail)
     if min_wind:

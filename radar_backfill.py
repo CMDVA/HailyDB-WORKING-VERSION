@@ -106,10 +106,11 @@ class RadarBackfillProcessor:
         hail_inches = self._extract_float(radar_data.get('hail_inches'))
         wind_mph = self._extract_int(radar_data.get('wind_mph'))
         
-        # Filter by criteria: all hail events, wind >= 50 mph
+        # Filter by criteria: all hail events (any amount), wind >= 50 mph
         create_hail_event = hail_inches is not None and hail_inches > 0
         create_wind_event = wind_mph is not None and wind_mph >= 50
         
+        # Must have either hail (any amount) or winds ≥50 mph to qualify
         if not (create_hail_event or create_wind_event):
             return stats
             
