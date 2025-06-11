@@ -61,12 +61,20 @@
                                                     <p class="mb-0">Hail Size</p>
                                                     <small class="text-light">
                                                         {% set hail_size = alert.radar_indicated.hail_inches %}
-                                                        {% if hail_size >= 2.0 %}Softball+ (Severe)
+                                                        {% if hail_size >= 4.5 %}Grapefruit (Record Size)
+                                                        {% elif hail_size >= 4.0 %}Softball (Extremely Severe)
+                                                        {% elif hail_size >= 3.0 %}Large Apple (Very Severe)
+                                                        {% elif hail_size >= 2.75 %}Baseball (Severe)
+                                                        {% elif hail_size >= 2.5 %}Tennis Ball (Severe)
+                                                        {% elif hail_size >= 2.0 %}Lime/Hen Egg (Significant)
                                                         {% elif hail_size >= 1.75 %}Golf Ball (Significant)
                                                         {% elif hail_size >= 1.5 %}Ping Pong Ball
                                                         {% elif hail_size >= 1.25 %}Half Dollar
-                                                        {% elif hail_size >= 1.0 %}Quarter
-                                                        {% else %}Penny Size
+                                                        {% elif hail_size >= 1.0 %}Quarter Size
+                                                        {% elif hail_size >= 0.88 %}Nickel Size
+                                                        {% elif hail_size >= 0.75 %}Penny Size
+                                                        {% elif hail_size >= 0.5 %}Mothball/Peanut Size
+                                                        {% else %}Pea Size
                                                         {% endif %}
                                                     </small>
                                                 </div>

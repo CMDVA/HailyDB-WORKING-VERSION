@@ -333,19 +333,23 @@ class IngestService:
     def _extract_hail_size(self, text: str) -> Optional[float]:
         """Extract hail size in inches from text"""
         try:
-            # Size conversion mapping
+            # Size conversion mapping based on official NWS hail size chart
             size_map = {
                 'pea': 0.25,
-                'marble': 0.5,
+                'mothball': 0.5,
+                'peanut': 0.5,
                 'penny': 0.75,
                 'nickel': 0.88,
                 'quarter': 1.0,
                 'half dollar': 1.25,
                 'ping pong ball': 1.5,
                 'golf ball': 1.75,
+                'lime': 2.0,
                 'tennis ball': 2.5,
                 'baseball': 2.75,
-                'softball': 4.0
+                'large apple': 3.0,
+                'softball': 4.0,
+                'grapefruit': 4.5
             }
             
             # Pattern 1: "hail up to X inch" or "hail up to X inches"
