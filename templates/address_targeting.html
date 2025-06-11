@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Address-Specific Weather Event Targeting{% endblock %}
+{% block title %}Radar Alerts Processing & Viewing{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -8,54 +8,79 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="h3 mb-0">
-                    <i class="fas fa-map-marker-alt me-2 text-primary"></i>
-                    Address-Specific Weather Event Targeting
+                    <i class="fas fa-radar me-2 text-primary"></i>
+                    Radar Alerts Processing & Viewing
                 </h1>
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-primary" onclick="loadSampleData()">
-                        <i class="fas fa-database me-1"></i>Load Sample Data
+                    <button type="button" class="btn btn-outline-info" onclick="loadStats()">
+                        <i class="fas fa-chart-bar me-1"></i>Refresh Stats
                     </button>
-                    <button type="button" class="btn btn-outline-success" onclick="runCityParsing()">
-                        <i class="fas fa-city me-1"></i>Parse City Names
+                    <button type="button" class="btn btn-outline-secondary" onclick="loadAvailableDates()">
+                        <i class="fas fa-calendar me-1"></i>Available Dates
                     </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Address Search Section -->
+    <!-- Statistics Overview -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="fas fa-search me-1"></i>Point-in-Polygon Address Search
+                        <i class="fas fa-chart-line me-1"></i>Radar Alerts Statistics
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form id="addressSearchForm" onsubmit="searchAddress(event)">
+                    <div id="statsOverview">
+                        <div class="text-center text-muted py-3">
+                            <p>Loading radar alerts statistics...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Systematic Backfill Controls -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cogs me-1"></i>Systematic Radar Backfill
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="backfillForm" onsubmit="triggerBackfill(event)">
                         <div class="row g-3">
-                            <div class="col-md-6">
-                                <label for="addressInput" class="form-label">Address or Location</label>
-                                <input type="text" class="form-control" id="addressInput" 
-                                       placeholder="e.g., Lassen County, CA or Orlando, FL" required>
+                            <div class="col-md-4">
+                                <label for="backfillStartDate" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="backfillStartDate" value="2025-06-10" required>
+                                <small class="form-text text-muted">Begin processing from this date</small>
                             </div>
-                            <div class="col-md-3">
-                                <label for="startDate" class="form-label">Start Date</label>
-                                <input type="date" class="form-control" id="startDate" value="2025-06-10">
+                            <div class="col-md-4">
+                                <label for="backfillEndDate" class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="backfillEndDate" value="2025-06-11" required>
+                                <small class="form-text text-muted">Process through this date</small>
                             </div>
-                            <div class="col-md-3">
-                                <label for="endDate" class="form-label">End Date</label>
-                                <input type="date" class="form-control" id="endDate" value="2025-06-11">
+                            <div class="col-md-4">
+                                <label for="batchSize" class="form-label">Batch Size</label>
+                                <input type="number" class="form-control" id="batchSize" value="100" min="10" max="1000">
+                                <small class="form-text text-muted">Alerts per processing batch</small>
                             </div>
                         </div>
                         <div class="row mt-3">
                             <div class="col-12">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-search me-1"></i>Search Weather Events
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-play me-1"></i>Start Backfill Processing
                                 </button>
-                                <button type="button" class="btn btn-outline-secondary ms-2" onclick="clearResults()">
-                                    <i class="fas fa-times me-1"></i>Clear Results
+                                <button type="button" class="btn btn-outline-primary ms-2" onclick="loadAvailableDates()">
+                                    <i class="fas fa-calendar me-1"></i>Show Available Dates
+                                </button>
+                                <button type="button" class="btn btn-outline-warning ms-2" onclick="validateJune10()">
+                                    <i class="fas fa-check me-1"></i>Validate 6/10/25 First
                                 </button>
                             </div>
                         </div>
@@ -65,21 +90,21 @@
         </div>
     </div>
 
-    <!-- Results Section -->
+    <!-- Processing Results -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="fas fa-bolt me-1"></i>Weather Events Found
+                        <i class="fas fa-tasks me-1"></i>Processing Results
                     </h5>
-                    <span id="resultCount" class="badge bg-primary">0 events</span>
+                    <span id="processingStatus" class="badge bg-secondary">Ready</span>
                 </div>
                 <div class="card-body">
-                    <div id="searchResults">
+                    <div id="processingResults">
                         <div class="text-center text-muted py-4">
-                            <i class="fas fa-search fa-3x mb-3"></i>
-                            <p>Enter an address above to search for weather events</p>
+                            <i class="fas fa-cogs fa-3x mb-3"></i>
+                            <p>Use the backfill controls above to process radar-detected events</p>
                         </div>
                     </div>
                 </div>
@@ -87,19 +112,19 @@
         </div>
     </div>
 
-    <!-- Sample Data Section -->
+    <!-- Available Dates Section -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="fas fa-database me-1"></i>Sample Radar-Detected Events (6/10/25)
+                        <i class="fas fa-calendar-alt me-1"></i>Available Radar Data Dates
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div id="sampleData">
+                    <div id="availableDates">
                         <div class="text-center text-muted py-3">
-                            <p>Click "Load Sample Data" to view authentic radar-detected events from June 10, 2025</p>
+                            <p>Loading available dates with radar-detected events...</p>
                         </div>
                     </div>
                 </div>
@@ -107,19 +132,22 @@
         </div>
     </div>
 
-    <!-- City Parsing Results -->
+    <!-- Processed Events View -->
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="fas fa-city me-1"></i>City Name Parsing Results
+                        <i class="fas fa-list me-1"></i>Processed Radar Events
                     </h5>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="loadProcessedEvents()">
+                        <i class="fas fa-refresh me-1"></i>Refresh
+                    </button>
                 </div>
                 <div class="card-body">
-                    <div id="cityParsingResults">
+                    <div id="processedEvents">
                         <div class="text-center text-muted py-3">
-                            <p>Click "Parse City Names" to extract city names from radar-detected events</p>
+                            <p>Loading processed radar events...</p>
                         </div>
                     </div>
                 </div>
@@ -163,54 +191,410 @@
 </style>
 
 <script>
-let currentResults = [];
+let currentStats = {};
 
-async function searchAddress(event) {
+// Load initial data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadStats();
+    loadAvailableDates();
+    loadProcessedEvents();
+});
+
+async function loadStats() {
+    try {
+        const response = await fetch('/api/radar-alerts/stats');
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load stats');
+        }
+        
+        currentStats = data;
+        displayStats(data);
+        
+    } catch (error) {
+        console.error('Stats loading error:', error);
+        document.getElementById('statsOverview').innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Failed to load stats: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function displayStats(stats) {
+    const statsDiv = document.getElementById('statsOverview');
+    
+    statsDiv.innerHTML = `
+        <div class="row">
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h3 class="text-primary mb-0">${stats.total_events || 0}</h3>
+                    <small class="text-muted">Total Events</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h3 class="text-danger mb-0">${stats.hail_events || 0}</h3>
+                    <small class="text-muted">Hail Events</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h3 class="text-success mb-0">${stats.wind_events || 0}</h3>
+                    <small class="text-muted">Wind Events</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h3 class="text-warning mb-0">${stats.events_created_today || 0}</h3>
+                    <small class="text-muted">Created Today</small>
+                </div>
+            </div>
+        </div>
+        ${stats.earliest_date && stats.latest_date ? `
+            <div class="mt-3">
+                <p class="mb-0"><strong>Date Range:</strong> ${stats.earliest_date} to ${stats.latest_date}</p>
+            </div>
+        ` : ''}
+    `;
+}
+
+async function triggerBackfill(event) {
     event.preventDefault();
     
-    const address = document.getElementById('addressInput').value;
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
+    const startDate = document.getElementById('backfillStartDate').value;
+    const endDate = document.getElementById('backfillEndDate').value;
+    const batchSize = parseInt(document.getElementById('batchSize').value);
     
-    if (!address.trim()) {
-        alert('Please enter an address or location');
+    if (!startDate || !endDate) {
+        alert('Please select both start and end dates');
         return;
     }
     
-    // Show loading state
-    const resultsDiv = document.getElementById('searchResults');
+    // Update status
+    const statusBadge = document.getElementById('processingStatus');
+    const resultsDiv = document.getElementById('processingResults');
+    
+    statusBadge.textContent = 'Processing...';
+    statusBadge.className = 'badge bg-warning';
+    
     resultsDiv.innerHTML = `
         <div class="text-center py-4">
             <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Searching...</span>
+                <span class="visually-hidden">Processing...</span>
             </div>
-            <p class="mt-2">Geocoding address and searching for weather events...</p>
+            <p class="mt-2">Processing radar alerts from ${startDate} to ${endDate}...</p>
         </div>
     `;
     
     try {
-        const params = new URLSearchParams({
-            address: address,
-            start_date: startDate,
-            end_date: endDate
+        const response = await fetch('/api/radar-alerts/backfill', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                start_date: startDate,
+                end_date: endDate,
+                batch_size: batchSize
+            })
         });
         
-        const response = await fetch(`/api/radar-alerts/contains-address?${params}`);
         const data = await response.json();
         
         if (!response.ok) {
-            throw new Error(data.error || 'Search failed');
+            throw new Error(data.error || 'Backfill failed');
         }
         
-        currentResults = data.events || [];
-        displayResults(data);
+        statusBadge.textContent = 'Completed';
+        statusBadge.className = 'badge bg-success';
+        
+        displayBackfillResults(data);
+        
+        // Refresh stats and processed events
+        setTimeout(() => {
+            loadStats();
+            loadProcessedEvents();
+        }, 1000);
         
     } catch (error) {
-        console.error('Search error:', error);
+        console.error('Backfill error:', error);
+        statusBadge.textContent = 'Failed';
+        statusBadge.className = 'badge bg-danger';
+        
         resultsDiv.innerHTML = `
             <div class="alert alert-danger">
                 <i class="fas fa-exclamation-triangle me-2"></i>
-                Search failed: ${error.message}
+                Backfill failed: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function displayBackfillResults(data) {
+    const resultsDiv = document.getElementById('processingResults');
+    const stats = data.stats || {};
+    
+    resultsDiv.innerHTML = `
+        <div class="alert alert-success">
+            <h6><i class="fas fa-check-circle me-2"></i>Backfill Completed Successfully</h6>
+            <div class="row mt-3">
+                <div class="col-md-3">
+                    <strong>Total Alerts Found:</strong><br>
+                    <span class="h5">${stats.total_alerts_found || 0}</span>
+                </div>
+                <div class="col-md-3">
+                    <strong>Hail Events Created:</strong><br>
+                    <span class="h5 text-danger">${stats.hail_events_created || 0}</span>
+                </div>
+                <div class="col-md-3">
+                    <strong>Wind Events Created:</strong><br>
+                    <span class="h5 text-success">${stats.wind_events_created || 0}</span>
+                </div>
+                <div class="col-md-3">
+                    <strong>Skipped/Failed:</strong><br>
+                    <span class="h5 text-warning">${(stats.skipped_existing || 0) + (stats.failed_processing || 0)}</span>
+                </div>
+            </div>
+            ${stats.processing_errors && stats.processing_errors.length > 0 ? `
+                <div class="mt-3">
+                    <strong>Processing Errors:</strong>
+                    <ul class="mb-0">
+                        ${stats.processing_errors.slice(0, 5).map(error => `<li>${error}</li>`).join('')}
+                        ${stats.processing_errors.length > 5 ? `<li>... and ${stats.processing_errors.length - 5} more</li>` : ''}
+                    </ul>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+async function loadAvailableDates() {
+    try {
+        const response = await fetch('/api/radar-alerts/available-dates');
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load available dates');
+        }
+        
+        displayAvailableDates(data);
+        
+    } catch (error) {
+        console.error('Available dates loading error:', error);
+        document.getElementById('availableDates').innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Failed to load available dates: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function displayAvailableDates(data) {
+    const datesDiv = document.getElementById('availableDates');
+    
+    if (!data.dates || data.dates.length === 0) {
+        datesDiv.innerHTML = `
+            <div class="text-center text-muted py-3">
+                <p>No radar-detected events available yet.</p>
+                <p><small>Use the backfill processor above to process historical alerts.</small></p>
+            </div>
+        `;
+        return;
+    }
+    
+    const datesHtml = data.dates.map(dateInfo => `
+        <div class="col-md-4 mb-3">
+            <div class="card border-left-primary">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between">
+                        <strong>${dateInfo.date}</strong>
+                        <span class="badge bg-primary">${dateInfo.count} events</span>
+                    </div>
+                    <small class="text-muted">
+                        ${dateInfo.hail_count || 0} hail, ${dateInfo.wind_count || 0} wind
+                    </small>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    datesDiv.innerHTML = `
+        <div class="row">
+            ${datesHtml}
+        </div>
+    `;
+}
+
+async function loadProcessedEvents() {
+    try {
+        const response = await fetch('/api/radar-alerts?limit=20');
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load processed events');
+        }
+        
+        displayProcessedEvents(data);
+        
+    } catch (error) {
+        console.error('Processed events loading error:', error);
+        document.getElementById('processedEvents').innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Failed to load processed events: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function displayProcessedEvents(data) {
+    const eventsDiv = document.getElementById('processedEvents');
+    
+    if (!data.events || data.events.length === 0) {
+        eventsDiv.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-database fa-3x mb-3"></i>
+                <p>No processed radar events found.</p>
+                <p><small>Use the backfill processor above to process radar-detected alerts.</small></p>
+            </div>
+        `;
+        return;
+    }
+    
+    const eventsHtml = data.events.map(event => {
+        const eventIcon = event.event_type === 'hail' ? 'fas fa-snowflake text-danger' : 'fas fa-wind text-success';
+        const eventValue = event.event_type === 'hail' ? `${event.hail_inches}"` : `${event.wind_mph} mph`;
+        
+        return `
+            <div class="weather-event-card">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="d-flex align-items-center">
+                        <i class="${eventIcon} me-2"></i>
+                        <strong>${event.event_type.toUpperCase()}: ${eventValue}</strong>
+                    </div>
+                    <small class="text-muted">${new Date(event.detected_time).toLocaleString()}</small>
+                </div>
+                <div class="mb-2">
+                    <strong>Location:</strong> ${event.city_names && event.city_names.length > 0 ? event.city_names.join(', ') : 'Multiple areas'}
+                </div>
+                ${event.county_names && event.county_names.length > 0 ? `
+                    <div class="mb-2">
+                        <strong>Counties:</strong> ${event.county_names.join(', ')}
+                    </div>
+                ` : ''}
+                <div class="mb-2">
+                    <strong>Event Date:</strong> ${event.event_date}
+                </div>
+                ${event.geometry_bounds ? `
+                    <div>
+                        <strong>Coverage Area:</strong> 
+                        <small class="text-muted">
+                            ${event.geometry_bounds.min_lat?.toFixed(4)}, ${event.geometry_bounds.min_lon?.toFixed(4)} to 
+                            ${event.geometry_bounds.max_lat?.toFixed(4)}, ${event.geometry_bounds.max_lon?.toFixed(4)}
+                        </small>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+    
+    eventsDiv.innerHTML = `
+        ${eventsHtml}
+        ${data.events.length >= 20 ? `
+            <div class="text-center mt-3">
+                <button class="btn btn-outline-primary" onclick="loadMoreEvents()">
+                    <i class="fas fa-chevron-down me-1"></i>Load More Events
+                </button>
+            </div>
+        ` : ''}
+    `;
+}
+
+async function validateJune10() {
+    const statusBadge = document.getElementById('processingStatus');
+    const resultsDiv = document.getElementById('processingResults');
+    
+    statusBadge.textContent = 'Validating...';
+    statusBadge.className = 'badge bg-info';
+    
+    resultsDiv.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-info" role="status">
+                <span class="visually-hidden">Validating...</span>
+            </div>
+            <p class="mt-2">Validating June 10, 2025 radar data...</p>
+        </div>
+    `;
+    
+    try {
+        // Set form to June 10, 2025
+        document.getElementById('backfillStartDate').value = '2025-06-10';
+        document.getElementById('backfillEndDate').value = '2025-06-10';
+        document.getElementById('batchSize').value = '50';
+        
+        // Trigger backfill for that specific date
+        const response = await fetch('/api/radar-alerts/backfill', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                start_date: '2025-06-10',
+                end_date: '2025-06-10',
+                batch_size: 50
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Validation failed');
+        }
+        
+        statusBadge.textContent = 'Validated';
+        statusBadge.className = 'badge bg-success';
+        
+        const stats = data.stats || {};
+        resultsDiv.innerHTML = `
+            <div class="alert alert-info">
+                <h6><i class="fas fa-check-circle me-2"></i>June 10, 2025 Validation Complete</h6>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <strong>Total Alerts Found:</strong><br>
+                        <span class="h5">${stats.total_alerts_found || 0}</span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Radar Events Created:</strong><br>
+                        <span class="h5 text-primary">${(stats.hail_events_created || 0) + (stats.wind_events_created || 0)}</span>
+                    </div>
+                </div>
+                <p class="mt-3 mb-0">
+                    <i class="fas fa-info-circle me-1"></i>
+                    This validates your NWS alert data contains radar-detected events. Use the full backfill controls above for larger date ranges.
+                </p>
+            </div>
+        `;
+        
+        // Refresh data displays
+        setTimeout(() => {
+            loadStats();
+            loadAvailableDates();
+            loadProcessedEvents();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Validation error:', error);
+        statusBadge.textContent = 'Failed';
+        statusBadge.className = 'badge bg-danger';
+        
+        resultsDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                June 10, 2025 validation failed: ${error.message}
             </div>
         `;
     }
