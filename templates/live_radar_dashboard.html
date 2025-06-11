@@ -376,7 +376,18 @@ function displayAlerts(alerts) {
         return;
     }
     
-    tbody.innerHTML = alerts.map(alert => {
+    // Filter for alerts with radar data and wind/hail information
+    const radarAlerts = alerts.filter(alert => {
+        const radarData = alert.radar_data || {};
+        return radarData.hail_inches > 0 || radarData.wind_mph >= 50;
+    });
+    
+    if (radarAlerts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No radar-detected wind/hail alerts currently active.</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = radarAlerts.map(alert => {
         const radarData = alert.radar_data || {};
         const hailSize = radarData.hail_inches || 0;
         const windSpeed = radarData.wind_mph || 0;
@@ -392,7 +403,8 @@ function displayAlerts(alerts) {
         const severity = getSeverityBadge(hailSize, windSpeed);
         
         const time = alert.effective ? new Date(alert.effective).toLocaleString() : 'Unknown';
-        const location = alert.city_names ? alert.city_names.join(', ') : (alert.area_desc || 'Unknown');
+        const location = alert.city_names && alert.city_names.length > 0 ? 
+            alert.city_names.join(', ') : (alert.area_desc || 'Unknown');
         const state = extractState(alert.area_desc || '');
         
         return `

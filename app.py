@@ -3779,11 +3779,23 @@ def api_live_radar_alerts():
             description = (props.get('description') or '').lower()
             headline = (props.get('headline') or '').lower()
             
-            # Check if this is a wind/hail related alert
-            is_wind_hail = any(keyword in event or keyword in description or keyword in headline 
-                             for keyword in ['severe', 'tornado', 'wind', 'hail', 'storm'])
+            # Check if this is a severe weather alert with potential radar indication
+            is_severe_weather = any(keyword in event for keyword in [
+                'severe thunderstorm', 'tornado', 'severe weather'
+            ])
             
-            if not is_wind_hail:
+            # Also check for radar-indicated keywords in description
+            has_radar_keywords = any(keyword in description for keyword in [
+                'radar indicated', 'radar showing', 'doppler radar', 'radar detected'
+            ])
+            
+            # Also check for wind/hail magnitude indicators
+            has_wind_hail_indicators = any(keyword in description for keyword in [
+                'mph', 'wind', 'hail', 'quarter size', 'golf ball', 'ping pong', 'tennis ball'
+            ])
+            
+            # Filter for alerts that are likely to have radar data
+            if not (is_severe_weather or has_radar_keywords or has_wind_hail_indicators):
                 continue
                 
             stats['wind_hail_alerts'] += 1
