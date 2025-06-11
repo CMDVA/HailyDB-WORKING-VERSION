@@ -58,11 +58,19 @@ class SPCIngestService:
     def should_poll_now(self, report_date: date) -> bool:
         """
         Check if we should poll for this date based on systematic schedule
-        Includes data protection for T-16+ dates and existing data checks
+        Uses SPC Day logic for T-0 determination and includes data protection for T-16+ dates
         """
-        # Check if date is in protected range (T-16+)
-        today = date.today()
-        days_ago = (today - report_date).days
+        # Use SPC Day logic to determine current day and days_ago calculation
+        now_utc = datetime.utcnow()
+        
+        if now_utc.hour >= 12:
+            # Current time is >= 12:00Z, so SPC day is today
+            current_spc_day = now_utc.date()
+        else:
+            # Current time is < 12:00Z, so SPC day is yesterday
+            current_spc_day = (now_utc - timedelta(days=1)).date()
+        
+        days_ago = (current_spc_day - report_date).days
         
         if days_ago >= 16:
             return False  # Data protected, no automatic polling
@@ -72,11 +80,25 @@ class SPCIngestService:
             SPCReport.report_date == report_date
         ).count()
         
+        # For T-0 (current SPC Day), always poll if interval has passed (active reporting window)
+        if days_ago == 0:
+            last_log = SPCIngestionLog.query.filter(
+                SPCIngestionLog.report_date == report_date,
+                SPCIngestionLog.success == True
+            ).order_by(SPCIngestionLog.completed_at.desc()).first()
+            
+            if not last_log:
+                return True  # Never polled before
+                
+            # For T-0, poll every 60 minutes during active SPC Day
+            time_since_last = datetime.utcnow() - last_log.completed_at
+            return time_since_last.total_seconds() >= (60 * 60)  # 60 minutes for T-0
+        
         # For dates older than 7 days, skip if we have any data (likely complete)
         if days_ago >= 7 and existing_count > 0:
             return False
             
-        # For recent dates (T-0 to T-6), check polling interval
+        # For recent dates (T-1 to T-6), check polling interval
         last_log = SPCIngestionLog.query.filter(
             SPCIngestionLog.report_date == report_date,
             SPCIngestionLog.success == True
