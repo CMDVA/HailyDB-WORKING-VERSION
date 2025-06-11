@@ -2427,7 +2427,7 @@ def get_county_hurricane_impacts(county_fips):
                 'max_wind_observed': max_wind_ever,
                 'landfall_events': landfall_events,
                 'category_distribution': category_stats,
-                'most_recent_impact': impacts[0].first_impact_time.isoformat() if impacts else None
+                'most_recent_impact': impacts[0].first_impact_time.isoformat() if impacts and impacts[0].first_impact_time else None
             },
             'impacts': [impact.to_dict() for impact in impacts]
         })
