@@ -111,7 +111,20 @@ class SPCEnhancedContextService:
         counties_affected = set()
         for alert in verified_alerts:
             if alert.county_names:
-                counties_affected.update(alert.county_names)
+                try:
+                    # Handle both list and string formats
+                    if isinstance(alert.county_names, list):
+                        # Filter out any non-string items
+                        for county in alert.county_names:
+                            if isinstance(county, str):
+                                counties_affected.add(county)
+                    elif isinstance(alert.county_names, str):
+                        counties_affected.add(alert.county_names)
+                    else:
+                        logger.warning(f"Unexpected county_names type: {type(alert.county_names)} - {alert.county_names}")
+                except Exception as e:
+                    logger.error(f"Error processing county_names for alert {alert.id}: {e}")
+                    continue
         
         # Calculate average match confidence
         confidences = [alert.spc_confidence_score for alert in verified_alerts if alert.spc_confidence_score]
@@ -378,12 +391,10 @@ Focus on locations that would be relevant for insurance, restoration, or emergen
 
 def enrich_spc_report_context(report_id: int) -> Dict[str, Any]:
     """Standalone function to enrich a single SPC report"""
-    with db.session as session:
-        service = SPCEnhancedContextService(session)
-        return service.enrich_spc_report(report_id)
+    service = SPCEnhancedContextService(db.session)
+    return service.enrich_spc_report(report_id)
 
 def enrich_all_spc_reports() -> Dict[str, int]:
     """Standalone function to enrich all verified SPC reports"""
-    with db.session as session:
-        service = SPCEnhancedContextService(session)
-        return service.enrich_all_verified_reports()
+    service = SPCEnhancedContextService(db.session)
+    return service.enrich_all_verified_reports()
