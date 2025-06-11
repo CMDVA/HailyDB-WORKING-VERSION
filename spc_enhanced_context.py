@@ -52,11 +52,7 @@ class SPCEnhancedContextService:
             # Get verified alerts that match this report
             verified_alerts = self._get_verified_alerts_for_report(report_id)
             
-            if not verified_alerts:
-                logger.info(f"No verified alerts found for SPC report {report_id}")
-                return {}
-            
-            # Generate enhanced context
+            # Generate enhanced context (with or without verified alerts)
             enhanced_context = self._build_enhanced_context(report, verified_alerts)
             
             # Update the report with enhanced context
@@ -95,6 +91,19 @@ class SPCEnhancedContextService:
     
     def _build_enhanced_context(self, report: SPCReport, verified_alerts: List[Alert]) -> Dict[str, Any]:
         """Build the enhanced context structure"""
+        
+        # Always get location context regardless of verified alerts
+        location_context = self._get_location_context(report)
+        
+        # Handle case with no verified alerts but still provide location enrichment
+        if not verified_alerts:
+            return {
+                "alert_count": 0,
+                "multi_alert_summary": self._generate_location_only_summary(report, location_context),
+                "location_context": location_context,
+                "generated_at": datetime.utcnow().isoformat(),
+                "has_verified_alerts": False
+            }
         
         # Calculate event duration
         if len(verified_alerts) > 1:
@@ -242,6 +251,55 @@ Make the location more meaningful by incorporating nearby places or geographic f
             logger.error(f"Error generating AI summary: {e}")
             # Fallback summary
             return f"This {report.report_type} report in {report.county} County, {report.state} was validated by {len(verified_alerts)} NWS alerts spanning {duration_minutes} minutes across {len(counties_affected)} counties."
+    
+    def _generate_location_only_summary(self, report: SPCReport, location_context: Dict[str, Any]) -> str:
+        """Generate location-enriched summary for reports without verified alerts"""
+        try:
+            # Extract meaningful location references
+            nearby_places = location_context.get('nearby_places', [])
+            geographic_features = location_context.get('geographic_features', [])
+            primary_location = location_context.get('primary_location', f"{report.location}, {report.county}")
+            
+            prompt = f"""Generate a location-enhanced summary for this SPC storm report:
+
+SPC Report Details:
+- Type: {report.report_type}
+- Location: {report.location}
+- State/County: {report.state}, {report.county}
+- Time: {report.time_utc}
+- Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
+- Comments: {report.comments}
+
+Enhanced Location Context:
+- Primary Location: {primary_location}
+- Nearby Places: {', '.join([place.get('name', '') for place in nearby_places]) if nearby_places else 'None identified'}
+- Geographic Features: {', '.join(geographic_features) if geographic_features else 'None identified'}
+
+Create a 1-2 sentence enhanced summary that:
+1. Uses the most recognizable location reference from the context data
+2. Describes the SPC report type and measurement clearly
+3. References nearby landmarks or recognizable places when available
+4. Makes the location more meaningful and accessible to readers
+
+Focus on making the event location clear and recognizable by incorporating nearby places or geographic features."""
+
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a meteorological data analyst specializing in location-enhanced weather summaries. Create clear, location-focused summaries that make storm reports more accessible."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=150,
+                temperature=0.2
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            logger.error(f"Error generating location-only summary: {e}")
+            # Fallback with location context
+            location_ref = location_context.get('primary_location', f"{report.location}, {report.county}, {report.state}")
+            return f"This {report.report_type} report occurred at {location_ref} at {report.time_utc}."
     
     def _get_location_context(self, report: SPCReport) -> Dict[str, Any]:
         """Get or generate location context for the report"""

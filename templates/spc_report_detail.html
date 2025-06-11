@@ -111,18 +111,23 @@
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
                     <h6 class="m-0 font-weight-bold text-success">
-                        <i class="fas fa-check-circle me-2"></i>Enhanced Multi-Alert Context
+                        <i class="fas fa-map-marker-alt me-2"></i>Enhanced Context Summary
                     </h6>
-                    <span class="badge bg-success">{{ report.enhanced_context.alert_count }} Verified Alerts</span>
+                    {% if report.enhanced_context.alert_count > 0 %}
+                        <span class="badge bg-success">{{ report.enhanced_context.alert_count }} Verified Alerts</span>
+                    {% else %}
+                        <span class="badge bg-info">Location Enhanced</span>
+                    {% endif %}
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-12 mb-3">
-                            <h6 class="text-muted mb-2">Multi-Alert Summary</h6>
+                            <h6 class="text-muted mb-2">Enhanced Summary</h6>
                             <p class="mb-0">{{ report.enhanced_context.multi_alert_summary }}</p>
                         </div>
                     </div>
                     
+                    {% if report.enhanced_context.alert_count > 0 %}
                     <div class="row mt-3">
                         <div class="col-md-6">
                             <h6 class="text-muted mb-2">Event Details</h6>
@@ -156,6 +161,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                     
                     {% if report.enhanced_context.location_context and report.enhanced_context.location_context.primary_location %}
                     <div class="row mt-3">
