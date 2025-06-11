@@ -11,6 +11,7 @@ from sqlalchemy import and_
 
 from app import db
 from models import Alert
+from config import Config
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -197,16 +198,8 @@ class HistoricalRadarParser:
                         except (ValueError, IndexError):
                             continue
             
-            # Size descriptors to inches mapping
-            size_descriptors = {
-                'quarter': 1.0,
-                'half dollar': 1.25,
-                'ping pong': 1.5,
-                'golf ball': 1.75,
-                'tennis ball': 2.5,
-                'baseball': 2.75,
-                'softball': 4.0
-            }
+            # Use centralized NWS hail size chart
+            size_descriptors = Config.NWS_HAIL_SIZE_CHART
             
             for descriptor, size in size_descriptors.items():
                 if descriptor in text and 'hail' in text:

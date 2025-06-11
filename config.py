@@ -33,6 +33,82 @@ class Config:
     # Logging Configuration
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
     
+    # Official NWS Hail Size Chart (inches)
+    NWS_HAIL_SIZE_CHART = {
+        'pea': 0.25,
+        'peanut': 0.5,
+        'penny': 0.75,
+        'nickel': 0.88,
+        'quarter': 1.0,
+        'half dollar': 1.25,
+        'ping pong ball': 1.5,
+        'golf ball': 1.75,
+        'egg': 2.0,
+        'tennis ball': 2.5,
+        'baseball': 2.75,
+        'large apple': 3.0,
+        'softball': 4.0,
+        'grapefruit': 4.5
+    }
+    
+    # Hail size categories for display and filtering
+    HAIL_SIZE_CATEGORIES = [
+        (0.25, "Pea"),
+        (0.5, "Marble"), 
+        (0.75, "Penny"),
+        (1.0, "Quarter"),
+        (1.25, "Half Dollar"),
+        (1.5, "Ping Pong"),
+        (1.75, "Golf Ball"),
+        (2.0, "Egg/Tennis Ball"),
+        (2.5, "Tennis Ball"),
+        (3.0, "Large Apple"),
+        (4.0, "Softball"),
+        (4.5, "Grapefruit")
+    ]
+    
+    @classmethod
+    def get_hail_display_name(cls, size_inches):
+        """Get display name for hail size"""
+        if size_inches >= 4.5:
+            return "Record Size"
+        elif size_inches >= 4.0:
+            return "Softball"
+        elif size_inches >= 2.5:
+            return "Tennis Ball+"
+        elif size_inches >= 2.0:
+            return "Egg"
+        elif size_inches >= 1.75:
+            return "Golf Ball"
+        elif size_inches >= 1.5:
+            return "Ping Pong"
+        elif size_inches >= 1.25:
+            return "Half Dollar"
+        elif size_inches >= 1.0:
+            return "Quarter"
+        elif size_inches >= 0.75:
+            return "Penny"
+        elif size_inches >= 0.5:
+            return "Marble"
+        elif size_inches >= 0.25:
+            return "Pea"
+        else:
+            return "Small"
+    
+    @classmethod
+    def get_hail_severity(cls, size_inches):
+        """Get severity category for hail size"""
+        if size_inches >= 4.0:
+            return "Extremely Severe"
+        elif size_inches >= 2.0:
+            return "Severe"
+        elif size_inches >= 1.0:
+            return "Significant"
+        elif size_inches >= 0.5:
+            return "Notable"
+        else:
+            return "Minor"
+    
     @classmethod
     def validate(cls):
         """Validate configuration settings"""
