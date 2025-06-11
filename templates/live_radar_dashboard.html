@@ -350,14 +350,20 @@ function updateLastRefreshTime() {
 
 async function loadLiveAlerts() {
     try {
+        console.log('Fetching live radar alerts...');
         const response = await fetch('/api/live-radar-alerts');
         const data = await response.json();
         
+        console.log('API Response:', data);
+        console.log('Alerts count:', data.alerts ? data.alerts.length : 0);
+        
         if (data.error) {
+            console.error('API Error:', data.error);
             displayError(data.error);
             return;
         }
         
+        console.log('Calling displayAlerts with:', data.alerts || []);
         displayAlerts(data.alerts || []);
         updateStatistics(data.statistics || {});
         updateLastRefreshTime();
