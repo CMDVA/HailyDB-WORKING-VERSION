@@ -2438,17 +2438,22 @@ def spc_matches_data():
         # Format matches for JSON response
         formatted_matches = []
         for match in matches:
-            # Parse SPC reports
+            # Parse SPC reports with IDs for navigation
             spc_reports = []
             if match.spc_reports:
-                for report in match.spc_reports:
+                # Get actual SPC report objects for this alert
+                from models import SPCReport
+                actual_reports = SPCReport.query.join(Alert, SPCReport.matched_alerts.any(Alert.id == match.id)).all()
+                
+                for report in actual_reports:
                     spc_reports.append({
-                        'report_type': report.get('report_type', 'unknown'),
-                        'time_utc': report.get('time_utc', ''),
-                        'location': report.get('location', ''),
-                        'county': report.get('county', ''),
-                        'state': report.get('state', ''),
-                        'comments': report.get('comments', '')
+                        'id': report.id,
+                        'report_type': report.report_type or 'unknown',
+                        'time_utc': report.time_utc or '',
+                        'location': report.location or '',
+                        'county': report.county or '',
+                        'state': report.state or '',
+                        'comments': report.comments or ''
                     })
             
             formatted_matches.append({

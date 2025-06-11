@@ -44,6 +44,80 @@
                             </div>
                         </div>
 
+                        <!-- SPC Confirmed Section -->
+                        {% if alert.spc_verified %}
+                        <div class="spc-confirmed mb-4">
+                            <div class="alert alert-success border-start border-success border-3 bg-success bg-opacity-10">
+                                <div class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-check-circle text-success me-2 fs-4"></i>
+                                    <h5 class="text-success mb-0 fw-bold">SPC Confirmed Event</h5>
+                                    <span class="badge bg-success ms-2">{{ alert.spc_report_count or 1 }} Report{{ 's' if (alert.spc_report_count or 1) > 1 else '' }}</span>
+                                </div>
+                                
+                                {% if alert.spc_ai_summary %}
+                                <div class="mb-3">
+                                    <p class="mb-0 text-dark">{{ alert.spc_ai_summary }}</p>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- SPC Report Details -->
+                                {% if alert.spc_reports %}
+                                <div class="row">
+                                    {% for spc_report in alert.spc_reports %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card border-success">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <h6 class="text-success mb-0">
+                                                        <i class="fas fa-file-alt me-1"></i>
+                                                        SPC Report #{{ spc_report.id }}
+                                                    </h6>
+                                                    <a href="{{ url_for('view_spc_report_detail', report_id=spc_report.id) }}" 
+                                                       class="btn btn-outline-success btn-sm">
+                                                        <i class="fas fa-external-link-alt me-1"></i>View Report
+                                                    </a>
+                                                </div>
+                                                
+                                                <div class="mb-2">
+                                                    <span class="badge bg-secondary me-2">{{ spc_report.type|title }}</span>
+                                                    {% if spc_report.type == 'hail' and spc_report.magnitude %}
+                                                    <span class="badge bg-info">{{ spc_report.magnitude }}" Hail</span>
+                                                    {% elif spc_report.type == 'wind' and spc_report.magnitude %}
+                                                    <span class="badge bg-warning">{{ spc_report.magnitude }} mph</span>
+                                                    {% elif spc_report.type == 'tornado' and spc_report.magnitude %}
+                                                    <span class="badge bg-danger">{{ spc_report.magnitude }}</span>
+                                                    {% endif %}
+                                                </div>
+                                                
+                                                <div class="small text-muted">
+                                                    <div><i class="fas fa-map-marker-alt me-1"></i>{{ spc_report.location }}</div>
+                                                    <div><i class="fas fa-map me-1"></i>{{ spc_report.county }}, {{ spc_report.state }}</div>
+                                                    {% if spc_report.comments %}
+                                                    <div class="mt-2"><strong>Comments:</strong> {{ spc_report.comments }}</div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                
+                                <div class="small text-muted mt-2">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Storm Prediction Center report{{ 's' if (alert.spc_report_count or 1) > 1 else '' }} 
+                                    confirm{{ '' if (alert.spc_report_count or 1) > 1 else 's' }} this radar-detected event
+                                    {% if alert.spc_match_method %}
+                                    via {{ alert.spc_match_method }} matching
+                                    {% endif %}
+                                    {% if alert.spc_confidence_score %}
+                                    ({{ (alert.spc_confidence_score * 100)|round|int }}% confidence)
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
                         <!-- Radar-Indicated Data -->
                         {% if alert.radar_indicated %}
                         <div class="radar-indicated mb-4">

@@ -1,0 +1,80 @@
+You are updating HailyDB’s SPC match presentation and surfacing across the application.
+
+I recommended maintaining the existing architecture — storing SPC match data inside the alerts table — because your current design intentionally embeds matches in the spc_reports JSONB array to support fast queries, flexible API responses, and simplified data access without introducing additional relational complexity. Introducing a separate spc_matches table would have required restructuring your data model and adding maintenance overhead for something your system already handles well. The real gap is in presentation and usability — not storage — so the correct move is to enhance the UI and API to make these embedded matches visible, consistent, and actionable for your users and clients, while preserving the architectural efficiency and avoiding unnecessary refactor risk. This decision ensures you can ship an improved user experience fast without disrupting your stable backend.
+
+⚠️ Do NOT propose adding a spc_matches table — our architecture is intentionally embedding SPC match data into the alerts table via the spc_reports JSONB array and related fields:
+
+spc_verified
+
+spc_match_method
+
+spc_confidence_score
+
+spc_report_count
+
+spc_reports (JSONB array with SPC report details)
+
+spc_ai_summary
+
+Objectives:
+✅ Improve visibility of SPC matches on /alerts/{id} page:
+
+Add a clear “SPC Confirmed” badge if spc_verified == true.
+
+Display the spc_ai_summary prominently under the badge.
+
+For each SPC match (in spc_reports), display:
+
+SPC Report ID (link to /spc/reports/{id})
+
+Type (hail, wind, tornado)
+
+Magnitude (hail size, wind speed, F-scale)
+
+Location, County, State
+
+SPC comments
+
+✅ Improve /spc-matches page:
+
+Ensure “View” link to /alerts/{id} opens in SAME window (not new tab).
+
+Display a link to the SPC report in each match row (based on spc_reports[].id).
+
+Display the same spc_ai_summary here, consistent with /alerts/{id}.
+
+✅ API Consistency:
+
+Ensure /spc-matches/data endpoint includes:
+
+Alert ID
+
+SPC Report IDs
+
+spc_ai_summary
+
+spc_verified
+
+spc_match_method
+
+spc_confidence_score
+
+✅ Maintain current architecture:
+
+SPC matches remain embedded in the alerts table.
+
+No new relational table is to be created.
+
+Do not refactor existing alerts.spc_reports JSONB structure.
+
+✅ Optional UX:
+
+On /spc/reports/{id} pages, you may add a “SPC Matched Alert(s)” section that links back to any alert(s) that have matched this SPC report — this can be queried by scanning alerts.spc_reports where the report ID matches.
+
+Summary:
+
+This is a presentation & API enhancement task, not a schema redesign.
+
+The goal is to improve clarity and usability of cross-confirmed SPC matches for users and for API consumers.
+
+Keep layman-friendly language and avoid internal technical terms (e.g. "polygon match" should be phrased user-friendly if shown at all).
