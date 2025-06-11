@@ -371,11 +371,14 @@ function updateLastRefreshTime() {
 
 async function loadLiveAlerts() {
     try {
-        console.log('Fetching live radar alerts...');
+        console.log('=== loadLiveAlerts() START ===');
         const response = await fetch('/api/live-radar-alerts');
-        const data = await response.json();
+        console.log('Response status:', response.status, response.statusText);
         
-        console.log('API Response:', data);
+        const data = await response.json();
+        console.log('=== API Response received ===');
+        console.log('Full data object:', data);
+        console.log('data.alerts exists:', !!data.alerts);
         console.log('Alerts count:', data.alerts ? data.alerts.length : 0);
         
         if (data.error) {
@@ -386,34 +389,53 @@ async function loadLiveAlerts() {
         
         // Store alerts globally for filter toggling
         window.currentAlerts = data.alerts || [];
+        console.log('=== Stored alerts globally ===');
+        console.log('window.currentAlerts:', window.currentAlerts);
         
-        console.log('Calling displayAlerts with:', window.currentAlerts);
+        console.log('=== About to call displayAlerts ===');
         displayAlerts(window.currentAlerts);
+        console.log('=== displayAlerts call completed ===');
+        
         updateStatistics(data.statistics || {});
         updateLastRefreshTime();
+        console.log('=== loadLiveAlerts() COMPLETE ===');
         
     } catch (error) {
-        console.error('Error loading live alerts:', error);
-        displayError('Failed to load live radar alerts');
+        console.error('=== ERROR in loadLiveAlerts ===');
+        console.error('Error type:', error.constructor.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        displayError('Failed to load live radar alerts: ' + error.message);
     }
 }
 
 function displayAlerts(alerts) {
-    console.log('=== displayAlerts() called ===');
-    console.log('Received alerts:', alerts);
-    console.log('Alerts type:', typeof alerts);
-    console.log('Alerts length:', alerts ? alerts.length : 'N/A');
-    
-    const tbody = document.getElementById('liveRadarTableBody');
-    console.log('Table body element found:', tbody ? 'YES' : 'NO');
-    
-    if (!alerts || alerts.length === 0) {
-        console.log('No alerts received, showing empty message');
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No live radar alerts currently active.</td></tr>';
+    try {
+        console.log('=== displayAlerts() called ===');
+        console.log('Received alerts:', alerts);
+        console.log('Alerts type:', typeof alerts);
+        console.log('Alerts length:', alerts ? alerts.length : 'N/A');
+        
+        const tbody = document.getElementById('liveRadarTableBody');
+        console.log('Table body element found:', tbody ? 'YES' : 'NO');
+        
+        if (!tbody) {
+            console.error('ERROR: Table body element not found!');
+            return;
+        }
+        
+        if (!alerts || alerts.length === 0) {
+            console.log('No alerts received, showing empty message');
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No live radar alerts currently active.</td></tr>';
+            return;
+        }
+        
+        console.log('Processing alerts for display...');
+    } catch (error) {
+        console.error('=== ERROR in displayAlerts start ===');
+        console.error('Error:', error);
         return;
     }
-    
-    console.log('Processing alerts for display...');
     
     // Get current filter selection
     const selectedFilter = document.querySelector('input[name="alertTypeFilter"]:checked')?.value || 'all';
@@ -637,6 +659,62 @@ function clearFilters() {
     document.getElementById('minHailSize').value = '';
     document.getElementById('minWindSpeed').value = '50';
     loadLiveAlerts();
+}
+
+// Helper functions for formatting display values
+function getHailSizeClass(size) {
+    if (size >= 2.0) return 'bg-danger';
+    if (size >= 1.0) return 'bg-warning';
+    if (size >= 0.5) return 'bg-info';
+    return 'bg-secondary';
+}
+
+function getHailSizeName(size) {
+    if (size >= 4.0) return 'Softball+';
+    if (size >= 2.75) return 'Baseball';
+    if (size >= 2.5) return 'Tennis Ball';
+    if (size >= 1.75) return 'Golf Ball';
+    if (size >= 1.5) return 'Ping Pong';
+    if (size >= 1.25) return 'Half Dollar';
+    if (size >= 1.0) return 'Quarter';
+    if (size >= 0.88) return 'Nickel';
+    if (size >= 0.75) return 'Penny';
+    if (size >= 0.5) return 'Marble';
+    if (size >= 0.25) return 'Pea';
+    return 'Small';
+}
+
+function getWindSpeedClass(speed) {
+    if (speed >= 75) return 'bg-danger';
+    if (speed >= 65) return 'bg-warning';
+    if (speed >= 50) return 'bg-info';
+    return 'bg-secondary';
+}
+
+function getWindSeverity(speed) {
+    if (speed >= 75) return 'Extreme';
+    if (speed >= 65) return 'Severe';
+    if (speed >= 50) return 'Strong';
+    return 'Moderate';
+}
+
+function getSeverityBadge(hailSize, windSpeed) {
+    const maxSeverity = Math.max(
+        hailSize >= 2.0 ? 3 : hailSize >= 1.0 ? 2 : hailSize >= 0.5 ? 1 : 0,
+        windSpeed >= 75 ? 3 : windSpeed >= 65 ? 2 : windSpeed >= 50 ? 1 : 0
+    );
+    
+    switch(maxSeverity) {
+        case 3: return '<span class="badge bg-danger">Extreme</span>';
+        case 2: return '<span class="badge bg-warning">Severe</span>';
+        case 1: return '<span class="badge bg-info">Moderate</span>';
+        default: return '<span class="badge bg-secondary">Light</span>';
+    }
+}
+
+function extractState(areaDesc) {
+    const match = areaDesc.match(/,\s*([A-Z]{2})\b/);
+    return match ? match[1] : '';
 }
 
 function viewAlert(alertId) {
