@@ -12,7 +12,7 @@ from sqlalchemy import text
 import openai
 import os
 
-from models import SPCReport, Alert, RadarAlert, db
+from app import db
 from config import Config
 
 # Configure logging
@@ -40,6 +40,9 @@ class SPCEnhancedContextService:
             Enhanced context dictionary
         """
         try:
+            # Import models here to avoid circular imports
+            from models import SPCReport, Alert, RadarAlert
+            
             # Get the SPC report
             report = self.db.query(SPCReport).filter_by(id=report_id).first()
             if not report:
@@ -66,7 +69,7 @@ class SPCEnhancedContextService:
             self.db.rollback()
             raise
     
-    def _get_verified_alerts_for_report(self, report_id: int) -> List[Alert]:
+    def _get_verified_alerts_for_report(self, report_id: int) -> List:
         """Get all verified alerts that match a specific SPC report"""
         
         # Query alerts that contain the report_id in their spc_reports JSONB field
@@ -85,10 +88,11 @@ class SPCEnhancedContextService:
             return []
         
         # Get full alert objects
+        from models import Alert
         alerts = self.db.query(Alert).filter(Alert.id.in_(alert_ids)).order_by(Alert.effective).all()
         return alerts
     
-    def _build_enhanced_context(self, report: SPCReport, verified_alerts: List[Alert]) -> Dict[str, Any]:
+    def _build_enhanced_context(self, report, verified_alerts: List) -> Dict[str, Any]:
         """Build the enhanced context structure"""
         
         # Always get location context regardless of verified alerts
