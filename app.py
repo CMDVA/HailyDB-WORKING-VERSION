@@ -2367,6 +2367,179 @@ def search_hurricanes_by_location():
         logger.error(f"Error searching hurricanes by location: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route("/api/hurricanes/county-impacts/<county_fips>", methods=["GET"])
+def get_county_hurricane_impacts(county_fips):
+    """
+    Get hurricane impact history for a specific county FIPS code
+    Supports insurance risk assessment and restoration targeting
+    """
+    try:
+        from models import HurricaneCountyImpact
+        
+        # Validate FIPS format (5 digits)
+        if not county_fips.isdigit() or len(county_fips) != 5:
+            return jsonify({'error': 'Invalid FIPS code format. Expected 5 digits.'}), 400
+        
+        # Query parameters for filtering
+        min_wind = request.args.get('min_wind', type=int)
+        category = request.args.get('category')  # CAT1, CAT2, etc.
+        since_year = request.args.get('since_year', type=int)
+        
+        # Base query
+        query = HurricaneCountyImpact.query.filter_by(county_fips=county_fips)
+        
+        # Apply filters
+        if min_wind:
+            query = query.filter(HurricaneCountyImpact.max_wind_mph_observed >= min_wind)
+        if category:
+            query = query.filter(HurricaneCountyImpact.wind_field_category == category)
+        if since_year:
+            query = query.filter(HurricaneCountyImpact.first_impact_time >= datetime(since_year, 1, 1))
+        
+        impacts = query.order_by(HurricaneCountyImpact.first_impact_time.desc()).all()
+        
+        if not impacts:
+            return jsonify({
+                'county_fips': county_fips,
+                'impacts': [],
+                'total_storms': 0,
+                'message': 'No hurricane impacts found for this county'
+            })
+        
+        # Calculate summary statistics
+        total_storms = len(impacts)
+        max_wind_ever = max(impact.max_wind_mph_observed for impact in impacts if impact.max_wind_mph_observed)
+        landfall_events = sum(1 for impact in impacts if impact.in_landfall_zone)
+        
+        # Category distribution
+        category_stats = {}
+        for impact in impacts:
+            cat = impact.wind_field_category
+            if cat:
+                category_stats[cat] = category_stats.get(cat, 0) + 1
+        
+        return jsonify({
+            'county_fips': county_fips,
+            'county_name': impacts[0].county_name if impacts else None,
+            'state_code': impacts[0].state_code if impacts else None,
+            'summary': {
+                'total_storms': total_storms,
+                'max_wind_observed': max_wind_ever,
+                'landfall_events': landfall_events,
+                'category_distribution': category_stats,
+                'most_recent_impact': impacts[0].first_impact_time.isoformat() if impacts else None
+            },
+            'impacts': [impact.to_dict() for impact in impacts]
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving county impacts for {county_fips}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/hurricanes/county-impacts/search", methods=["GET"])
+def search_county_impacts():
+    """
+    Search county impacts by state, wind threshold, or storm characteristics
+    Query parameters:
+    - state: 2-letter state code
+    - min_wind: Minimum wind speed threshold
+    - category: Hurricane category (CAT1-CAT5, TS, TD)
+    - landfall_only: true/false
+    - since_year: Year filter
+    """
+    try:
+        from models import HurricaneCountyImpact
+        
+        # Query parameters
+        state = request.args.get('state')
+        min_wind = request.args.get('min_wind', type=int)
+        category = request.args.get('category')
+        landfall_only = request.args.get('landfall_only', 'false').lower() == 'true'
+        since_year = request.args.get('since_year', type=int)
+        limit = min(request.args.get('limit', default=100, type=int), 500)
+        
+        # Base query
+        query = HurricaneCountyImpact.query
+        
+        # Apply filters
+        if state:
+            query = query.filter(HurricaneCountyImpact.state_code == state.upper())
+        if min_wind:
+            query = query.filter(HurricaneCountyImpact.max_wind_mph_observed >= min_wind)
+        if category:
+            query = query.filter(HurricaneCountyImpact.wind_field_category == category)
+        if landfall_only:
+            query = query.filter(HurricaneCountyImpact.in_landfall_zone == True)
+        if since_year:
+            query = query.filter(HurricaneCountyImpact.first_impact_time >= datetime(since_year, 1, 1))
+        
+        # Execute with ordering and limit
+        impacts = query.order_by(
+            HurricaneCountyImpact.max_wind_mph_observed.desc(),
+            HurricaneCountyImpact.first_impact_time.desc()
+        ).limit(limit).all()
+        
+        return jsonify({
+            'results': [impact.to_dict() for impact in impacts],
+            'total_found': len(impacts),
+            'filters_applied': {
+                'state': state,
+                'min_wind': min_wind,
+                'category': category,
+                'landfall_only': landfall_only,
+                'since_year': since_year
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error searching county impacts: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/hurricanes/storm/<storm_id>/counties", methods=["GET"])
+def get_storm_county_impacts(storm_id):
+    """Get all county impacts for a specific storm"""
+    try:
+        from models import HurricaneCountyImpact
+        
+        impacts = HurricaneCountyImpact.query.filter_by(storm_id=storm_id).order_by(
+            HurricaneCountyImpact.max_wind_mph_observed.desc()
+        ).all()
+        
+        if not impacts:
+            return jsonify({
+                'storm_id': storm_id,
+                'county_impacts': [],
+                'message': 'No county impact data found for this storm'
+            })
+        
+        # Calculate storm-wide statistics
+        total_counties = len(impacts)
+        landfall_counties = sum(1 for impact in impacts if impact.in_landfall_zone)
+        max_wind = max(impact.max_wind_mph_observed for impact in impacts if impact.max_wind_mph_observed)
+        
+        # State distribution
+        state_counts = {}
+        for impact in impacts:
+            state = impact.state_code
+            if state:
+                state_counts[state] = state_counts.get(state, 0) + 1
+        
+        return jsonify({
+            'storm_id': storm_id,
+            'summary': {
+                'total_counties_affected': total_counties,
+                'landfall_counties': landfall_counties,
+                'max_wind_observed': max_wind,
+                'states_affected': list(state_counts.keys()),
+                'counties_by_state': state_counts
+            },
+            'county_impacts': [impact.to_dict() for impact in impacts]
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving county impacts for storm {storm_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route("/internal/hurricane-ingest", methods=["POST"])
 def trigger_hurricane_ingestion():
     """Admin endpoint to trigger hurricane data ingestion"""

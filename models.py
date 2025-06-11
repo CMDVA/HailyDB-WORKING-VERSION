@@ -529,3 +529,60 @@ class HurricaneTrack(db.Model):
             'ingested_at': self.ingested_at.isoformat() if self.ingested_at else None,
             'ai_summary': self.ai_summary
         }
+
+
+class HurricaneCountyImpact(db.Model):
+    """
+    County-level hurricane impact analysis for insurance and restoration targeting
+    Links hurricanes to specific FIPS codes with temporal and wind field data
+    """
+    __tablename__ = "hurricane_county_impacts"
+    
+    id = Column(db.Integer, primary_key=True)
+    storm_id = Column(String(20), nullable=False, index=True)  # e.g., "AL092022"
+    county_fips = Column(String(5), nullable=False, index=True)  # 5-digit FIPS code
+    state_code = Column(String(2), nullable=False)  # 2-letter state code
+    county_name = Column(String(100))  # County name for readability
+    
+    # Geographic impact metrics
+    min_distance_to_center_miles = Column(db.Numeric(8,2))  # Closest approach distance
+    max_wind_mph_observed = Column(db.Integer)  # Highest wind speed affecting county
+    in_landfall_zone = Column(Boolean, default=False)  # Direct landfall in county
+    wind_field_category = Column(String(10))  # Highest category affecting county (CAT1-5, TS, TD)
+    
+    # Temporal impact tracking
+    first_impact_time = Column(DateTime)  # When storm first affected county
+    last_impact_time = Column(DateTime)  # When storm last affected county  
+    track_points_in_county = Column(db.Integer, default=0)  # Number of track points within impact radius
+    
+    # Metadata
+    created_at = Column(DateTime, default=func.now())
+    
+    # Ensure one record per storm-county combination
+    __table_args__ = (
+        UniqueConstraint('storm_id', 'county_fips', name='uq_storm_county'),
+        Index('idx_county_impact_storm', 'storm_id'),
+        Index('idx_county_impact_fips', 'county_fips'),
+        Index('idx_county_impact_wind', 'max_wind_mph_observed'),
+        Index('idx_county_impact_distance', 'min_distance_to_center_miles'),
+    )
+    
+    def __repr__(self):
+        return f'<HurricaneCountyImpact {self.storm_id}: {self.county_fips} - {self.wind_field_category}>'
+        
+    def to_dict(self):
+        """Convert impact record to dictionary for JSON serialization"""
+        return {
+            'storm_id': self.storm_id,
+            'county_fips': self.county_fips,
+            'state_code': self.state_code,
+            'county_name': self.county_name,
+            'min_distance_to_center_miles': float(self.min_distance_to_center_miles) if self.min_distance_to_center_miles else None,
+            'max_wind_mph_observed': self.max_wind_mph_observed,
+            'in_landfall_zone': self.in_landfall_zone,
+            'wind_field_category': self.wind_field_category,
+            'first_impact_time': self.first_impact_time.isoformat() if self.first_impact_time else None,
+            'last_impact_time': self.last_impact_time.isoformat() if self.last_impact_time else None,
+            'track_points_in_county': self.track_points_in_county,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

@@ -10,7 +10,7 @@ import requests
 import json
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
-from models import HurricaneTrack
+from models import HurricaneTrack, HurricaneCountyImpact
 from app import db
 
 logger = logging.getLogger(__name__)
@@ -192,10 +192,16 @@ class HurricaneIngestService:
                         # Parse status
                         status = parts[3] if len(parts) > 3 else 'TD'
                         
-                        # Create timestamp
-                        year = current_storm['year']
-                        month = int(date_str[:2])
-                        day = int(date_str[2:4])
+                        # Create timestamp - HURDAT2 format is YYYYMMDD
+                        if len(date_str) == 8:
+                            year = int(date_str[:4])
+                            month = int(date_str[4:6])
+                            day = int(date_str[6:8])
+                        else:
+                            year = current_storm['year']
+                            month = int(date_str[:2])
+                            day = int(date_str[2:4])
+                            
                         hour = int(time_str[:2]) if time_str else 0
                         minute = int(time_str[2:4]) if len(time_str) >= 4 else 0
                         
