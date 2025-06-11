@@ -93,21 +93,22 @@ class WebhookService:
             return False
     
     def _evaluate_hail_condition(self, rule: WebhookRule, alert: Alert) -> bool:
-        """Evaluate hail threshold condition"""
+        """Evaluate hail threshold condition - capture ALL hail if threshold is 0"""
         # Check radar-indicated hail first
         if alert.radar_indicated and 'hail_inches' in alert.radar_indicated:
             hail_size = alert.radar_indicated['hail_inches']
-            if hail_size and hail_size >= rule.threshold_value:
-                logger.debug(f"Hail condition met: radar-indicated {hail_size}\" >= {rule.threshold_value}\"")
-                return True
+            if hail_size and hail_size > 0:  # Any hail size if threshold is 0
+                if rule.threshold_value == 0 or hail_size >= rule.threshold_value:
+                    logger.debug(f"Hail condition met: radar-indicated {hail_size}\" (threshold: {rule.threshold_value}\")")
+                    return True
         
         # Check SPC-verified hail
         if alert.spc_verified and alert.spc_reports:
             for report in alert.spc_reports:
                 if report.get('report_type') == 'hail' and report.get('magnitude', {}).get('size'):
                     spc_hail_size = report['magnitude']['size']
-                    if spc_hail_size >= rule.threshold_value:
-                        logger.debug(f"Hail condition met: SPC-verified {spc_hail_size}\" >= {rule.threshold_value}\"")
+                    if rule.threshold_value == 0 or spc_hail_size >= rule.threshold_value:
+                        logger.debug(f"Hail condition met: SPC-verified {spc_hail_size}\" (threshold: {rule.threshold_value}\")")
                         return True
         
         return False

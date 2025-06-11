@@ -451,7 +451,6 @@ class WebhookRule(db.Model):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
     __table_args__ = (
-        Index('idx_webhook_event_location', 'event_type', 'location_filter'),
         Index('idx_webhook_threshold', 'event_type', 'threshold_value'),
     )
     
@@ -469,6 +468,56 @@ class WebhookRule(db.Model):
             'location_filter': self.location_filter,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class WebhookEvent(db.Model):
+    """
+    Track webhook dispatches and delivery status for audit trail
+    Records all webhook attempts with payload details
+    """
+    __tablename__ = "webhook_events"
+    
+    id = Column(db.Integer, primary_key=True)
+    webhook_rule_id = Column(db.Integer, db.ForeignKey('webhook_rules.id'), nullable=False)
+    alert_id = Column(String(255), db.ForeignKey('alerts.id'), nullable=False)
+    user_id = Column(String(50), index=True)
+    event_type = Column(String(20), nullable=False, index=True)
+    threshold_value = Column(db.Float)
+    actual_value = Column(db.Float)  # The actual hail/wind measurement
+    webhook_url = Column(String(500), nullable=False)
+    location_data = Column(JSONB)  # Granular location: FIPS, city, coordinates
+    payload = Column(JSONB)  # Complete webhook payload sent
+    dispatched_at = Column(DateTime, server_default=func.now(), index=True)
+    http_status_code = Column(db.Integer)
+    response_time_ms = Column(db.Integer)
+    success = Column(Boolean, default=False, index=True)
+    error_message = Column(Text)
+    retry_count = Column(db.Integer, default=0)
+    
+    # Relationships
+    webhook_rule = db.relationship('WebhookRule', backref='events')
+    alert = db.relationship('Alert', backref='webhook_events')
+    
+    def __repr__(self):
+        return f'<WebhookEvent {self.id}: {self.event_type} {self.actual_value} -> {self.success}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'webhook_rule_id': self.webhook_rule_id,
+            'alert_id': self.alert_id,
+            'user_id': self.user_id,
+            'event_type': self.event_type,
+            'threshold_value': self.threshold_value,
+            'actual_value': self.actual_value,
+            'webhook_url': self.webhook_url,
+            'location_data': self.location_data,
+            'dispatched_at': self.dispatched_at.isoformat() if self.dispatched_at else None,
+            'http_status_code': self.http_status_code,
+            'response_time_ms': self.response_time_ms,
+            'success': self.success,
+            'error_message': self.error_message,
+            'retry_count': self.retry_count
         }
 
 
