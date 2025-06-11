@@ -3108,36 +3108,58 @@ def get_radar_alerts_summary():
         if not start_date or not end_date:
             return jsonify({"error": "start_date and end_date are required"}), 400
         
-        # Use raw SQL to properly handle array fields
+        # Use raw SQL to properly handle array fields - fix UNNEST to handle string arrays correctly
         sql_query = """
+        WITH expanded_data AS (
+            SELECT 
+                city_name,
+                state_name,
+                event_date,
+                event_type,
+                hail_inches,
+                wind_mph
+            FROM radar_alerts,
+            UNNEST(
+                CASE WHEN city_names = '{}' OR city_names IS NULL THEN ARRAY['Unknown']::text[] 
+                     ELSE city_names::text[] END
+            ) as city_name,
+            UNNEST(
+                CASE WHEN affected_states = '{}' OR affected_states IS NULL THEN ARRAY['Unknown']::text[] 
+                     ELSE affected_states::text[] END
+            ) as state_name
+            WHERE event_date >= :start_date AND event_date <= :end_date
+        )
         SELECT 
-            UNNEST(city_names) as city,
-            UNNEST(affected_states) as state,
+            city_name as city,
+            state_name as state,
             event_date as date,
             COUNT(CASE WHEN event_type = 'hail' THEN 1 END) as hail_count,
             MAX(CASE WHEN event_type = 'hail' THEN hail_inches END) as max_hail_inches,
             COUNT(CASE WHEN event_type = 'wind' THEN 1 END) as wind_count,
             MAX(CASE WHEN event_type = 'wind' THEN wind_mph END) as max_wind_mph
-        FROM radar_alerts 
-        WHERE event_date >= :start_date AND event_date <= :end_date
+        FROM expanded_data
         """
         
         params = {'start_date': start_date, 'end_date': end_date}
         
+        sql_query += """
+        WHERE 1=1
+        """
+        
         # Apply filters
         if state_filter:
-            sql_query += " AND :state_filter = ANY(affected_states)"
+            sql_query += " AND state_name = :state_filter"
             params['state_filter'] = state_filter
         
         if city_filter:
-            sql_query += " AND EXISTS (SELECT 1 FROM UNNEST(city_names) as city WHERE city ILIKE :city_filter)"
+            sql_query += " AND city_name ILIKE :city_filter"
             params['city_filter'] = f'%{city_filter}%'
         
         sql_query += """
-        GROUP BY city, state, date
+        GROUP BY city_name, state_name, event_date
         HAVING COALESCE(MAX(CASE WHEN event_type = 'hail' THEN hail_inches END), 0) >= :min_hail_inches
            AND COALESCE(MAX(CASE WHEN event_type = 'wind' THEN wind_mph END), 0) >= :min_wind_mph
-        ORDER BY date, state, city
+        ORDER BY event_date, state_name, city_name
         """
         
         params['min_hail_inches'] = min_hail_inches
