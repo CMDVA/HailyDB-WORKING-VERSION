@@ -448,14 +448,7 @@ class HurricaneIngestService:
                     storm_id, timestamp, point['lat'], point['lon']
                 )
                 
-                # Check if record already exists
-                existing = HurricaneTrack.query.filter_by(row_hash=row_hash).first()
-                if existing:
-                    logger.debug(f"Duplicate track point skipped: {storm_id} at {timestamp}")
-                    stats['duplicates'] += 1
-                    continue
-                
-                # Create new track record
+                # Create new track record with robust duplicate handling
                 track = HurricaneTrack(
                     storm_id=storm_id,
                     name=name,
@@ -472,9 +465,22 @@ class HurricaneIngestService:
                     row_hash=row_hash
                 )
                 
-                self.db.add(track)
-                stats['new'] += 1
-                logger.debug(f"Added track point: {storm_id} at {timestamp}")
+                try:
+                    self.db.add(track)
+                    self.db.flush()  # Test for constraint violations before commit
+                    stats['new'] += 1
+                    logger.debug(f"Added track point: {storm_id} at {timestamp}")
+                except Exception as constraint_error:
+                    # Handle hash-based duplicates without losing data
+                    self.db.rollback()
+                    if 'duplicate key' in str(constraint_error) or 'unique constraint' in str(constraint_error):
+                        stats['duplicates'] += 1
+                        logger.debug(f"Duplicate track point skipped: {storm_id} at {timestamp}")
+                    else:
+                        # Other constraint violations - log and continue
+                        stats['failed'] += 1
+                        logger.error(f"Constraint violation for {storm_id} at {timestamp}: {constraint_error}")
+                    continue
                 
             except Exception as e:
                 logger.error(f"Failed to process track point {idx} for storm {storm_id}: {e}")
