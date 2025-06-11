@@ -1,0 +1,70 @@
+Analysis of current gaps:
+
+You have the polygon detection status (yes/no) in the Location Enrichment section of the SPC Report Details — but it is not referenced in the Enhanced Summary.
+
+You have Radar Confirmed alerts (in the Verified Alerts section) — but the summary prompt is not clearly capturing or referencing whether this SPC report location was inside any radar polygon (which is one of your key differentiators vs HailTrace).
+
+The "Event Duration" and "Counties Affected" are being sent, but the AI sometimes downplays them because of how the prompt is worded.
+
+The NWS Office is buried in the verified alert data, but it's not clearly presented at the top of the summary, which is a missed opportunity for professional tone.
+
+The Location Context includes a nearby place list but is not explicitly told to prioritize clear, short readable lists (too often it just says “nearby places include X”).
+
+Recommended Rewrite Goals:
+✅ Cleanly structure the prompt input fields so OpenAI has everything it needs.
+✅ Be clear and explicit in what must appear in the final 2-3 sentence output.
+✅ Tell the model to clearly report polygon-confirmed status (without using "polygon" terminology for end users).
+✅ Use more clear "phrase templates" so the output is consistent and factual.
+✅ Keep it simple for end users (layman-friendly) — remember your direction earlier about not giving away too much of the method.
+
+Final Recommended Prompt Rewrite for spc_enhanced_context.py
+python
+Copy
+Edit
+prompt = f"""
+Generate a professional 2-3 sentence enhanced summary for this SPC storm report.
+
+SPC Report Details:
+- Type: {report.report_type}
+- Location: {report.location}, {report.county}, {report.state}
+- Time: {report.time_utc}
+- Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
+
+Location Context:
+- Nearest Major City: {major_city} ({major_city_distance} away)
+- Nearby Places: {nearby_context if nearby_context else 'None found nearby'}
+
+Radar Detection:
+- Radar Detection at this Location: {'Yes' if radar_polygon_match else 'No'}
+- Radar Event Type (if matched): {radar_event_type if radar_polygon_match else 'N/A'}
+
+Verified Alerts Summary:
+- Total Verified NWS Alerts: {len(verified_alerts)} spanning {duration_minutes} minutes
+- Counties Affected: {', '.join(sorted(counties_affected))}
+- NWS Office(s): {nws_office}
+
+Instructions:
+Write a clear and professional summary that:
+1. Begins with the SPC Report Location: "{report.location}, {report.county}, {report.state}".
+2. References the Nearest Major City and distance.
+3. Mentions notable Nearby Places if available.
+4. Clearly states whether the location was confirmed as within a Radar-detected storm area. 
+   - If Radar Detection = Yes, use layman terms like "Radar-confirmed storm area was present".
+   - If Radar Detection = No, say "No Radar-confirmed storm area was detected at this location".
+5. Emphasizes the number of Verified NWS Alerts, duration, and geographic coverage.
+6. Optionally includes the NWS Office name to provide source credibility.
+7. Write for a broad audience — use plain language, avoid technical jargon like 'polygon', 'lat/lon', or 'point-in-polygon'.
+
+CRITICAL:
+- Follow the above instructions strictly.
+- Do not hallucinate additional historical data.
+- Use only the provided inputs — do not speculate.
+- Be consistent — users will compare multiple SPC Reports and expect uniform structure.
+"""
+Summary of the improvements vs. your current version:
+✅ Brings in Radar Detection status and presents it clearly.
+✅ Tightens the instructions to ensure uniform style and phrase structure across all SPC reports.
+✅ Adds layman guidance to avoid the "polygon" terminology trap.
+✅ Moves NWS Office name into clear priority position (many end users find this trustworthy).
+✅ Clarifies that the "Verified Alerts" span and county coverage must be explicitly written out, not just hinted.
+✅ Avoids speculative language.

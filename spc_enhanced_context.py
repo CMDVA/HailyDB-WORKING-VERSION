@@ -218,7 +218,19 @@ class SPCEnhancedContextService:
                 if closest_places:
                     nearby_context = f"near {', '.join(closest_places)}"
 
-            prompt = f"""Generate a comprehensive 2-3 sentence enhanced summary for this SPC storm report:
+            # Check for radar polygon detection
+            radar_polygon_match = False
+            radar_event_type = 'N/A'
+            if hasattr(report, 'location_enrichment') and report.location_enrichment:
+                try:
+                    enrichment_data = json.loads(report.location_enrichment) if isinstance(report.location_enrichment, str) else report.location_enrichment
+                    radar_polygon_match = enrichment_data.get('polygon_detected', False)
+                    if radar_polygon_match:
+                        radar_event_type = enrichment_data.get('radar_event_type', 'storm activity')
+                except:
+                    pass
+
+            prompt = f"""Generate a professional 2-3 sentence enhanced summary for this SPC storm report.
 
 SPC Report Details:
 - Type: {report.report_type}
@@ -226,25 +238,36 @@ SPC Report Details:
 - Time: {report.time_utc}
 - Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
 
-Location Context (USE THIS DATA):
+Location Context:
 - Nearest Major City: {major_city} ({major_city_distance} away)
-- Nearby Places: {nearby_context if nearby_context else 'None within close proximity'}
+- Nearby Places: {nearby_context if nearby_context else 'None found nearby'}
 
-Verified Alerts ({len(verified_alerts)} total):
-{json.dumps(alert_details, indent=2)}
+Radar Detection:
+- Radar Detection at this Location: {'Yes' if radar_polygon_match else 'No'}
+- Radar Event Type (if matched): {radar_event_type if radar_polygon_match else 'N/A'}
 
-Event Duration: {duration_minutes} minutes
-Counties Affected: {', '.join(sorted(counties_affected))}
-NWS Office: {nws_office}
+Verified Alerts Summary:
+- Total Verified NWS Alerts: {len(verified_alerts)} spanning {duration_minutes} minutes
+- Counties Affected: {', '.join(sorted(counties_affected))}
+- NWS Office(s): {nws_office}
 
-Create an enhanced professional summary that:
-1. Starts with the SPC report location: "{report.location}, {report.county}, {report.state}"
-2. MUST reference the nearest major city: "{major_city}" at "{major_city_distance}" away
-3. Include nearby places when available: {nearby_context}
-4. Emphasize verification by {len(verified_alerts)} NWS alerts spanning {duration_minutes} minutes
-5. Focus on factual geographic and temporal context
+Instructions:
+Write a clear and professional summary that:
+1. Begins with the SPC Report Location: "{report.location}, {report.county}, {report.state}".
+2. References the Nearest Major City and distance.
+3. Mentions notable Nearby Places if available.
+4. Clearly states whether the location was confirmed as within a Radar-detected storm area. 
+   - If Radar Detection = Yes, use layman terms like "Radar-confirmed storm area was present".
+   - If Radar Detection = No, say "No Radar-confirmed storm area was detected at this location".
+5. Emphasizes the number of Verified NWS Alerts, duration, and geographic coverage.
+6. Optionally includes the NWS Office name to provide source credibility.
+7. Write for a broad audience — use plain language, avoid technical jargon like 'polygon', 'lat/lon', or 'point-in-polygon'.
 
-CRITICAL: Use the provided location data exactly as given. Do not add historical context or speculation."""
+CRITICAL:
+- Follow the above instructions strictly.
+- Do not hallucinate additional historical data.
+- Use only the provided inputs — do not speculate.
+- Be consistent — users will compare multiple SPC Reports and expect uniform structure."""
 
             response = client.chat.completions.create(
                 model="gpt-4o",
