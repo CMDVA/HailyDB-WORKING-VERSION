@@ -336,7 +336,6 @@ class IngestService:
             # Size conversion mapping based on official NWS hail size chart
             size_map = {
                 'pea': 0.25,
-                'mothball': 0.5,
                 'peanut': 0.5,
                 'penny': 0.75,
                 'nickel': 0.88,
@@ -344,7 +343,7 @@ class IngestService:
                 'half dollar': 1.25,
                 'ping pong ball': 1.5,
                 'golf ball': 1.75,
-                'lime': 2.0,
+                'egg': 2.0,
                 'tennis ball': 2.5,
                 'baseball': 2.75,
                 'large apple': 3.0,
