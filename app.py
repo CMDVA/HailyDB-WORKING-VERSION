@@ -683,15 +683,17 @@ def search_alerts():
     min_wind = request.args.get('min_wind', type=int)
     
     if has_radar_data:
-        # Only show events with hail (any amount) and/or winds ≥50 mph
-        query = query.filter(Alert.radar_indicated.isnot(None))
-        
-        # Build conditions for qualifying radar events
+        # Only show events with legitimate radar-detected data
+        # Must have "radar indicated" in description AND qualifying hail/wind data
         hail_condition = Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0
         wind_condition = Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50
+        radar_source_condition = Alert.properties['description'].astext.ilike('%radar indicated%')
         
-        # Must have either hail or significant wind
-        query = query.filter(db.or_(hail_condition, wind_condition))
+        query = query.filter(
+            Alert.radar_indicated.isnot(None),
+            radar_source_condition,
+            db.or_(hail_condition, wind_condition)
+        )
         
     if min_hail:
         query = query.filter(Alert.radar_indicated['hail_inches'].astext.cast(db.Float) >= min_hail)
@@ -3118,8 +3120,17 @@ def get_direct_radar_alerts():
         start_date = request.args.get('start_date', '').strip()
         end_date = request.args.get('end_date', '').strip()
         
-        # Build base query for alerts with radar data
-        query = Alert.query.filter(Alert.radar_indicated.isnot(None))
+        # Build base query for alerts with legitimate radar-detected data
+        # Must have "radar indicated" in description AND qualifying hail/wind data
+        hail_condition = Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0
+        wind_condition = Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50
+        radar_source_condition = Alert.properties['description'].astext.ilike('%radar indicated%')
+        
+        query = Alert.query.filter(
+            Alert.radar_indicated.isnot(None),
+            radar_source_condition,
+            db.or_(hail_condition, wind_condition)
+        )
         
         # Apply search filter
         if search:
