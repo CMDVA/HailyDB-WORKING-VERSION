@@ -204,12 +204,72 @@
         </div>
     </div>
 </div>
+        <!-- World Clock Display -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body py-2">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <i class="fas fa-clock text-info me-2"></i>
+                                    <div>
+                                        <small class="text-muted d-block">Pacific</small>
+                                        <span id="pacific-time" class="fw-bold">--:--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <i class="fas fa-clock text-success me-2"></i>
+                                    <div>
+                                        <small class="text-muted d-block">Eastern</small>
+                                        <span id="eastern-time" class="fw-bold">--:--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <i class="fas fa-globe text-primary me-2"></i>
+                                    <div>
+                                        <small class="text-muted d-block">UTC</small>
+                                        <span id="utc-time" class="fw-bold">--:--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <i class="fas fa-tornado text-warning me-2"></i>
+                                    <div>
+                                        <small class="text-muted d-block">SPC Day</small>
+                                        <span id="spc-day" class="fw-bold">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Today's Data Verification -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card shadow mb-4">
                     <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                        <h6 class="m-0 font-weight-bold text-primary">Today's Alerts</h6>
+                        <div class="d-flex align-items-center">
+                            <h6 class="m-0 font-weight-bold text-primary me-3">Today's Alerts</h6>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <input type="radio" class="btn-check" name="time-mode" id="utc-mode" checked>
+                                <label class="btn btn-outline-secondary" for="utc-mode">
+                                    <i class="fas fa-globe me-1"></i>UTC Day
+                                </label>
+                                <input type="radio" class="btn-check" name="time-mode" id="spc-mode">
+                                <label class="btn btn-outline-warning" for="spc-mode">
+                                    <i class="fas fa-tornado me-1"></i>SPC Day
+                                </label>
+                            </div>
+                        </div>
                         <a href="{{ url_for('get_alerts') }}" class="btn btn-sm btn-outline-primary">
                             View All <i class="fas fa-arrow-right ms-1"></i>
                         </a>

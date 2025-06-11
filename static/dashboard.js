@@ -33,6 +33,13 @@ function initializeDashboard() {
         loadTodaysAlerts();
         loadSPCVerificationTable();
         
+        // Initialize world clock
+        updateWorldClock();
+        setInterval(updateWorldClock, 1000); // Update every second
+        
+        // Initialize time mode toggle
+        initializeTimeModeToggle();
+        
         // Set up automatic refresh every 30 seconds
         setInterval(() => {
             loadTodaysAlerts();
@@ -1441,6 +1448,261 @@ function onPlayScheduler() {
 // Pause button click handler
 function onPauseScheduler() {
     stopAutonomousScheduler();
+}
+
+// World Clock Functions
+function updateWorldClock() {
+    const now = new Date();
+    
+    // Pacific Time (PST/PDT)
+    const pacificTime = now.toLocaleTimeString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    // Eastern Time (EST/EDT)
+    const easternTime = now.toLocaleTimeString('en-US', {
+        timeZone: 'America/New_York',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    // UTC Time
+    const utcTime = now.toLocaleTimeString('en-US', {
+        timeZone: 'UTC',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    // SPC Day calculation
+    const utcHour = parseInt(now.toLocaleTimeString('en-US', {
+        timeZone: 'UTC',
+        hour12: false,
+        hour: '2-digit'
+    }));
+    
+    let spcDay;
+    if (utcHour >= 12) {
+        // Current time is >= 12:00Z, so SPC day is today (UTC date)
+        spcDay = now.toLocaleDateString('en-CA', { timeZone: 'UTC' });
+    } else {
+        // Current time is < 12:00Z, so SPC day is yesterday (UTC date - 1)
+        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        spcDay = yesterday.toLocaleDateString('en-CA', { timeZone: 'UTC' });
+    }
+    
+    // Update DOM elements
+    const pacificElement = document.getElementById('pacific-time');
+    const easternElement = document.getElementById('eastern-time');
+    const utcElement = document.getElementById('utc-time');
+    const spcElement = document.getElementById('spc-day');
+    
+    if (pacificElement) pacificElement.textContent = pacificTime;
+    if (easternElement) easternElement.textContent = easternTime;
+    if (utcElement) utcElement.textContent = utcTime;
+    if (spcElement) spcElement.textContent = spcDay;
+}
+
+// Time Mode Toggle Functions
+function initializeTimeModeToggle() {
+    const utcModeRadio = document.getElementById('utc-mode');
+    const spcModeRadio = document.getElementById('spc-mode');
+    
+    if (utcModeRadio && spcModeRadio) {
+        utcModeRadio.addEventListener('change', function() {
+            if (this.checked) {
+                loadTodaysAlertsWithMode('utc');
+            }
+        });
+        
+        spcModeRadio.addEventListener('change', function() {
+            if (this.checked) {
+                loadTodaysAlertsWithMode('spc');
+            }
+        });
+    }
+}
+
+async function loadTodaysAlertsWithMode(mode) {
+    try {
+        const tableContainer = document.getElementById('todays-alerts-table');
+        if (!tableContainer) return;
+        
+        let endpoint, dateParam;
+        
+        if (mode === 'spc') {
+            // Use SPC Day - fetch from our new SPC Day endpoint
+            const response = await fetch('/api/spc/reports/today');
+            const data = await response.json();
+            
+            if (data.reports && data.reports.length > 0) {
+                displaySPCReports(data.reports, data.spc_day, tableContainer);
+            } else {
+                tableContainer.innerHTML = `
+                    <div class="text-center py-3">
+                        <div class="h5 text-warning">0</div>
+                        <small class="text-muted">No SPC reports for current SPC day (${data.spc_day})</small>
+                    </div>`;
+            }
+            return;
+        } else {
+            // UTC Mode - use current logic
+            const today = new Date().toISOString().split('T')[0];
+            const cacheBuster = new Date().getTime();
+            endpoint = `/alerts?format=json&per_page=1000&ingested_date=${today}&_cb=${cacheBuster}`;
+        }
+        
+        const response = await fetch(endpoint);
+        const data = await response.json();
+        
+        // Use existing logic for UTC mode
+        const todaysAlerts = data.alerts || [];
+        
+        if (todaysAlerts.length > 0) {
+            // Group by event type for compact breakdown
+            const alertsByType = todaysAlerts.reduce((acc, alert) => {
+                const eventType = alert.event || 'Unknown';
+                acc[eventType] = (acc[eventType] || 0) + 1;
+                return acc;
+            }, {});
+            
+            const totalIngestedToday = data.pagination ? data.pagination.total : todaysAlerts.length;
+            let html = `<div class="mb-3"><strong>${todaysAlerts.length}/${totalIngestedToday} alerts ingested today (UTC)</strong></div>
+                       <div class="mb-2"><small class="text-muted">Showing alerts by ingestion date (database completeness)</small></div>`;
+            
+            // Continue with existing alert display logic...
+            displayNWSAlerts(todaysAlerts, html, tableContainer);
+        } else {
+            tableContainer.innerHTML = '<div class="text-center py-3"><div class="h5 text-warning">0</div><small class="text-muted">No alerts ingested today (UTC)</small></div>';
+        }
+    } catch (error) {
+        console.error('Error loading alerts with mode:', error);
+        const tableContainer = document.getElementById('todays-alerts-table');
+        if (tableContainer) {
+            tableContainer.innerHTML = '<p class="text-danger">Error loading alerts data.</p>';
+        }
+    }
+}
+
+function displaySPCReports(reports, spcDay, container) {
+    // Group reports by type
+    const reportsByType = reports.reduce((acc, report) => {
+        const type = report.report_type || 'Unknown';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+    }, {});
+    
+    let html = `
+        <div class="mb-3">
+            <strong>${reports.length} SPC reports for SPC Day ${spcDay}</strong>
+        </div>
+        <div class="mb-2">
+            <small class="text-muted">SPC Day: ${spcDay}T12:00Z → ${getNextDay(spcDay)}T11:59Z</small>
+        </div>`;
+    
+    // Create summary table
+    if (Object.keys(reportsByType).length > 0) {
+        html += '<div class="table-responsive mb-3"><table class="table table-sm">';
+        html += '<thead><tr><th>Report Type</th><th class="text-end">Count</th></tr></thead><tbody>';
+        
+        Object.entries(reportsByType).forEach(([type, count]) => {
+            const typeCapitalized = type.charAt(0).toUpperCase() + type.slice(1);
+            html += `
+                <tr>
+                    <td>${typeCapitalized}</td>
+                    <td class="text-end"><span class="badge bg-warning">${count}</span></td>
+                </tr>`;
+        });
+        html += '</tbody></table></div>';
+        
+        // Show recent reports with basic info
+        html += '<div class="table-responsive"><table class="table table-sm small">';
+        html += '<thead><tr><th>Time</th><th>Type</th><th>Location</th><th>State</th><th>Details</th></tr></thead><tbody>';
+        
+        // Sort by time descending
+        const sortedReports = reports.sort((a, b) => (b.time_utc || '').localeCompare(a.time_utc || ''));
+        
+        sortedReports.slice(0, 20).forEach(report => {
+            const time = report.time_utc || '--';
+            const type = (report.report_type || 'Unknown').charAt(0).toUpperCase() + (report.report_type || 'Unknown').slice(1);
+            const location = report.location || '--';
+            const state = report.state || '--';
+            const magnitude = report.magnitude || {};
+            
+            let details = '--';
+            if (type.toLowerCase() === 'hail' && magnitude.size_inches) {
+                details = `${magnitude.size_inches}"`;
+            } else if (type.toLowerCase() === 'wind' && magnitude.speed_mph) {
+                details = `${magnitude.speed_mph} mph`;
+            } else if (report.comments) {
+                details = report.comments.substring(0, 50) + (report.comments.length > 50 ? '...' : '');
+            }
+            
+            html += `
+                <tr>
+                    <td>${time}</td>
+                    <td><span class="badge bg-warning">${type}</span></td>
+                    <td>${location}</td>
+                    <td>${state}</td>
+                    <td><small>${details}</small></td>
+                </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+function displayNWSAlerts(alerts, existingHtml, container) {
+    // Continue with existing NWS alert display logic from loadTodaysAlerts
+    // This preserves the current functionality for UTC mode
+    let html = existingHtml;
+    
+    // Add existing table logic here...
+    if (alerts.length > 0) {
+        const alertsPerPage = 50;
+        const totalPages = Math.ceil(alerts.length / alertsPerPage);
+        let currentPage = 1;
+        
+        html += '<div class="table-responsive"><table class="table table-sm small">';
+        html += '<thead><tr><th>Date/Time</th><th>Severity</th><th>Type</th><th>Area</th><th>Actions</th></tr></thead><tbody id="alerts-tbody">';
+        
+        // Sort by effective date descending
+        const sortedAlerts = alerts.sort((a, b) => new Date(b.effective) - new Date(a.effective));
+        
+        // Show first page
+        const pageAlerts = sortedAlerts.slice(0, alertsPerPage);
+        pageAlerts.forEach(alert => {
+            const effectiveDate = new Date(alert.effective).toLocaleString();
+            const severity = alert.severity || 'Unknown';
+            const event = alert.event || 'Unknown';
+            const areas = alert.areas_desc || 'Unknown';
+            
+            html += `
+                <tr>
+                    <td><small>${effectiveDate}</small></td>
+                    <td><span class="badge severity-${severity.toLowerCase()}">${severity}</span></td>
+                    <td>${event}</td>
+                    <td><small>${areas.substring(0, 50)}${areas.length > 50 ? '...' : ''}</small></td>
+                    <td><a href="/alerts/${alert.id}" class="btn btn-sm btn-outline-primary">View</a></td>
+                </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+function getNextDay(dateString) {
+    const date = new Date(dateString + 'T00:00:00Z');
+    date.setUTCDate(date.getUTCDate() + 1);
+    return date.toISOString().split('T')[0];
 }
 
 console.log('Dashboard JavaScript loaded successfully');
