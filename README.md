@@ -298,12 +298,12 @@ curl -X POST "https://your-hailydb.com/internal/webhook-rules" \
   "effective": "2025-06-10T20:15:00Z",
   "expires": "2025-06-10T21:00:00Z",
   "sent": "2025-06-10T20:14:32Z",
-  
+
   "radar_indicated": {
     "hail_inches": 1.25,
     "wind_mph": 70
   },
-  
+
   "fips_codes": ["48201", "48339"],
   "county_names": [
     {"county": "Harris", "state": "TX"},
@@ -318,7 +318,7 @@ curl -X POST "https://your-hailydb.com/internal/webhook-rules" \
     "min_lon": -95.9876,
     "max_lon": -95.5432
   },
-  
+
   "spc_verified": true,
   "spc_reports": [
     {
@@ -329,14 +329,14 @@ curl -X POST "https://your-hailydb.com/internal/webhook-rules" \
     }
   ],
   "spc_confidence_score": 0.89,
-  
+
   "enhanced_geometry": {
     "has_detailed_geometry": true,
     "coverage_area_sq_degrees": 0.125,
     "county_state_mapping": [...],
     "affected_states": ["TX"]
   },
-  
+
   "ai_summary": "Severe thunderstorm with quarter-size hail and 70 mph winds affecting northwestern Harris County and southern Montgomery County.",
   "ai_tags": ["hail", "damaging_winds", "property_damage_risk"]
 }
@@ -356,7 +356,7 @@ class InsuranceClaimsBot:
         self.base_url = hailydb_base_url
         self.webhook_url = webhook_url
         self.setup_hail_monitoring()
-    
+
     def setup_hail_monitoring(self):
         """Register webhook for hail events affecting coverage areas"""
         webhook_config = {
@@ -365,18 +365,18 @@ class InsuranceClaimsBot:
             "threshold_value": 0.75,  # 3/4 inch or larger
             "user_id": "insurance_bot"
         }
-        
+
         response = requests.post(
             f"{self.base_url}/internal/webhook-rules",
             json=webhook_config
         )
         print(f"Hail monitoring active: {response.status_code}")
-    
+
     def process_hail_alert(self, alert_data):
         """Process incoming hail alert for claims preparation"""
         radar_indicated = alert_data.get('radar_indicated', {})
         hail_size = radar_indicated.get('hail_inches', 0)
-        
+
         if hail_size >= 1.0:  # Quarter size or larger
             self.create_potential_claim_area(alert_data)
             self.notify_field_adjusters(alert_data)
@@ -410,11 +410,121 @@ HailyDB provides comprehensive RESTful API access to National Weather Service al
 - **Enhanced Location Data**: County-state mapping for insurance claims
 - **Spatial Intelligence**: Comprehensive geographic processing for field operations
 
-### Authentication
+### RESTful API Design
+**Base URL:** `https://your-hailydb.replit.app`  
+**Access:** Public API - no authentication required  
+**Response Format:** JSON with consistent error handling  
+**Rate Limiting:** None - designed for high-volume data access
 
-No authentication required for public endpoints. Internal endpoints are for administrative use.
+## 5. Data Types and Parsing Guide
 
----
+### Available Data Types
+
+#### National Weather Service (NWS) Alerts
+**Data Structure:** Complete GeoJSON feature objects with enhanced processing
+```json
+{
+  "id": "urn:oid:2.49.0.1.840.0.e47a6dc7...",
+  "event": "Severe Thunderstorm Warning",
+  "severity": "Moderate",
+  "area_desc": "Harris, TX; Montgomery, TX",
+  "effective": "2025-06-11T18:15:00Z",
+  "expires": "2025-06-11T19:00:00Z",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[[...coordinate arrays...]]]
+  },
+  "radar_indicated": {
+    "hail_inches": 1.25,
+    "wind_mph": 70
+  },
+  "fips_codes": ["48201", "48339"],
+  "county_names": [
+    {"county": "Harris", "state": "TX"},
+    {"county": "Montgomery", "state": "TX"}
+  ],
+  "ai_summary": "AI-generated plain language summary",
+  "ai_tags": ["hail", "damaging_winds", "property_damage_risk"],
+  "spc_verified": true,
+  "spc_reports": [...storm reports...],
+  "enhanced_geometry": {
+    "geometry_bounds": {"min_lat": 30.1, "max_lat": 30.6, "min_lon": -96.0, "max_lon": -95.5},
+    "coverage_area_sq_degrees": 0.125,
+    "affected_states": ["TX"]
+  }
+}
+```
+
+#### Storm Prediction Center (SPC) Reports
+**Data Structure:** Historical storm verification data
+```json
+{
+  "id": 12345,
+  "report_date": "2025-06-11",
+  "report_type": "hail",
+  "time_utc": "1822",
+  "location": "Spring, TX",
+  "county": "Harris",
+  "state": "TX",
+  "latitude": 30.0833,
+  "longitude": -95.4167,
+  "magnitude": {"size": 1.25},
+  "comments": "Quarter size hail reported by trained spotter"
+}
+```
+
+#### Hurricane Track Data
+**Data Structure:** NOAA HURDAT2 historical tracks
+```json
+{
+  "storm_id": "AL142020",
+  "name": "Laura",
+  "year": 2020,
+  "timestamp": "2020-08-27T12:00:00Z",
+  "lat": 29.8,
+  "lon": -93.4,
+  "category": "CAT4",
+  "wind_mph": 150,
+  "pressure_mb": 937,
+  "status": "HU"
+}
+```
+
+### Data Parsing Capabilities
+
+#### Radar-Indicated Measurements
+HailyDB automatically extracts radar-indicated measurements from NWS text:
+- **Hail Size:** "quarter size hail" → `{"hail_inches": 1.0}`
+- **Wind Speed:** "winds to 70 mph" → `{"wind_mph": 70}`
+- **Enhanced Detection:** Supports size descriptions (penny, nickel, quarter, golf ball, tennis ball)
+
+#### Geographic Processing
+- **FIPS Codes:** Extracted from NWS geometry data
+- **County Mapping:** Parsed from area descriptions with state association
+- **Coordinate Bounds:** Calculated coverage areas and geographic extents
+- **State Lists:** Comprehensive affected state identification
+
+#### AI Enhancement
+- **Summaries:** Plain-language alert descriptions
+- **Tags:** Categorical risk classification
+- **Verification:** Cross-referenced with actual storm reports
+
+### Data Presentation Formats
+
+#### JSON API Responses
+All endpoints return structured JSON with:
+- **Consistent Field Names:** Standardized across all data types
+- **ISO 8601 Timestamps:** All dates in UTC format
+- **Null Handling:** Explicit null values for missing data
+- **Pagination:** Cursor-based for large datasets
+
+#### Geographic Data Formats
+- **GeoJSON:** Native NWS geometry preservation
+- **Coordinate Arrays:** Polygon and MultiPolygon support
+- **Bounding Boxes:** Min/max latitude/longitude for mapping
+- **Coverage Areas:** Calculated square degrees for impact assessment
+
+#### Search and Filtering Capabilities
 
 ### 🚨 Alert Endpoints
 
@@ -493,6 +603,14 @@ GET /internal/status
 
 ### Real-Time Webhook System
 
+#### Webhook Rule Configuration
+**Endpoint:** `POST /internal/webhook-rules`  
+**Access:** Public endpoint for rule management  
+**Rule Types:**
+- `"hail"` - Triggers on radar-indicated hail size (inches)
+- `"wind"` - Triggers on radar-indicated wind speed (mph)
+- `"damage_probability"` - Triggers on calculated damage probability (0.0-1.0)
+
 #### Register Webhook Rule
 ```
 POST /internal/webhook-rules
@@ -515,22 +633,36 @@ POST /internal/webhook-rules
 - `"wind"` - Triggers on radar-indicated wind speed (mph)
 - `"damage_probability"` - Triggers on calculated damage probability (0.0-1.0)
 
-### Hurricane Track Endpoints
+#### Hurricane Track Search (`/api/hurricane-tracks`)
+**Parameters:**
+- `storm_id`: Specific storm identifier (AL142020)
+- `year`: Hurricane season year
+- `lat`, `lon`, `radius`: Geographic radius search
+- `landfall_only`: Boolean for landfall events only
 
-#### Get Hurricane Tracks
-```
-GET /api/hurricane-tracks
-```
-**Description**: Retrieve historical hurricane track data with filtering options
+### Data Export and Bulk Access
 
-**Query Parameters**:
-- `storm_id` (string) - Filter by NOAA storm identifier (e.g., "AL012020")
-- `name` (string) - Filter by hurricane name (e.g., "Laura")
-- `year` (int) - Filter by year (e.g., 2020)
-- `lat_min`, `lat_max`, `lon_min`, `lon_max` (float) - Bounding box filter
-- `start_date`, `end_date` (string, YYYY-MM-DD) - Date range filter
-- `landfall_only` (boolean) - Only storms that made US landfall
-- `category_min` (int, 1-5) - Minimum hurricane category
+#### Bulk Alert Downloads
+```bash
+# All alerts from the last 30 days
+curl "https://your-hailydb.replit.app/api/alerts/search?limit=1000&format=json"
+
+# All tornado warnings in Texas
+curl "https://your-hailydb.replit.app/api/alerts/search?event_type=Tornado%20Warning&state=TX&limit=1000"
+
+# SPC verified alerts with storm reports
+curl "https://your-hailydb.replit.app/spc-matches/data?hours=720&format=json"
+```
+
+#### CSV Export Capabilities
+- **Storm Reports:** `/api/spc/reports?format=csv` (if implemented)
+- **Hurricane Tracks:** Structured JSON suitable for CSV conversion
+- **Alert Summaries:** Tabular format for spreadsheet analysis
+
+#### Data Streaming Patterns
+- **Pagination:** Use `limit` and `offset` for large datasets
+- **Date Ranges:** Filter by `effective_start` and `effective_end`
+- **Geographic Chunks:** State-by-state or county-by-county processing
 
 ## 📊 SPC Storm Report Ingestion - Data Organization and Timezone Handling
 
