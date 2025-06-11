@@ -365,22 +365,36 @@ CRITICAL: Use the provided location data exactly as given. Do not add historical
                 nearby_places_data = existing_enrichment.get('nearby_places', [])
                 
                 # Use the primary location from the report
-                primary_location = f"{report.county} County"
+                primary_location = f"{report.location}, {report.county} County, {report.state}"
                 
                 # Format nearby places for Enhanced Context using the actual enrichment data
                 nearby_place_names = []
-                for place in nearby_places_data[:5]:  # Take first 5 places
-                    place_name = place.get('name', '')
-                    if place_name:
-                        # Use a reasonable distance estimation for nearby places
-                        nearby_place_names.append({
-                            'name': place_name,
-                            'distance_miles': 3.0  # Reasonable approximation for "nearby" places
-                        })
-                
-                # Extract nearest major city info (for now use fallback since not in current enrichment format)
                 nearest_major_city = "Unknown"
                 major_city_distance = ""
+                
+                for place in nearby_places_data:
+                    place_name = place.get('name', '')
+                    place_distance = place.get('distance_miles', 0)  # Fixed: was 'distance'
+                    place_type = place.get('type', '')
+                    
+                    if place_name and place_distance:
+                        # Add to nearby places list
+                        nearby_place_names.append({
+                            'name': place_name,
+                            'distance_miles': float(place_distance)
+                        })
+                        
+                        # Use the primary_location or nearest_city as the major city
+                        if (place_type in ['primary_location', 'nearest_city'] and 
+                            nearest_major_city == "Unknown"):
+                            nearest_major_city = place_name
+                            major_city_distance = f"{place_distance:.1f} miles"
+                
+                # If we have nearby places but no major city set, use the first one
+                if nearby_place_names and nearest_major_city == "Unknown":
+                    first_place = nearby_place_names[0]
+                    nearest_major_city = first_place['name']
+                    major_city_distance = f"{first_place['distance_miles']:.1f} miles"
                 
                 # Get radar polygon match status
                 radar_polygon_match = existing_enrichment.get('radar_polygon_match', False)
