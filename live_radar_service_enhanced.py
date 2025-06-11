@@ -265,9 +265,9 @@ class ProductionLiveRadarService:
         
         try:
             if props.get('effective'):
-                effective_time = datetime.fromisoformat(props['effective'].replace('Z', '+00:00'))
+                effective_time = datetime.fromisoformat(props['effective'].replace('Z', '+00:00')).replace(tzinfo=None)
             if props.get('expires'):
-                expires_time = datetime.fromisoformat(props['expires'].replace('Z', '+00:00'))
+                expires_time = datetime.fromisoformat(props['expires'].replace('Z', '+00:00')).replace(tzinfo=None)
         except:
             pass
         
