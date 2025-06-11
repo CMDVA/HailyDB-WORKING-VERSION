@@ -155,7 +155,7 @@ class SPCEnrichmentService:
             List of nearby places with name and approximate coordinates
         """
         try:
-            # Enhanced prompt with distance-aware geographic search
+            # Enhanced prompt with distance-aware geographic search and nearest city identification
             prompt = f"""
             You are a local geography expert for {county} County, {state}. Find real places near coordinates {lat:.4f}, {lon:.4f}.
             
@@ -172,13 +172,20 @@ class SPCEnrichmentService:
             - Major geographic features or landmarks
             - State/county boundaries or significant infrastructure
             
+            NEAREST MAJOR CITY:
+            - Identify the nearest major city (population 10,000+) within reasonable distance
+            - Include county seats, regional centers, or well-known cities
+            - Calculate distance in miles from the coordinates
+            
             For coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}:
             1. First try to find places within 5 miles
             2. If none found, identify the CLOSEST real places within 25 miles
-            3. Estimate distances in miles from the coordinates
+            3. Identify the nearest major city regardless of distance
+            4. Estimate distances in miles from the coordinates
             
             Return JSON in this exact format:
             {{
+                "nearest_city": {{"name": "Major City Name", "distance_miles": 8.5, "approx_lat": 29.6516, "approx_lon": -82.3248}},
                 "places": [
                     {{"name": "Real Place Name", "distance_miles": 2.3, "approx_lat": {lat:.4f}, "approx_lon": {lon:.4f}}},
                     {{"name": "Another Real Place", "distance_miles": 8.7, "approx_lat": {lat:.4f}, "approx_lon": {lon:.4f}}}
@@ -187,9 +194,10 @@ class SPCEnrichmentService:
             
             REQUIREMENTS:
             - Only include places that actually exist
-            - Always include estimated distance_miles for each place
+            - Always include estimated distance_miles for each place and nearest_city
             - For remote areas, find at least 1-3 closest places even if far away
             - Prioritize closer places but ensure at least one result when possible
+            - nearest_city should be a major city or regional center, not a small town
             """
             
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
@@ -218,9 +226,19 @@ class SPCEnrichmentService:
             # Validate and format response
             if isinstance(places_data, dict) and 'places' in places_data:
                 places_list = places_data['places']
+                nearest_city = places_data.get('nearest_city')
+                
                 if isinstance(places_list, list):
                     logger.info(f"Found {len(places_list)} places in response")
-                    return places_list[:6]  # Limit to 6 places max
+                    
+                    # Add nearest_city to the first place if it exists and has distance info
+                    if nearest_city and isinstance(nearest_city, dict) and 'name' in nearest_city:
+                        logger.info(f"Found nearest city: {nearest_city['name']} at {nearest_city.get('distance_miles', 'unknown')} miles")
+                        # Mark the nearest city with a special type
+                        nearest_city['type'] = 'nearest_city'
+                        places_list.insert(0, nearest_city)  # Add to beginning of list
+                    
+                    return places_list[:7]  # Allow 1 extra for nearest city
             elif isinstance(places_data, list):
                 logger.info(f"Found direct array with {len(places_data)} places")
                 return places_data[:6]  # Direct array format
