@@ -2314,7 +2314,7 @@ def get_hurricane_tracks():
         logger.error(f"Error retrieving hurricane tracks: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route("/api/hurricanes/storms/<storm_id>", methods=["GET"])
+@app.route("/api/hurricanes/storm/<storm_id>", methods=["GET"])
 def get_hurricane_storm(storm_id):
     """Get complete track data for a specific storm"""
     try:
