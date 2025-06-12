@@ -499,10 +499,12 @@ REQUIREMENTS:
         polygon_matches = []
         
         for alert in verified_alerts:
+            radar_confirmed = self._check_radar_confirmation(alert, report)
             match_data = {
                 "alert_id": alert.id,
                 "headline": getattr(alert, 'headline', 'Unknown'),
-                "radar_confirmed": self._check_radar_confirmation(alert, report)
+                "radar_confirmed": radar_confirmed,
+                "status": "Radar Confirmed" if radar_confirmed else "Temporally Matched"
             }
             polygon_matches.append(match_data)
         
