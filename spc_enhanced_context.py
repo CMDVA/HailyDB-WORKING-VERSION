@@ -6,6 +6,8 @@ Implements multi-alert, multi-source enrichment for comprehensive SPC report int
 import json
 import logging
 import math
+import time
+import uuid
 from datetime import datetime
 from typing import Dict, Any, List
 from sqlalchemy.orm import Session
@@ -431,18 +433,35 @@ Generate a professional summary following meteorological standards."""
             # Build proper local summary without distant city references
             template_summary = f"{magnitude_display} {report.report_type.lower()} was reported in {report.location}, {report.county} County, {report.state} at {time_str} on {date_str}. {other_nearby}"
 
-            # Use OpenAI to polish the template with proper NWS terminology
-            response = openai_client.chat.completions.create(
-                model="gpt-4o", # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-                messages=[
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": f"Generate the enhanced summary using this template: {template_summary}"}
-                ],
-                max_tokens=300,
-                temperature=0.1
-            )
+            # Use OpenAI with retry logic and timeout control
+            max_retries = 3
+            retry_delay = 1
             
-            return response.choices[0].message.content.strip()
+            for attempt in range(max_retries):
+                try:
+                    response = openai_client.chat.completions.create(
+                        model="gpt-4o", # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+                        messages=[
+                            {"role": "system", "content": prompt},
+                            {"role": "user", "content": f"Generate the enhanced summary using this template: {template_summary}"}
+                        ],
+                        max_tokens=300,
+                        temperature=0.1,
+                        timeout=30  # 30 second timeout
+                    )
+                    break  # Success, exit retry loop
+                except Exception as e:
+                    logging.warning(f"OpenAI API attempt {attempt + 1} failed for report {report.id}: {e}")
+                    if attempt == max_retries - 1:
+                        # Final attempt failed, use fallback
+                        logging.error(f"All OpenAI attempts failed for report {report.id}, using fallback")
+                        return template_summary
+                    time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
+            
+            if response and response.choices:
+                return response.choices[0].message.content.strip()
+            else:
+                return template_summary
             
         except Exception as e:
             import logging
