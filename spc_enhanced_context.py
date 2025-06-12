@@ -432,14 +432,14 @@ CRITICAL: Lead with magnitude first, use exact damage classification from data p
                 else:
                     time_str = "unknown time"
                     
-                # Get date from spc_date field if available
-                if hasattr(report, 'spc_date') and report.spc_date:
+                # Get date from report_date field if available
+                if hasattr(report, 'report_date') and report.report_date:
                     from datetime import datetime
-                    if isinstance(report.spc_date, str):
-                        date_obj = datetime.strptime(report.spc_date, '%Y-%m-%d')
+                    if isinstance(report.report_date, str):
+                        date_obj = datetime.strptime(report.report_date, '%Y-%m-%d')
                         date_str = date_obj.strftime('%B %d, %Y')
                     else:
-                        date_str = report.spc_date.strftime('%B %d, %Y')
+                        date_str = report.report_date.strftime('%B %d, %Y')
                 else:
                     date_str = "unknown date"
             except (ValueError, AttributeError):
