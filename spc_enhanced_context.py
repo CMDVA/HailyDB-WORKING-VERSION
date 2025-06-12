@@ -100,9 +100,13 @@ class SPCEnhancedContextService:
         
         # Handle case with no verified alerts but still provide location enrichment
         if not verified_alerts:
+            # Use the consolidated Enhanced Summary function with empty verified alerts list
+            enhanced_summary = self._generate_enhanced_summary(
+                report, [], 0, set(), "Unknown", location_context, False
+            )
             return {
                 "alert_count": 0,
-                "multi_alert_summary": self._generate_location_only_summary(report, location_context),
+                "multi_alert_summary": enhanced_summary,
                 "location_context": location_context,
                 "generated_at": datetime.utcnow().isoformat(),
                 "has_verified_alerts": False
