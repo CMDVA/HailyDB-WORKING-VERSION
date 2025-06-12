@@ -344,8 +344,15 @@ async function loadSPCVerificationTable() {
         // Force refresh verification data every time (no caching)
         // This ensures accurate real-time counts without stale data display
         
-        // Get verification data (only for initial load)
-        const verifyResponse = await fetch(`/internal/spc-verify-today`);
+        // Get verification data with cache-busting to ensure fresh data
+        const timestamp = new Date().getTime();
+        const verifyResponse = await fetch(`/internal/spc-verify-today?_t=${timestamp}`, {
+            cache: 'no-cache',
+            headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        });
         const verifyData = await verifyResponse.json();
         
         if (verifyData.status === 'success' && verifyData.results) {
