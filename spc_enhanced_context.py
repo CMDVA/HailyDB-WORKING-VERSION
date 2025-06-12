@@ -32,13 +32,13 @@ class SPCEnhancedContextService:
     def _map_hail_threat_level(self, hail_size: float) -> str:
         """Map hail size to NWS official classification for historical reports"""
         if hail_size >= 2.75:
-            return "Giant Hail"
+            return "Giant Hail - Hail larger than 2 3/4 inch (larger than baseballs, such as the size of grapefruit or softballs) causing major damage"
         elif hail_size >= 1.75:
-            return "Very Large Hail"
+            return "Very Large Hail - Hail from 1 3/4 inch to 2 3/4 inch in diameter (from the size of golf balls to baseballs) causing moderate damage"
         elif hail_size >= 1.0:
-            return "Large Hail"
+            return "Large Hail - Hail from 1 inch to 1 3/4 inch in diameter (from the size of quarters to golf balls) causing minor damage"
         else:
-            return "Small Hail"
+            return "Small Hail - Hail less than 1 inch in diameter (from the size of peas to nickels)"
     
     def _get_hail_natural_language(self, hail_size: float) -> str:
         """Get natural language equivalent for hail size"""
@@ -59,39 +59,17 @@ class SPCEnhancedContextService:
     def _map_wind_threat_level(self, wind_speed: float) -> str:
         """Map wind speed to NWS official classification for historical reports"""
         if wind_speed >= 92:
-            return "Violent Wind Gusts"
+            return "Violent Wind Gusts - Severe thunderstorm wind gusts greater than 92 mph (80 knots or greater) causing major damage"
         elif wind_speed >= 75:
-            return "Very Damaging Wind Gusts"
+            return "Very Damaging Wind Gusts - Severe thunderstorm wind gusts between 75 mph and 91 mph (between 65 knots and 79 knots) causing moderate damage"
         elif wind_speed >= 58:
-            return "Damaging Wind Gusts"
+            return "Damaging Wind Gusts - Severe thunderstorm wind gusts between 58 mph and 74 mph (between 50 knots and 64 knots) causing minor damage"
         elif wind_speed >= 39:
-            return "Strong Wind Gusts"
+            return "Strong Wind Gusts - Thunderstorm wind gusts between 39 mph and 57 mph (between 34 knots and 49 knots)"
         else:
-            return "Light Wind"
+            return "Light Wind Gusts"
 
-    def _hail_effect_statement(self, hail_size: float) -> str:
-        """Generate NWS official hail classification and damage statement"""
-        if hail_size >= 2.75:
-            return "will likely cause major damage to homes, automobiles and personal property"
-        elif hail_size >= 1.75:
-            return "will likely cause moderate damage to homes, automobiles and personal property"
-        elif hail_size >= 1.0:
-            return "will likely cause minor damage to homes, automobiles and personal property"
-        else:
-            return "typically causes minimal damage to property"
 
-    def _wind_effect_statement(self, wind_speed: int) -> str:
-        """Generate NWS-derived wind effect statement using official classifications"""
-        if wind_speed >= 92:
-            return "will likely cause major damage to homes, automobiles and personal property"
-        elif wind_speed >= 75:
-            return "will likely cause moderate damage to homes, automobiles and personal property"
-        elif wind_speed >= 58:
-            return "will likely cause minor damage to homes, automobiles and personal property"
-        elif wind_speed >= 39:
-            return "typically causes minimal damage to property"
-        else:
-            return "typically has minimal impact on property"
     
     def enrich_spc_report(self, report_id: int) -> Dict[str, Any]:
         """
@@ -352,17 +330,11 @@ class SPCEnhancedContextService:
             hail_threat_level = self._map_hail_threat_level(hail_size)
             wind_threat_level = self._map_wind_threat_level(wind_speed)
 
-            # Include SPC comments if present, otherwise use NWS-derived effects
+            # Include SPC comments if present, otherwise use complete NWS classification  
             if hasattr(report, 'comments') and report.comments and report.comments.strip():
                 damage_statement = f"Reported Damage: {report.comments.strip()}"
             else:
-                # Fallback to NWS-derived potential effects
-                if report.report_type == "HAIL":
-                    damage_statement = self._hail_effect_statement(hail_size)
-                elif report.report_type == "WIND":
-                    damage_statement = self._wind_effect_statement(wind_speed)
-                else:
-                    damage_statement = "No specific damage reports were received as of this summary."
+                damage_statement = ""  # Will use complete NWS classification in template
 
             # Calculate direction from event to major city (default to known relationship)
             direction = "north-northeast"  # Based on your template example
@@ -380,62 +352,50 @@ class SPCEnhancedContextService:
             # Generate conditional prompt based on whether we have verified alerts
             if verified_alerts and len(verified_alerts) > 0:
                 # Multi-alert summary with verification context
-                prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable insurance restoration and public safety intelligence.
+                prompt = f"""You are a professional, truthful meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance, designed for actionable intelligence in storm restoration, insurance, and public safety.
 
 This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
 
-REQUIRED Summary Format (lead with magnitude and emphasize damage potential):
-"On [date], [magnitude] [storm type] was reported at [location], [county] County, [state]. [NWS Classification Statement with damage emphasis]. The event occurred [distance] [direction] of [major city]{f' near {nearby_context}' if nearby_context else ''}."
+REQUIRED Summary Format - rewrite the following sentence EXACTLY:
+"{report.magnitude if report.magnitude else 'Unknown magnitude'} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), or approximately {major_city_distance} {direction} from {nearby_context.split(',')[0] if nearby_context else 'nearby locations'}, in {report.county} County, {report.state} at {report.time_utc.strftime('%H:%M')} (UTC) on {report.time_utc.strftime('%B %d, %Y')}. {hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}. {damage_statement if damage_statement else ''} ({report.source if hasattr(report, 'source') else 'SPC'})."
 
-COMPLETE SPC HISTORICAL REPORT DATA:
-- Report ID: {report.id}
-- Date/Time: {report.time_utc}
-- Storm Type: {report.report_type}
-- Magnitude: {report.magnitude if report.magnitude else 'Unknown magnitude'}
-- Location: {report.location}, {report.county} County, {report.state}
-- Coordinates: {report.latitude}, {report.longitude}
-- Comments/Details: {report.comments if hasattr(report, 'comments') and report.comments else 'No damage details available'}
-- Source: {report.source if hasattr(report, 'source') else 'SPC'}
-- F-Scale: {report.f_scale if hasattr(report, 'f_scale') else 'N/A'}
-- Threat Classification: {hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}
-- Damage Assessment: {damage_statement}
+NWS THREAT CLASSIFICATION:
+{hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}
 
-Location Context:
-- Major City Reference: {major_city_distance} {direction} of {major_city}
-- Nearby Places: {nearby_context if nearby_context else 'in a remote area'}
-- Radar Verification: {'Radar-detected' if radar_polygon_match else 'Report-based'}
+LOCATION DATA:
+- Event Location: {report.location}, {report.county} County, {report.state}
+- Reference: {major_city_distance} {direction} of {major_city}
+- Nearby: {nearby_context if nearby_context else 'in a remote area'}
 
-NWS Verification: {len(verified_alerts)} matching alerts spanning {duration_minutes} minutes
-
-CRITICAL: Lead with magnitude first, use exact damage classification from data provided, include directional reference to major city."""
+CRITICAL REQUIREMENTS:
+1. Use the EXACT NWS threat classification provided
+2. Lead with magnitude and location relationship
+3. Include complete damage assessment from NWS classification
+4. Professional meteorological language only
+5. NO creative additions - stick to data provided"""
             else:
                 # Location-only summary for unverified reports  
-                prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable insurance restoration and public safety intelligence.
+                prompt = f"""You are a professional, truthful meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance, designed for actionable intelligence in storm restoration, insurance, and public safety.
 
 This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
 
-REQUIRED Summary Format (lead with magnitude and emphasize damage potential):
-"On [date], [magnitude] [storm type] was reported at [location], [county] County, [state]. [NWS Classification Statement with damage emphasis]. The event occurred [distance] [direction] of [major city]{f' near {nearby_context}' if nearby_context else ''}."
+REQUIRED Summary Format - rewrite the following sentence EXACTLY:
+"{report.magnitude if report.magnitude else 'Unknown magnitude'} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), or approximately {major_city_distance} {direction} from {nearby_context.split(',')[0] if nearby_context else 'nearby locations'}, in {report.county} County, {report.state} at {report.time_utc.strftime('%H:%M')} (UTC) on {report.time_utc.strftime('%B %d, %Y')}. {hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}. {damage_statement if damage_statement else ''} ({report.source if hasattr(report, 'source') else 'SPC'})."
 
-COMPLETE SPC HISTORICAL REPORT DATA:
-- Report ID: {report.id}
-- Date/Time: {report.time_utc}
-- Storm Type: {report.report_type}
-- Magnitude: {report.magnitude if report.magnitude else 'Unknown magnitude'}
-- Location: {report.location}, {report.county} County, {report.state}
-- Coordinates: {report.latitude}, {report.longitude}
-- Comments/Details: {report.comments if hasattr(report, 'comments') and report.comments else 'No damage details available'}
-- Source: {report.source if hasattr(report, 'source') else 'SPC'}
-- F-Scale: {report.f_scale if hasattr(report, 'f_scale') else 'N/A'}
-- Threat Classification: {hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}
-- Damage Assessment: {damage_statement}
+NWS THREAT CLASSIFICATION:
+{hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}
 
-Location Context:
-- Major City Reference: {major_city_distance} {direction} of {major_city}
-- Nearby Places: {nearby_context if nearby_context else 'in a remote area'}
-- Verification Status: Unverified (no matching NWS alerts found)
+LOCATION DATA:
+- Event Location: {report.location}, {report.county} County, {report.state}
+- Reference: {major_city_distance} {direction} of {major_city}
+- Nearby: {nearby_context if nearby_context else 'in a remote area'}
 
-CRITICAL: Lead with magnitude first, use exact damage classification from data provided, include directional reference to major city."""
+CRITICAL REQUIREMENTS:
+1. Use the EXACT NWS threat classification provided
+2. Lead with magnitude and location relationship
+3. Include complete damage assessment from NWS classification
+4. Professional meteorological language only
+5. NO creative additions - stick to data provided"""
 
             # Generate summary using your exact template format
             # Get time components - convert from SPC format (HHMM) to proper time
