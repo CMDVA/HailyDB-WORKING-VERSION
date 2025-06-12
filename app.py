@@ -4298,7 +4298,7 @@ Focus on impact and professional terminology."""
         
         enhanced_summary = response.choices[0].message.content.strip()
         
-        # Create enhanced context
+        # Create enhanced context with versioning
         enhanced_context = {
             "location_context": {
                 "primary_location": primary_place['name'] if primary_place else location_text,
@@ -4306,12 +4306,19 @@ Focus on impact and professional terminology."""
                 "nearby_places": nearby_places
             },
             "enhanced_summary": enhanced_summary,
-            "generated_at": datetime.utcnow().isoformat()
+            "generated_at": datetime.utcnow().isoformat(),
+            "version": "v2.0"
         }
         
-        # Save to database
-        report.enhanced_context = enhanced_context
-        db.session.commit()
+        # Save to database with transaction isolation and versioning
+        try:
+            with db.session.begin():
+                report.enhanced_context = enhanced_context
+                report.enhanced_context_version = "v2.0"
+                report.enhanced_context_generated_at = datetime.utcnow()
+        except Exception as db_error:
+            db.session.rollback()
+            raise db_error
         
         return jsonify({
             "success": True,
