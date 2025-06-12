@@ -3749,10 +3749,10 @@ def api_live_radar_alerts():
         user_states = None
         
     try:
-        from live_radar_service_enhanced import ProductionLiveRadarService
+        from live_radar_service_clean import get_live_radar_service
         
         # Initialize service with database session
-        service = ProductionLiveRadarService(db.session)
+        service = get_live_radar_service(db.session)
         
         # Get live alerts with state-based filtering and caching
         alerts_data = service.get_live_alerts_with_state_filtering(user_states)
