@@ -44,6 +44,7 @@ class AutonomousScheduler:
         self.last_nws_poll = None
         self.last_spc_poll = None
         self.last_matching = None
+        self.last_enhanced_context = None
         
         # Operation locks to prevent overlaps
         self.nws_lock = threading.Lock()
@@ -309,15 +310,15 @@ class AutonomousScheduler:
             from spc_enhanced_context import SPCEnhancedContextService
             
             # Get verified SPC reports without Enhanced Context
-            with self.db_session() as session:
-                service = SPCEnhancedContextService(session)
-                result = service.enrich_all_reports(batch_size=50, unenriched_only=True)
-                
-                processed = result.get('total_processed', 0)
-                successful = result.get('successful_enrichments', 0)
-                
-                self.last_enhanced_context = datetime.utcnow()
-                logger.info(f"Enhanced Context generation completed: {successful}/{processed} reports enriched")
+            from app import db
+            service = SPCEnhancedContextService(db.session)
+            result = service.enrich_all_reports(batch_size=50, unenriched_only=True)
+            
+            processed = result.get('total_processed', 0)
+            successful = result.get('successful_enrichments', 0)
+            
+            self.last_enhanced_context = datetime.utcnow()
+            logger.info(f"Enhanced Context generation completed: {successful}/{processed} reports enriched")
                 
         except Exception as e:
             logger.error(f"Enhanced Context generation failed: {e}")

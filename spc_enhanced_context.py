@@ -178,7 +178,7 @@ class SPCEnhancedContextService:
                 nws_office, location_context, radar_polygon_match
             )
             
-            enhanced_context['multi_alert_summary'] = enhanced_summary
+            enhanced_context['enhanced_summary'] = enhanced_summary
             
             return {
                 "report_id": report_id,
