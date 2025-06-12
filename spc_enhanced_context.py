@@ -30,34 +30,28 @@ class SPCEnhancedContextService:
         self.db = db_session
     
     def _map_hail_threat_level(self, hail_size: float) -> str:
-        """Map hail size to damage severity classification for historical reports"""
+        """Map hail size to NWS official classification for historical reports"""
         if hail_size >= 2.75:
-            return "Severe Damage"
+            return "Giant Hail"
         elif hail_size >= 1.75:
-            return "Significant Damage"
+            return "Very Large Hail"
         elif hail_size >= 1.0:
-            return "Moderate Damage"
-        elif hail_size >= 0.75:
-            return "Minor Damage"
-        elif hail_size >= 0.5:
-            return "Minimal Damage"
+            return "Large Hail"
         else:
-            return "No Significant Damage"
+            return "Small Hail"
 
     def _map_wind_threat_level(self, wind_speed: float) -> str:
-        """Map wind speed to damage severity classification for historical reports"""
+        """Map wind speed to NWS official classification for historical reports"""
         if wind_speed >= 92:
-            return "Severe Damage"
+            return "Violent Wind Gusts"
         elif wind_speed >= 75:
-            return "Significant Damage"
+            return "Very Damaging Wind Gusts"
         elif wind_speed >= 58:
-            return "Moderate Damage"
+            return "Damaging Wind Gusts"
         elif wind_speed >= 39:
-            return "Minor Damage"
-        elif wind_speed > 0:
-            return "Minimal Damage"
+            return "Strong Wind Gusts"
         else:
-            return "No Significant Damage"
+            return "Light Wind"
 
     def _hail_effect_statement(self, hail_size: float) -> str:
         """Generate NWS-derived hail effect statement using official classifications"""
@@ -291,17 +285,25 @@ class SPCEnhancedContextService:
                 self._check_radar_confirmation(alert, report) for alert in verified_alerts
             )
 
-            # Extract hail and wind magnitudes
-            try:
-                hail_size = float(report.magnitude) if report.report_type == "HAIL" and report.magnitude else 0.0
-            except ValueError:
-                hail_size = 0.0
-
-            try:
-                wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip()) \
-                    if report.report_type == "WIND" and report.magnitude else 0
-            except (ValueError, AttributeError):
-                wind_speed = 0
+            # Extract hail and wind magnitudes correctly
+            hail_size = 0.0
+            wind_speed = 0
+            
+            if report.report_type == "HAIL" and report.magnitude:
+                try:
+                    # Hail magnitude is stored as inches (float)
+                    hail_size = float(report.magnitude)
+                except (ValueError, TypeError):
+                    hail_size = 0.0
+            elif report.report_type == "WIND" and report.magnitude:
+                try:
+                    # Wind magnitude is stored as mph (integer)
+                    if isinstance(report.magnitude, str):
+                        wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip())
+                    else:
+                        wind_speed = int(report.magnitude)
+                except (ValueError, TypeError):
+                    wind_speed = 0
 
             # Map to NWS Threat Levels
             hail_threat_level = self._map_hail_threat_level(hail_size)
@@ -389,26 +391,48 @@ Location Context:
 
 CRITICAL: Lead with magnitude first, use exact damage classification from data provided, include directional reference to major city."""
 
-            # Generate direct summary using our calculated damage classifications - no OpenAI needed
+            # Generate summary using your exact template format
+            # Get time components
+            time_str = report.time_utc.strftime('%H:%M (UTC)') if hasattr(report.time_utc, 'strftime') else str(report.time_utc)
             date_str = report.time_utc.strftime('%B %d, %Y') if hasattr(report.time_utc, 'strftime') else str(report.time_utc)
             
-            if report.report_type == 'HAIL':
-                event_description = f"{report.magnitude}-inch hail"
-                damage_classification = hail_threat_level
-            else:
-                event_description = f"{report.magnitude} mph wind"
-                damage_classification = wind_threat_level
+            # Build enriched event location (from location context)
+            enriched_location = major_city if major_city else report.location
             
-            # Build nearby context string
-            nearby_context_str = ""
+            # Get nearest major city with direction (limit to top 3 nearby places)
+            nearby_places_list = []
             if nearby_context:
-                nearby_context_str = f" near {nearby_context}"
+                # Parse nearby context to get individual places with distances
+                places = nearby_context.split(', ')[:3]  # Limit to 3
+                nearby_places_list = places
             
-            # Generate the summary directly using our calculated values
-            summary = (f"On {date_str}, {event_description} was reported at {report.location}, "
-                      f"{report.county} County, {report.state}. {damage_classification} classification "
-                      f"with {damage_statement}. The event occurred {major_city_distance} {direction} "
-                      f"of {major_city}{nearby_context_str}.")
+            # Get the first enriched location or fallback to nearest place
+            enriched_event_location = nearby_places_list[0] if nearby_places_list else report.location
+            
+            # Generate template-based summary following exact format
+            if report.report_type == 'HAIL':
+                summary = (f"{hail_size}\" hail was reported {major_city_distance} {direction} "
+                          f"of {enriched_event_location} ({report.location}), or approximately {major_city_distance} "
+                          f"{direction} from {major_city}, in {report.county} County, {report.state} at "
+                          f"{time_str} on {date_str}. {hail_threat_level} - {damage_statement}.")
+            else:
+                summary = (f"{wind_speed} mph wind was reported {major_city_distance} {direction} "
+                          f"of {enriched_event_location} ({report.location}), or approximately {major_city_distance} "
+                          f"{direction} from {major_city}, in {report.county} County, {report.state} at "
+                          f"{time_str} on {date_str}. {wind_threat_level} - {damage_statement}.")
+            
+            # Add nearby locations (max 3, exclude the first one already used)
+            if len(nearby_places_list) > 1:
+                other_locations = []
+                for i, place in enumerate(nearby_places_list[1:4]):  # Skip first, take next 3
+                    distance = location_context.get('nearby_places', [])[i+1].get('distance_miles', 0)
+                    other_locations.append(f"{place} ({distance} mi)")
+                if other_locations:
+                    summary += f" Other nearby locations include {', '.join(other_locations)}."
+            
+            # Add SPC comments if available
+            if hasattr(report, 'comments') and report.comments and report.comments.strip():
+                summary += f" {report.comments.strip()}"
             
             return summary
             
