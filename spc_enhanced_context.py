@@ -30,34 +30,34 @@ class SPCEnhancedContextService:
         self.db = db_session
     
     def _map_hail_threat_level(self, hail_size: float) -> str:
-        """Map hail size to official NWS threat level"""
+        """Map hail size to damage severity classification for historical reports"""
         if hail_size >= 2.75:
-            return "Extreme Threat"
+            return "Severe Damage"
         elif hail_size >= 1.75:
-            return "High Threat"
+            return "Significant Damage"
         elif hail_size >= 1.0:
-            return "Moderate Threat"
+            return "Moderate Damage"
         elif hail_size >= 0.75:
-            return "Low Threat"
+            return "Minor Damage"
         elif hail_size >= 0.5:
-            return "Very Low Threat"
+            return "Minimal Damage"
         else:
-            return "Minimal Threat"
+            return "No Significant Damage"
 
     def _map_wind_threat_level(self, wind_speed: float) -> str:
-        """Map wind speed to official NWS threat level"""
+        """Map wind speed to damage severity classification for historical reports"""
         if wind_speed >= 92:
-            return "Extreme Threat"
+            return "Severe Damage"
         elif wind_speed >= 75:
-            return "High Threat"
+            return "Significant Damage"
         elif wind_speed >= 58:
-            return "Moderate Threat"
+            return "Moderate Damage"
         elif wind_speed >= 39:
-            return "Low Threat"
+            return "Minor Damage"
         elif wind_speed > 0:
-            return "Very Low Threat"
+            return "Minimal Damage"
         else:
-            return "Non-Threatening"
+            return "No Significant Damage"
 
     def _hail_effect_statement(self, hail_size: float) -> str:
         """Generate NWS-derived hail effect statement using official classifications"""
@@ -389,17 +389,28 @@ Location Context:
 
 CRITICAL: Lead with magnitude first, use exact damage classification from data provided, include directional reference to major city."""
 
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are a meteorological data analyst specializing in location-enhanced weather summaries. Create comprehensive summaries that make locations more recognizable and meaningful."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=250,
-                temperature=0.2
-            )
+            # Generate direct summary using our calculated damage classifications - no OpenAI needed
+            date_str = report.time_utc.strftime('%B %d, %Y') if hasattr(report.time_utc, 'strftime') else str(report.time_utc)
             
-            return response.choices[0].message.content.strip()
+            if report.report_type == 'HAIL':
+                event_description = f"{report.magnitude}-inch hail"
+                damage_classification = hail_threat_level
+            else:
+                event_description = f"{report.magnitude} mph wind"
+                damage_classification = wind_threat_level
+            
+            # Build nearby context string
+            nearby_context_str = ""
+            if nearby_context:
+                nearby_context_str = f" near {nearby_context}"
+            
+            # Generate the summary directly using our calculated values
+            summary = (f"On {date_str}, {event_description} was reported at {report.location}, "
+                      f"{report.county} County, {report.state}. {damage_classification} classification "
+                      f"with {damage_statement}. The event occurred {major_city_distance} {direction} "
+                      f"of {major_city}{nearby_context_str}.")
+            
+            return summary
             
         except Exception as e:
             logger.error(f"Error generating AI summary: {e}")

@@ -1,0 +1,30 @@
+Let's review the enhanced summary - for the same example. 
+
+"At 10 NNE Recluse, Campbell County, Wyoming, hail was reported. The magnitude places this event in the Non-Threatening category. No damage was reported. The event occurred 1.4 miles north-northeast of Plum Tree Reservoir, near Plum Tree Reservoir, approximately 40.4 miles from Gillette and 1.7 miles from Chalk Prong."
+
+Rewritten - prompt for this styling. 
+
+1.5" hail was reported 1.4 miles north-northeast of Plum Tree Resivoire (10 NNE Recluse), or approximately 40.4 miles {insert direction} from Gilette, in Campbell County, Wyoming at 23:52 (UTC) on June 11, 2025. Large Hail - (1 inch to 1 3/4 inch in diameterm, or the size of quarters to golf balls) can cause minor damage to homes and personal property. Other nearby locations include Chalk Prong (1.7 mi), Heart X Outfitters 307 (4.9 mi) and White Tail Butte (6.3 mi). 
+
+1. Lead with magnitude and event type
+2. at Enriched Event Location (SPC Report Location in parenthesis)
+3. Or (distance from) Nearest Major City - with direction
+4. Include information for hail and wind (appended below)
+5. Other nearby locations (max 3, starting with closest)
+
+*you were mistaking alerts for historical reports. Therefore, this event should NOT BE CONSIDERED non-threatening, as it does not have a Severe Threat Level. Use the above template in order to instruct your prompt more clearly. Be sure to include all content in SPC Comments, rewritten to accentuate the event factually. If Verified Alerts apply to the Enhanced Context Summary, use them accordingly. 
+
+HAIL via NWS:
+Note: To be considered severe, hail stones must be at least 1 inch in diameter.
+Small Hail - Hail less than 1 inch in diameter (from the size of peas to nickels).
+Large Hail - Hail from 1 inch to 1 3/4 inch in diameter (from the size of quarters to golf balls) causing minor damage. 
+Very Large Hail  - Hail from 1 3/4 inch to 2 3/4 inch in diameter (from the size of golf balls to baseballs) causing moderate damage. 
+Giant Hail - Hail larger than 2 3/4 inch (larger than baseballs, such as the size of grapefruit or softballs) causing major damage. 
+
+WIND via NWS: 
+Note: To be considered severe, associated wind gusts must be 58 mph or greater (50 knots or greater).
+Strong Wind Gusts - Thunderstorm wind gusts between 39 mph and 57 mph (between 34 knots and 49 knots).
+
+Damaging Wind Gusts - Severe thunderstorm wind gusts between 58 mph and 74 mph (between 50 knots and 64 knots) causing minor damage. 
+Very Damaging Wind Gusts  -  Severe thunderstorm wind gusts between 75 mph and 91 mph (between 65 knots and 79 knots) causing moderate damage. 
+Violent Wind Gusts -  Severe thunderstorm wind gusts greater than 92 mph (80 knots or greater) causing major damage. 
