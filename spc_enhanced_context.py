@@ -275,16 +275,13 @@ class SPCEnhancedContextService:
                 time_str = str(report.time_utc) if hasattr(report, 'time_utc') else "unknown time"
                 date_str = str(report.spc_date) if hasattr(report, 'spc_date') else "unknown date"
 
-            # Build proper magnitude display and correct threat classification
+            # Build proper magnitude display - AI will generate damage assessment
             if report.report_type.upper() == "HAIL":
                 magnitude_display = f"{hail_size} inch" if hail_size else "Unknown size"
-                threat_classification = hail_threat_level
             elif report.report_type.upper() == "WIND":
                 magnitude_display = f"{wind_speed} mph" if wind_speed else "Unknown speed"
-                threat_classification = wind_threat_level
             else:
                 magnitude_display = report.magnitude if report.magnitude else 'Unknown magnitude'
-                threat_classification = "Unknown threat level"
 
             # Generate prompt with correct NWS classifications - NO SPC comments
             prompt = f"""You are a professional, truthful meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance, designed for actionable intelligence in storm restoration, insurance, and public safety.
