@@ -4024,10 +4024,6 @@ def api_generate_enhanced_context():
             "success": False,
             "error": f"Error generating enhanced context: {str(e)}"
         }), 500
-        
-    except Exception as e:
-        logger.error(f"Error generating enhanced context: {str(e)}")
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/live-radar-alerts', methods=['GET'])
 def api_live_radar_alerts():

@@ -1,0 +1,142 @@
+1️⃣ Enhanced Context Version is not displayed anywhere
+→ You are now adding enhanced_context_version → but this template does not display it.
+
+Fix: Add under Enhanced Context Summary, small text:
+
+html
+Copy
+Edit
+<small class="text-muted">Version: {{ report.enhanced_context_version or 'N/A' }}</small>
+→ This is critical when you roll out v1.1 / v2.0 so users know which version they are seeing.
+
+2️⃣ enhanced_context_generated_at is used inconsistently
+In some places:
+
+html
+Copy
+Edit
+Generated {{ report.enhanced_context.generated_at[:10] }}
+But in JS button generateEnhancedContext, you refresh the page with a timestamp param:
+
+js
+Copy
+Edit
+window.location.href = window.location.protocol + '//' + window.location.host + window.location.pathname + '?t=' + new Date().getTime();
+→ That is correct — but I recommend that you also show "Last generated: FULL timestamp (UTC)", not just the date.
+
+Fix: Change this:
+
+html
+Copy
+Edit
+Generated {{ report.enhanced_context.generated_at[:10] }}
+→ to:
+
+html
+Copy
+Edit
+Generated {{ report.enhanced_context.generated_at.replace('T', ' ')[:16] }} UTC
+→ This gives exact user clarity (did it run just now? 5 minutes ago?).
+
+3️⃣ Location Context fallback logic is duplicated
+You already show:
+
+html
+Copy
+Edit
+report.enhanced_context.location_context.primary_location
+And later again:
+
+html
+Copy
+Edit
+Nearby: {{ report.enhanced_context.location_context.nearby_places|map(attribute='name')|join(', ') }}
+But you also have duplicated logic under spc_enrichment block:
+
+primary_location
+
+nearest_city
+
+other_nearby_places
+
+→ Not a bug, but it’s slightly inconsistent — be careful that your _get_location_context in Python matches what this template expects.
+
+Recommendation:
+
+Add location_context.primary_location and location_context.nearest_major_city as always guaranteed fields.
+
+Do not rely on spc_enrichment.nearby_places.type == 'primary_location' — it is too brittle.
+
+→ Use Enhanced Context FIRST, always.
+
+4️⃣ Map Button could be improved
+You already do this:
+
+html
+Copy
+Edit
+<a href="https://www.google.com/maps?q={{ report.latitude }},{{ report.longitude }}"
+→ Perfect.
+
+Extra improvement (minor):
+
+html
+Copy
+Edit
+target="_blank" rel="noopener noreferrer"
+→ Security best practice for external links.
+
+5️⃣ No Spinner or Lock on Verified Alerts Regenerate
+You have:
+
+html
+Copy
+Edit
+<button class="btn btn-sm btn-outline-primary ms-2" onclick="regenerateContext({{ report.id }})">
+But regenerateContext → calls generateEnhancedContext, which expects button parameter.
+
+→ Minor JS bug → you are not passing this.
+
+Correct:
+
+html
+Copy
+Edit
+onclick="regenerateContext({{ report.id }}, this)"
+→ Otherwise your button won’t show "Re-enriching..." etc.
+
+6️⃣ Future-proofing → add an "Enhanced Context API raw dump"
+You already display enhanced_context.enhanced_summary.
+
+Recommendation:
+
+Add a collapsed <details> block below:
+
+html
+Copy
+Edit
+<details class="mt-3">
+  <summary class="small text-muted">View full Enhanced Context JSON</summary>
+  <pre class="small bg-light p-2 mt-2 rounded">{{ report.enhanced_context | tojson(indent=2) }}</pre>
+</details>
+→ WHY? For debugging → when you change prompt version, you’ll want to see:
+
+Alert count
+
+Radar match status
+
+Nearby places
+
+Version, generated_at
+All in raw JSON.
+
+→ Helps your devs and test users a ton.
+
+Final Checklist for this Template:
+Item	Status / Recommendation
+Basic Info & Coordinates	✅ Perfect
+Enhanced Context Summary	✅ Correct flow, but add version + exact timestamp
+Location Context	⚠️ Slightly inconsistent fallback → align with Python service
+Map Button	Minor fix → add rel="noopener noreferrer"
+Regenerate button	⚠️ Missing this param → minor JS bug
+Enhanced Context Raw Dump	❗ Strongly recommend adding <details> block for future debugging
