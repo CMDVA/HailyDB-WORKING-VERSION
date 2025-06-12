@@ -266,8 +266,51 @@
             </div>
             {% endif %}
 
+            <!-- Enhanced Context Display Section -->
+            {% if report.enhanced_context and report.enhanced_context.enhanced_summary %}
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-success">
+                        <i class="fas fa-magic me-2"></i>Enhanced Context Summary
+                    </h6>
+                    <span class="badge bg-success">Generated</span>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <p class="mb-0">{{ report.enhanced_context.enhanced_summary }}</p>
+                    </div>
+                    
+                    {% if report.enhanced_context.location_context and report.enhanced_context.location_context.nearby_places %}
+                    <div class="mt-3 pt-3 border-top">
+                        <h6 class="text-muted mb-2">Nearby Locations</h6>
+                        <div class="row">
+                            {% for place in report.enhanced_context.location_context.nearby_places[:6] %}
+                            <div class="col-md-4 mb-2">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-map-marker-alt text-muted me-2"></i>
+                                    <div>
+                                        <div class="fw-bold">{{ place.name }}</div>
+                                        <small class="text-muted">{{ place.distance_miles }} miles</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mt-3 pt-2 border-top">
+                        <small class="text-muted">
+                            Generated {{ report.enhanced_context.generated_at[:10] }}
+                            <button class="btn btn-sm btn-outline-primary ms-2" onclick="generateEnhancedContext({{ report.id }}, this)">
+                                <i class="fas fa-sync me-1"></i>Regenerate
+                            </button>
+                        </small>
+                    </div>
+                </div>
+            </div>
+            {% else %}
             <!-- Enhanced Context Generation Section -->
-            {% if not (report.enhanced_context and report.enhanced_context.enhanced_summary) %}
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
                     <h6 class="m-0 font-weight-bold text-warning">
