@@ -77,12 +77,13 @@ class SPCEnrichmentService:
             )
             enrichment.update(radar_match)
             
-            # Generate nearby places
+            # Generate nearby places (pass SPC location for reference city extraction)
             nearby_places = self._generate_nearby_places(
                 spc_report.latitude,
                 spc_report.longitude,
                 spc_report.county,
-                spc_report.state
+                spc_report.state,
+                spc_report.location if hasattr(spc_report, 'location') else None
             )
             enrichment['nearby_places'] = nearby_places
             
@@ -167,7 +168,41 @@ class SPCEnrichmentService:
                 'error': str(e)
             }
     
-    def _generate_nearby_places(self, lat: float, lon: float, county: str, state: str) -> List[Dict[str, Any]]:
+    def _extract_spc_reference_city(self, location: str) -> Optional[str]:
+        """
+        Extract the reference city from SPC location field (e.g., "10 NNE Recluse" -> "Recluse")
+        
+        Args:
+            location: SPC location field text
+            
+        Returns:
+            Reference city name or None if not found
+        """
+        if not location:
+            return None
+            
+        # Common SPC location patterns: "10 NNE Recluse", "5 S Dallas", "2 E Los Angeles"
+        import re
+        
+        # Pattern to match: optional distance + direction + city name
+        # Examples: "10 NNE Recluse", "5 S Dallas", "2 E Los Angeles", "Dallas"
+        patterns = [
+            r'\d+\s+[NSEW]{1,3}\s+(.+)$',  # "10 NNE Recluse" -> "Recluse"
+            r'\d+\s+[NSEW]{1,3}\s+(.+?)\s*$',  # Handle trailing spaces
+            r'^(.+)$'  # Fallback to entire location if no distance/direction
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, location.strip(), re.IGNORECASE)
+            if match:
+                city = match.group(1).strip()
+                # Filter out obvious non-city patterns
+                if len(city) > 1 and not city.isdigit():
+                    return city
+                    
+        return None
+
+    def _generate_nearby_places(self, lat: float, lon: float, county: str, state: str, spc_location: str = None) -> List[Dict[str, Any]]:
         """
         Generate location identification using ONLY SPC lat/lon coordinates.
         Returns publicly identifiable, Google Maps-searchable places in priority order.
