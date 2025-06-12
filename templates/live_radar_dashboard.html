@@ -209,7 +209,7 @@
 <!-- Statistics Cards -->
 <div class="row mb-4">
     <div class="col-md-3">
-        <div class="card bg-danger text-white">
+        <div class="card bg-primary text-white">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
@@ -787,10 +787,11 @@ function manualLoadAlerts() {
 
 // Helper functions for formatting display values
 function getHailSizeClass(size) {
-    if (size >= 2.0) return 'bg-danger';
-    if (size >= 1.0) return 'bg-warning';
-    if (size >= 0.5) return 'bg-info';
-    return 'bg-secondary';
+    // All hail badges should be BLUE (bg-primary)
+    if (size >= 2.0) return 'bg-primary';
+    if (size >= 1.0) return 'bg-primary';
+    if (size >= 0.5) return 'bg-primary';
+    return 'bg-primary';
 }
 
 function getHailSizeName(size) {
@@ -809,10 +810,11 @@ function getHailSizeName(size) {
 }
 
 function getWindSpeedClass(speed) {
-    if (speed >= 75) return 'bg-danger';
+    // All wind badges should be YELLOW (bg-warning)
+    if (speed >= 75) return 'bg-warning';
     if (speed >= 65) return 'bg-warning';
-    if (speed >= 50) return 'bg-info';
-    return 'bg-secondary';
+    if (speed >= 50) return 'bg-warning';
+    return 'bg-warning';
 }
 
 function getWindSeverity(speed) {
