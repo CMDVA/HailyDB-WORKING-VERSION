@@ -375,13 +375,7 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <!-- Enriched Summary -->
-                    {% if report.spc_enrichment.enriched_summary %}
-                    <div class="alert alert-primary mb-3">
-                        <div class="text-primary font-weight-bold small mb-1">Property Impact Assessment</div>
-                        <p class="mb-0 lead">{{ report.spc_enrichment.enriched_summary }}</p>
-                    </div>
-                    {% endif %}
+
 
                     <!-- Nearby Places -->
                     {% if report.spc_enrichment.nearby_places and report.spc_enrichment.nearby_places|length > 0 %}
