@@ -371,7 +371,7 @@ class SPCEnrichmentService:
                             'distance_miles': round(actual_distance, 1),
                             'approx_lat': event_loc['approx_lat'],
                             'approx_lon': event_loc['approx_lon'],
-                            'type': 'event_location'
+                            'type': 'primary_location'
                         })
                         logger.info(f"Event Location: {event_loc['name']} at {actual_distance:.1f} miles")
             
@@ -389,7 +389,7 @@ class SPCEnrichmentService:
                         'distance_miles': round(actual_distance, 1),
                         'approx_lat': city_data['approx_lat'],
                         'approx_lon': city_data['approx_lon'],
-                        'type': 'nearest_major_city'
+                        'type': 'nearest_city'
                     })
                     logger.info(f"Nearest Major City: {city_data['name']} at {actual_distance:.1f} miles")
             
