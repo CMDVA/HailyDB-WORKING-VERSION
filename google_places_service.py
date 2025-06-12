@@ -176,8 +176,22 @@ class GooglePlacesService:
     def find_nearest_major_city(self, lat: float, lon: float) -> Optional[PlaceResult]:
         """
         Find nearest major city for regional context (no distance limit)
+        Filters out small communities and only returns actual cities
         """
         try:
+            # Known major cities in Wyoming and surrounding areas for filtering
+            major_cities = [
+                'Cheyenne', 'Casper', 'Laramie', 'Gillette', 'Rock Springs', 
+                'Sheridan', 'Green River', 'Evanston', 'Riverton', 'Jackson',
+                'Cody', 'Rawlins', 'Worland', 'Lander', 'Torrington', 'Powell',
+                'Douglas', 'Wheatland', 'Newcastle', 'Buffalo',
+                # Major cities in surrounding states
+                'Denver', 'Colorado Springs', 'Fort Collins', 'Boulder', 'Pueblo',
+                'Billings', 'Great Falls', 'Missoula', 'Bozeman', 'Helena',
+                'Rapid City', 'Sioux Falls', 'Pierre', 'Aberdeen',
+                'Salt Lake City', 'Ogden', 'Provo', 'West Valley City'
+            ]
+            
             # Search for cities within increasingly larger radii
             for radius_miles in [25, 50, 100, 200]:
                 radius_meters = int(radius_miles * 1609.34)
@@ -195,13 +209,20 @@ class GooglePlacesService:
                 data = response.json()
                 
                 if data.get('results'):
-                    # Find cities, prioritize by prominence/rating
-                    cities = [r for r in data['results'] if r.get('rating', 0) > 3.5 or r.get('user_ratings_total', 0) > 100]
-                    if not cities:
-                        cities = data['results']
+                    # Filter for actual major cities only
+                    major_city_results = []
+                    for result in data['results']:
+                        city_name = result['name']
+                        # Check if it's in our major cities list or has significant ratings indicating size
+                        is_major = (
+                            city_name in major_cities or 
+                            (result.get('user_ratings_total', 0) > 500 and result.get('rating', 0) > 4.0)
+                        )
+                        if is_major:
+                            major_city_results.append(result)
                     
-                    if cities:
-                        closest_city = min(cities, key=lambda p: self._calculate_distance(
+                    if major_city_results:
+                        closest_city = min(major_city_results, key=lambda p: self._calculate_distance(
                             lat, lon,
                             p['geometry']['location']['lat'],
                             p['geometry']['location']['lng']
