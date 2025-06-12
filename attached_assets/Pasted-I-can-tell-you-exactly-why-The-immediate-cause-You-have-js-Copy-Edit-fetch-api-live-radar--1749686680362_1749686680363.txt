@@ -1,0 +1,181 @@
+I can tell you exactly why:
+
+The immediate cause:
+👉 You have:
+
+js
+Copy
+Edit
+fetch('/api/live-radar-alerts')
+    .then(response => {
+        console.log('Direct fetch response:', response.status, response.statusText);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Direct fetch success:', data);
+        console.log('Alert count from direct fetch:', data.alerts ? data.alerts.length : 0);
+        
+        // Now try the actual function
+        console.log('Direct fetch succeeded, now calling loadLiveAlerts()...');
+        return loadLiveAlerts();
+    })
+What happens:
+You first fetch('/api/live-radar-alerts') manually → OK
+
+Then inside the .then(), you call loadLiveAlerts() — which calls fetch again.
+
+But initializeDashboard() already calls setInterval(loadLiveAlerts, 30000), which is also hitting the API.
+
+→ Result: You have multiple overlapping fetch() calls to /api/live-radar-alerts — and if ANY one of them errors / hangs, your displayAlerts() never executes → stuck on Loading.
+
+The deeper cause:
+/api/live-radar-alerts is not returning valid data → your JS expects:
+
+json
+Copy
+Edit
+{
+  "alerts": [...],
+  "statistics": {...}
+}
+But your current live_radar_service.py sometimes returns an empty array or an invalid JSON if NWS /active is slow.
+
+👉 When the fetch() gets bad JSON or an empty response → it hangs.
+👉 Your catch() block logs an error but the Loading spinner is NOT cleared → UI remains stuck.
+
+Conclusion: This is 100% expected.
+Fix required:
+1️⃣ Remove the "test fetch then call loadLiveAlerts()" double-fetch:
+js
+Copy
+Edit
+// REMOVE THIS:
+fetch('/api/live-radar-alerts')
+    .then(response => {
+        console.log('Direct fetch response:', response.status, response.statusText);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Direct fetch success:', data);
+        console.log('Alert count from direct fetch:', data.alerts ? data.alerts.length : 0);
+        
+        console.log('Direct fetch succeeded, now calling loadLiveAlerts()...');
+        return loadLiveAlerts();
+    })
+    .catch(error => {
+        console.error('Direct fetch failed:', error);
+    });
+
+// REPLACE WITH THIS:
+loadLiveAlerts();
+2️⃣ In loadLiveAlerts(), add a finally block to always clear the Loading spinner:
+js
+Copy
+Edit
+finally {
+    updateLastRefreshTime();
+    // If no alerts loaded, clear spinner
+    if (!window.currentAlerts || window.currentAlerts.length === 0) {
+        displayAlerts([]);
+    }
+}
+Why does this matter?
+👉 You built your template correctly.
+👉 Your live_radar_service.py is not 100% stable → sometimes returning "empty" or malformed data → this breaks your JS flow.
+👉 Your JS flow currently lacks defensive code to always handle this case → UI gets stuck.
+1️⃣ Mixed and Redundant JS Functions
+You have multiple copies of utility functions defined twice in this block:
+
+js
+Copy
+Edit
+function getHailSizeClass(size) { ... }
+function getHailSizeName(size) { ... }
+function getWindSpeedClass(speed) { ... }
+function getWindSeverity(speed) { ... }
+function getSeverityBadge(hailSize, windSpeed) { ... }
+function extractState(areaDesc) { ... }
+— One block inside displayAlerts() logic
+— Another block further down ("Helper functions for formatting display values")
+
+👉 Problem: Browser will use the last function defined — so your display may be inconsistent.
+→ Example: your CSS classes on the table won’t match your statistics cards.
+
+👉 Solution: remove the duplicate set — keep only one set of these utilities.
+
+2️⃣ Data Structure Mismatch
+You are expecting:
+
+js
+Copy
+Edit
+alert.max_hail_size
+alert.max_wind_gust
+alert.description
+But per your own audit earlier, and as of your current HailyDB live_radar_service.py:
+
+Actual live API sends:
+
+json
+Copy
+Edit
+radar_data: {
+    hail_inches: ...,
+    wind_mph: ...
+}
+👉 This means your hailSize and windSpeed assignments here:
+
+js
+Copy
+Edit
+let hailSize = alert.max_hail_size || 0;
+let windSpeed = alert.max_wind_gust || 0;
+→ Will be undefined → 0 → UI will show "None".
+
+👉 Solution: adjust to:
+
+js
+Copy
+Edit
+let hailSize = (alert.radar_data && alert.radar_data.hail_inches) || 0;
+let windSpeed = (alert.radar_data && alert.radar_data.wind_mph) || 0;
+3️⃣ Search & Filter — No actual hook
+You have a #searchFilter input field, but:
+
+There is no JS handler to filter on keyup or change.
+
+applyFilters() function is stubbed out (just calls loadLiveAlerts() which re-pulls the entire dataset).
+
+👉 Result: Search box looks functional but does nothing.
+👉 Solution: implement keyup handler on #searchFilter, apply client-side filter on displayAlerts().
+
+4️⃣ Double Polling Risk
+You already have this in initializeDashboard():
+
+js
+Copy
+Edit
+setInterval(loadLiveAlerts, 30000);
+AND your Auto Refresh button does:
+
+js
+Copy
+Edit
+autoRefreshInterval = setInterval(loadLiveAlerts, 30000);
+But you don’t clear the original setInterval() when enabling auto-refresh.
+
+👉 Result: Double interval → duplicate API calls every 30s once Auto Refresh is enabled.
+👉 Solution: add clearInterval() on both sides to ensure only one polling loop is active.
+
+5️⃣ Minor / cosmetic
+You reference alert.effective_time → OK for live alerts, but remember: historical radar_alerts has detected_time. If you generalize the template, support both.
+
+Your View Alert button is using /alerts/${alert.id} — OK for database radar_alerts but NOT valid for live NWS alerts (urn:oid IDs → 404). You need to suppress this button on live-only alerts.
+
+Summary of action items:
+Issue	Impact	Action
+Redundant JS utilities	Causes subtle UI bugs	Keep only 1 set
+radar_data mismatch	Hail / wind show as "None"	Fix JS parsing to radar_data.xxx
+Search box non-functional	UX broken	Implement keyup filter
+Double polling	Extra load on API	Fix polling loop logic
+View button → live alerts	Broken links on live alerts	Suppress or modify button logic

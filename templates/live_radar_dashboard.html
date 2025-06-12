@@ -330,41 +330,26 @@ function initializeDashboard() {
     
     console.log('Starting initial alert load...');
     
-    // Test immediate call
-    console.log('Calling loadLiveAlerts() function...');
-    
-    // Simple test first
-    console.log('Testing fetch API...');
-    fetch('/api/live-radar-alerts')
-        .then(response => {
-            console.log('Direct fetch response:', response.status, response.statusText);
-            return response.json();
-        })
-        .then(data => {
-            console.log('Direct fetch success:', data);
-            console.log('Alert count from direct fetch:', data.alerts ? data.alerts.length : 0);
-            
-            // Now try the actual function
-            console.log('Direct fetch succeeded, now calling loadLiveAlerts()...');
-            return loadLiveAlerts();
-        })
-        .catch(error => {
-            console.error('Direct fetch failed:', error);
-        });
+    // Load alerts immediately
+    loadLiveAlerts();
     
     // Set up auto-refresh to load alerts every 30 seconds
-    setInterval(loadLiveAlerts, 30000);
+    window.dashboardInterval = setInterval(loadLiveAlerts, 30000);
     
     console.log('Dashboard initialized successfully');
 }
 
 function enableAutoRefresh() {
     if (autoRefreshEnabled) {
+        // Stop auto refresh and clear both intervals
         clearInterval(autoRefreshInterval);
+        clearInterval(window.dashboardInterval);
         autoRefreshEnabled = false;
         document.querySelector('[onclick="enableAutoRefresh()"]').innerHTML = '<i class="fas fa-clock me-1"></i>Auto Refresh';
     } else {
-        autoRefreshInterval = setInterval(loadLiveAlerts, 30000); // Refresh every 30 seconds
+        // Stop the existing dashboard interval and start fresh auto refresh
+        clearInterval(window.dashboardInterval);
+        autoRefreshInterval = setInterval(loadLiveAlerts, 30000);
         autoRefreshEnabled = true;
         document.querySelector('[onclick="enableAutoRefresh()"]').innerHTML = '<i class="fas fa-pause me-1"></i>Stop Auto';
         loadLiveAlerts();
@@ -416,6 +401,17 @@ async function loadLiveAlerts() {
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
         displayError('Failed to load live radar alerts: ' + error.message);
+    } finally {
+        // Always ensure loading spinner is cleared
+        updateLastRefreshTime();
+        // If no alerts were loaded, show empty state
+        if (!window.currentAlerts || window.currentAlerts.length === 0) {
+            console.log('No alerts loaded, displaying empty state');
+            const tbody = document.getElementById('liveRadarTableBody');
+            if (tbody && tbody.innerHTML.includes('Loading live radar alerts')) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No live radar alerts currently active.</td></tr>';
+            }
+        }
     }
 }
 
@@ -453,8 +449,8 @@ function displayAlerts(alerts) {
     // Apply filter based on toggle selection
     const filteredAlerts = alerts.filter(alert => {
         // Extract wind and hail data from the correct API response structure
-        let hailSize = alert.max_hail_size || 0;
-        let windSpeed = alert.max_wind_gust || 0;
+        let hailSize = (alert.radar_data && alert.radar_data.hail_inches) || alert.max_hail_size || 0;
+        let windSpeed = (alert.radar_data && alert.radar_data.wind_mph) || alert.max_wind_gust || 0;
         
         // Parse from description if not already available
         if (!hailSize && !windSpeed && alert.description) {
@@ -506,8 +502,8 @@ function displayAlerts(alerts) {
     
     tbody.innerHTML = filteredAlerts.map(alert => {
         // Extract wind and hail data from the correct API response structure
-        let hailSize = alert.max_hail_size || 0;
-        let windSpeed = alert.max_wind_gust || 0;
+        let hailSize = (alert.radar_data && alert.radar_data.hail_inches) || alert.max_hail_size || 0;
+        let windSpeed = (alert.radar_data && alert.radar_data.wind_mph) || alert.max_wind_gust || 0;
         
         // Parse from description if not already available
         if (!hailSize && !windSpeed && alert.description) {
