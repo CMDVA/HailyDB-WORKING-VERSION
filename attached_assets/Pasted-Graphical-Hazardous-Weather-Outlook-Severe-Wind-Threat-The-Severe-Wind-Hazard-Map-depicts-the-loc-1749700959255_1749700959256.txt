@@ -1,0 +1,62 @@
+Graphical Hazardous Weather Outlook
+Severe Wind Threat
+
+The "Severe Wind Hazard Map" depicts the local threat of severe wind gusts associated with thunderstorms for specified areas.  It is based on the likelihood that severe wind gusts will occur combined with the anticipated speed of the greatest gusts.    
+
+Severe Wind Threat Level
+
+Threat Level Descriptions
+
+Extreme
+
+"An Extreme Threat to Life and Property from Severe Wind Gusts Associated with Thunderstorms."
+Within 12 miles of a location, a moderate likelihood or greater (16% probability or greater) of severe wind, with storms capable of violent wind gusts (80 knots or greater) causing major damage.   
+
+AND/OR...a  high likelihood or greater (26% probability or greater) of severe wind, with storms capable of very damaging wind gusts (between 65 knots and 79 knots) causing moderate damage. 
+
+AND/OR...a  very high likelihood (36% or greater) of severe wind, with storms capable of damaging wind gusts (between 50 and 64 knots) causing minor damage. 
+
+High
+
+"A High Threat to Life and Property from Severe Wind Gusts Associated with Thunderstorms."
+Within 12 miles of a location, a low likelihood (6% to 15% probability) of severe wind, with storms capable of violent wind gusts (80 knots or greater) causing major damage.
+
+AND/OR...a moderate likelihood (16% to 25% probability) of severe wind, with storms capable of very damaging wind gusts (between 65 knots and 79 knots) causing moderate damage. 
+
+AND/OR...a high likelihood (26% to 35% probability) of severe wind, with storms capable of damaging wind gusts (between 50 and 64 knots) causing minor damage.  
+
+Moderate
+
+"A Moderate Threat to Life and Property from Severe Wind Gusts Associated with Thunderstorms."
+Within 12 miles of a location, a very low likelihood (2% to 5% probability) of severe wind, with storms capable of violent wind gusts (80 knots or greater) causing major damage.  
+
+AND/OR...a low likelihood (6% to 15% probability) of severe wind, with storms capable of very damaging wind gusts (between 65 knots and 79 knots) causing moderate damage. 
+
+AND/OR...a moderate likelihood (16% to 25% probability) of severe wind, with storms capable of damaging wind gusts (between 50 and 64 knots) causing minor damage.   
+
+Low
+
+"A Low Threat to Life and Property from Severe Wind Gusts Associated with Thunderstorms."
+Within 12 miles of a location, a very low likelihood (2% to 5% probability) of severe wind, with storms capable of very damaging wind gusts (between 65 knots and 79 knots) causing moderate damage.
+
+AND/OR...a low likelihood (6% to 15% probability) of severe wind, with storms capable of damaging wind gusts (between 50 and 64 knots) causing minor damage.    
+
+Very Low
+" A Very Low Threat to Life and Property from Severe Wind Gusts Associated with Thunderstorms."
+Within 12 miles of a location, a very low likelihood (2% to 5% probability) of severe wind, with storms capable of damaging wind gusts (between 50 and 64 knots) causing minor damage.
+
+AND/OR...a low likelihood or greater (6% or greater) of strong wind gusts (between 34 and 49 knots).
+
+Non-Threatening
+" No Discernable Threat to Life and Property from Severe Wind Gusts Associated with Thunderstorms."
+Within 12 miles of a location, environmental conditions do not support the occurrence of severe wind gusts from thunderstorms.     
+
+Note: To be considered severe, associated wind gusts must be 58 mph or greater (50 knots or greater).
+Strong Wind Gusts - Thunderstorm wind gusts between 39 mph and 57 mph (between 34 knots and 49 knots).
+
+Damaging Wind Gusts - Severe thunderstorm wind gusts between 58 mph and 74 mph (between 50 knots and 64 knots) causing minor damage. 
+
+Very Damaging Wind Gusts  -  Severe thunderstorm wind gusts between 75 mph and 91 mph (between 65 knots and 79 knots) causing moderate damage. 
+
+Violent Wind Gusts -  Severe thunderstorm wind gusts greater than 92 mph (80 knots or greater) causing major damage. 
+

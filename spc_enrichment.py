@@ -204,13 +204,13 @@ class SPCEnrichmentService:
             - Hyde Park (west Tampa neighborhood)
             - Ybor City (northeast Tampa)
             
-            Return JSON with exact primary location:
+            Return JSON with exact primary location including coordinates:
             {{
-                "primary_location": {{"name": "Davis Island", "distance_miles": 0.0, "type": "island"}},
+                "primary_location": {{"name": "Davis Island", "approx_lat": 27.9455, "approx_lon": -82.4501, "type": "island"}},
                 "location_type": "island"
             }}
             
-            REQUIREMENT: Return the specific place name where {lat:.4f}, {lon:.4f} is located. JSON format only.
+            REQUIREMENT: Return the specific place name where {lat:.4f}, {lon:.4f} is located with approximate coordinates. JSON format only.
             """
             
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
@@ -274,17 +274,28 @@ class SPCEnrichmentService:
             # Combine results: Start with primary location, then add nearby places
             all_places = []
             
-            # Add primary location first (distance 0.0)
+            # Add primary location with calculated distance
             if 'primary_location' in location_result and location_result['primary_location']:
                 primary_loc = location_result['primary_location']
+                
+                # Calculate actual distance to primary location if coordinates are provided
+                primary_distance = 0.0
+                primary_lat, primary_lon = lat, lon
+                
+                # Check if AI provided specific coordinates for the primary location
+                if 'approx_lat' in primary_loc and 'approx_lon' in primary_loc:
+                    primary_lat = primary_loc['approx_lat']
+                    primary_lon = primary_loc['approx_lon']
+                    primary_distance = self._calculate_distance(lat, lon, primary_lat, primary_lon)
+                
                 all_places.append({
                     'name': primary_loc['name'],
-                    'distance_miles': 0.0,
-                    'approx_lat': lat,
-                    'approx_lon': lon,
+                    'distance_miles': round(primary_distance, 1),
+                    'approx_lat': primary_lat,
+                    'approx_lon': primary_lon,
                     'type': 'primary_location'
                 })
-                logging.info(f"Found primary location: {primary_loc['name']} at 0.0 miles (event location)")
+                logging.info(f"Found primary location: {primary_loc['name']} at {primary_distance:.1f} miles")
             
             # Add nearby places with recalculated distances
             if 'places' in nearby_result:

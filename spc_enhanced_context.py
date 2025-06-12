@@ -233,30 +233,48 @@ class SPCEnhancedContextService:
             # Include SPC comments for damage emphasis
             damage_details = report.comments if hasattr(report, 'comments') and report.comments else 'No damage details provided'
             
-            # Determine damage potential based on magnitude
+            # Determine damage potential based on official NWS classifications
             damage_emphasis = ""
             if report.report_type == "HAIL" and hasattr(report, 'magnitude') and report.magnitude:
                 try:
                     hail_size = float(report.magnitude)
-                    if hail_size >= 1.0:
-                        damage_emphasis = f"CRITICAL: {hail_size}\" hail is capable of significant property damage including vehicle dents, roof damage, broken windows, and agricultural destruction."
+                    if hail_size >= 2.75:
+                        # Giant Hail - Major Damage
+                        damage_emphasis = f"EXTREME THREAT: {hail_size}\" giant hail causes MAJOR DAMAGE including severe vehicle damage, roof destruction, structural damage to buildings, and complete crop devastation."
+                    elif hail_size >= 1.75:
+                        # Very Large Hail - Moderate Damage  
+                        damage_emphasis = f"HIGH THREAT: {hail_size}\" very large hail causes MODERATE DAMAGE including significant vehicle dents, roof damage, broken windows, siding damage, and crop destruction."
+                    elif hail_size >= 1.0:
+                        # Large Hail - Minor Damage
+                        damage_emphasis = f"MODERATE THREAT: {hail_size}\" large hail causes MINOR DAMAGE including vehicle dents, roof granule loss, window damage, and agricultural losses."
                     elif hail_size >= 0.75:
-                        damage_emphasis = f"WARNING: {hail_size}\" hail can cause property damage including vehicle dents, minor roof damage, and crop destruction."
+                        # Approaching severe threshold
+                        damage_emphasis = f"LOW THREAT: {hail_size}\" hail approaches severe criteria and may cause minor vehicle damage, plant damage, and small dents."
                     else:
-                        damage_emphasis = f"CAUTION: {hail_size}\" hail may cause minor property damage and crop damage."
+                        # Small hail
+                        damage_emphasis = f"VERY LOW THREAT: {hail_size}\" small hail may cause minor plant damage and very light vehicle impact damage."
                 except ValueError:
-                    damage_emphasis = "Hail of reported size has potential for property damage."
+                    damage_emphasis = "Hail of reported size has documented damage potential per NWS classifications."
             elif report.report_type == "WIND" and hasattr(report, 'magnitude') and report.magnitude:
                 try:
                     wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip())
-                    if wind_speed >= 75:
-                        damage_emphasis = f"CRITICAL: {wind_speed} mph winds can cause severe structural damage to buildings, uproot large trees, and create dangerous flying debris."
-                    elif wind_speed >= 60:
-                        damage_emphasis = f"WARNING: {wind_speed} mph winds can damage roofs, break large branches, and overturn mobile homes."
+                    if wind_speed >= 92:
+                        # Violent Wind Gusts - Major Damage
+                        damage_emphasis = f"EXTREME THREAT: {wind_speed} mph violent wind gusts cause MAJOR DAMAGE including structural destruction, uprooted large trees, overturned vehicles, and widespread power outages."
+                    elif wind_speed >= 75:
+                        # Very Damaging Wind Gusts - Moderate Damage
+                        damage_emphasis = f"HIGH THREAT: {wind_speed} mph very damaging wind gusts cause MODERATE DAMAGE including roof damage, large tree damage, mobile home overturning, and significant debris."
+                    elif wind_speed >= 58:
+                        # Damaging Wind Gusts - Minor Damage  
+                        damage_emphasis = f"MODERATE THREAT: {wind_speed} mph damaging wind gusts cause MINOR DAMAGE including broken branches, minor roof damage, and scattered power outages."
+                    elif wind_speed >= 39:
+                        # Strong Wind Gusts
+                        damage_emphasis = f"LOW THREAT: {wind_speed} mph strong wind gusts may cause small branch damage and minor debris."
                     else:
-                        damage_emphasis = f"CAUTION: {wind_speed} mph winds can break small branches and cause minor property damage."
+                        # Below strong threshold
+                        damage_emphasis = f"VERY LOW THREAT: {wind_speed} mph winds below strong gust criteria but may still cause minor impacts."
                 except (ValueError, AttributeError):
-                    damage_emphasis = "Wind speeds of this magnitude have potential for property damage."
+                    damage_emphasis = "Wind speeds of this magnitude have documented damage potential per NWS classifications."
 
             prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable property damage intelligence.
 
