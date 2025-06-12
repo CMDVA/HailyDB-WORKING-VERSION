@@ -92,6 +92,10 @@ class AutonomousScheduler:
                     # Check if matching is due
                     if self._should_run_matching(current_time):
                         self._run_matching()
+                    
+                    # Check if Enhanced Context generation is due
+                    if self._should_run_enhanced_context(current_time):
+                        self._run_enhanced_context_generation()
                 
                 # Sleep for 30 seconds before next check
                 time.sleep(30)
@@ -290,6 +294,33 @@ class AutonomousScheduler:
                 )
         finally:
             self.matching_lock.release()
+    
+    def _should_run_enhanced_context(self, current_time: datetime) -> bool:
+        """Check if Enhanced Context generation should run - every 10 minutes"""
+        if self.last_enhanced_context is None:
+            return True
+        
+        time_since_last = current_time - self.last_enhanced_context
+        return time_since_last.total_seconds() >= 600  # 10 minutes
+    
+    def _run_enhanced_context_generation(self):
+        """Generate Enhanced Context for verified SPC reports without context"""
+        try:
+            from spc_enhanced_context import SPCEnhancedContextService
+            
+            # Get verified SPC reports without Enhanced Context
+            with self.db_session() as session:
+                service = SPCEnhancedContextService(session)
+                result = service.enrich_all_reports(batch_size=50, unenriched_only=True)
+                
+                processed = result.get('total_processed', 0)
+                successful = result.get('successful_enrichments', 0)
+                
+                self.last_enhanced_context = datetime.utcnow()
+                logger.info(f"Enhanced Context generation completed: {successful}/{processed} reports enriched")
+                
+        except Exception as e:
+            logger.error(f"Enhanced Context generation failed: {e}")
     
     def _run_webhook_evaluation(self):
         """Evaluate and dispatch webhooks for recent alerts"""

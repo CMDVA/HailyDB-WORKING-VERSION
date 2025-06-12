@@ -214,6 +214,9 @@ class SPCEnhancedContextService:
 
     def _build_enhanced_context(self, report, verified_alerts: List) -> Dict[str, Any]:
         """Build the enhanced context structure"""
+        # Generate polygon match status for each verified alert
+        polygon_matches = self._generate_polygon_match_status(verified_alerts, report)
+        
         return {
             "alert_count": len(verified_alerts),
             "has_verified_alerts": len(verified_alerts) > 0,
@@ -221,7 +224,8 @@ class SPCEnhancedContextService:
             "radar_polygon_match": any(
                 hasattr(alert, 'radar_indicated') and alert.radar_indicated 
                 for alert in verified_alerts
-            ) if verified_alerts else False
+            ) if verified_alerts else False,
+            "polygon_matches": polygon_matches
         }
 
     def _extract_nws_office(self, verified_alerts: List) -> str:
