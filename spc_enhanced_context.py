@@ -278,16 +278,27 @@ class SPCEnhancedContextService:
                 time_str = str(report.time_utc) if hasattr(report, 'time_utc') else "unknown time"
                 date_str = str(report.spc_date) if hasattr(report, 'spc_date') else "unknown date"
 
-            # Generate prompt with proper NWS classifications
+            # Build proper magnitude display and correct threat classification
+            if report.report_type.upper() == "HAIL":
+                magnitude_display = f"{hail_size} inch" if hail_size else "Unknown size"
+                threat_classification = hail_threat_level
+            elif report.report_type.upper() == "WIND":
+                magnitude_display = f"{wind_speed} mph" if wind_speed else "Unknown speed"
+                threat_classification = wind_threat_level
+            else:
+                magnitude_display = report.magnitude if report.magnitude else 'Unknown magnitude'
+                threat_classification = "Unknown threat level"
+
+            # Generate prompt with correct NWS classifications
             prompt = f"""You are a professional, truthful meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance, designed for actionable intelligence in storm restoration, insurance, and public safety.
 
 This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
 
 REQUIRED Summary Format - rewrite the following sentence EXACTLY:
-"{report.magnitude if report.magnitude else 'Unknown magnitude'} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), or approximately {major_city_distance} {direction} from {nearby_context.split(',')[0] if nearby_context else 'nearby locations'}, in {report.county} County, {report.state} at {time_str} on {date_str}. {hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}. {damage_statement if damage_statement else ''} ({report.source if hasattr(report, 'source') else 'SPC'})."
+"{magnitude_display} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), or approximately {major_city_distance} {direction} from {nearby_context.split(',')[0] if nearby_context else 'nearby locations'}, in {report.county} County, {report.state} at {time_str} on {date_str}. {threat_classification}. {damage_statement if damage_statement else ''} ({report.source if hasattr(report, 'source') else 'SPC'})."
 
 NWS THREAT CLASSIFICATION:
-{hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}
+{threat_classification}
 
 LOCATION DATA:
 - Event Location: {report.location}, {report.county} County, {report.state}
