@@ -416,44 +416,37 @@ Use ONLY the exact threat classifications provided. NEVER exaggerate beyond NWS 
                 # Extract nearby places data from the actual Location Enrichment format
                 nearby_places_data = existing_enrichment.get('nearby_places', [])
                 
-                # Extract structured Event Location and Nearest Major City
-                event_location = None
-                event_location_distance = ""
+                # Use the primary location from the report
+                primary_location = f"{report.location}, {report.county} County, {report.state}"
+                
+                # Format nearby places for Enhanced Context using the actual enrichment data
+                nearby_place_names = []
                 nearest_major_city = "Unknown"
                 major_city_distance = ""
                 
-                # Find Event Location (primary_location type)
-                for place in nearby_places_data:
-                    if place.get('type') == 'primary_location':
-                        event_location = place.get('name', '')
-                        distance = place.get('distance_miles', 0)
-                        event_location_distance = f"{distance:.1f} miles away" if distance > 0 else "at coordinates"
-                        break
-                
-                # Find Nearest Major City (nearest_city type)
-                for place in nearby_places_data:
-                    if place.get('type') == 'nearest_city':
-                        nearest_major_city = place.get('name', '')
-                        distance = place.get('distance_miles', 0)
-                        major_city_distance = f"{distance:.1f} miles away" if distance > 0 else ""
-                        break
-                
-                # Use the primary location from the report as fallback
-                primary_location = f"{report.location}, {report.county} County, {report.state}"
-                
-                # Format nearby places for Enhanced Context (excluding primary_location and nearest_city)
-                nearby_place_names = []
                 for place in nearby_places_data:
                     place_name = place.get('name', '')
-                    place_distance = place.get('distance_miles', 0)
+                    place_distance = place.get('distance_miles', 0)  # Fixed: was 'distance'
                     place_type = place.get('type', '')
                     
-                    if (place_name and place_distance and 
-                        place_type not in ['primary_location', 'nearest_city']):
+                    if place_name and place_distance:
+                        # Add to nearby places list
                         nearby_place_names.append({
                             'name': place_name,
                             'distance_miles': float(place_distance)
                         })
+                        
+                        # Use the primary_location or nearest_city as the major city
+                        if (place_type in ['primary_location', 'nearest_city'] and 
+                            nearest_major_city == "Unknown"):
+                            nearest_major_city = place_name
+                            major_city_distance = f"{place_distance:.1f} miles"
+                
+                # If we have nearby places but no major city set, use the first one
+                if nearby_place_names and nearest_major_city == "Unknown":
+                    first_place = nearby_place_names[0]
+                    nearest_major_city = first_place['name']
+                    major_city_distance = f"{first_place['distance_miles']:.1f} miles"
                 
                 # Get radar polygon match status
                 radar_polygon_match = existing_enrichment.get('radar_polygon_match', False)
