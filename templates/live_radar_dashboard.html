@@ -3,6 +3,21 @@
 {% block title %}Live Radar Alerts - HailyDB{% endblock %}
 
 {% block content %}
+<!-- Start Modal Overlay -->
+<div id="startModal" class="position-fixed w-100 h-100 d-flex align-items-center justify-content-center" style="top: 0; left: 0; background-color: rgba(0, 0, 0, 0.5); z-index: 1050;">
+    <div class="text-center text-white">
+        <div class="mb-4">
+            <i class="fas fa-satellite-dish fa-4x mb-3"></i>
+            <h2 class="h3 mb-2">Live Radar Alerts</h2>
+            <p class="lead mb-4">Start monitoring real-time weather alerts</p>
+        </div>
+        <button id="startButton" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow-lg" onclick="startLiveRadar()">
+            <i class="fas fa-play me-2"></i>
+            Start Live Feed
+        </button>
+    </div>
+</div>
+
 <div class="row">
     <!-- Header -->
     <div class="col-12">
@@ -328,23 +343,31 @@ async function initializeDashboard() {
         });
     });
     
-    console.log('Starting initial alert load...');
+    console.log('Dashboard initialized successfully - waiting for user to start live feed');
+}
+
+function startLiveRadar() {
+    console.log('=== STARTING LIVE RADAR FEED ===');
     
-    // Load LIVE alerts FIRST (this is what user wants to see)
-    await initializeLiveAlerts();
+    // Hide the modal
+    const modal = document.getElementById('startModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
     
-    // Automatically enable auto-refresh on page load
+    // Start loading alerts immediately
+    loadLiveAlerts();
+    
+    // Enable auto-refresh
     autoRefreshEnabled = true;
     autoRefreshInterval = setInterval(loadLiveAlerts, 30000);
-    console.log('Auto-refresh activated on page load - refreshing every 30 seconds');
+    console.log('Live radar feed started - refreshing every 30 seconds');
     
     // Update button text to show auto-refresh is active
     const autoRefreshBtn = document.querySelector('[onclick="enableAutoRefresh()"]');
     if (autoRefreshBtn) {
         autoRefreshBtn.innerHTML = '<i class="fas fa-pause me-1"></i>Stop Auto';
     }
-    
-    console.log('Dashboard initialized successfully');
 }
 
 function enableAutoRefresh() {
