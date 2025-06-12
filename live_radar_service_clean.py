@@ -348,7 +348,9 @@ class ProductionLiveRadarService:
         try:
             # Handle ISO format with timezone
             if 'T' in time_str:
-                return datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                parsed_dt = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                # Convert to UTC naive datetime for comparison
+                return parsed_dt.replace(tzinfo=None)
             return None
         except:
             return None
