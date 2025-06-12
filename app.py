@@ -3755,13 +3755,47 @@ def api_live_radar_alerts():
         user_states = None
         
     try:
-        from live_radar_service_clean import get_live_radar_service
+        from live_radar_service import get_live_radar_service
         
-        # Initialize service with database session
-        service = get_live_radar_service(db.session)
+        # Get the global service instance
+        service = get_live_radar_service()
         
-        # Get live alerts with state-based filtering and caching
-        alerts_data = service.get_live_alerts_with_state_filtering(user_states)
+        if not service:
+            raise Exception("Live radar service not initialized")
+        
+        # Get active alerts and filter by states
+        active_alerts = service.get_active_alerts()
+        
+        # Filter by states if specified
+        if user_states:
+            filtered_alerts = []
+            for alert in active_alerts:
+                alert_states = alert.get('affectedStates', [])
+                if any(state in user_states for state in alert_states):
+                    filtered_alerts.append(alert)
+            active_alerts = filtered_alerts
+        
+        # Calculate statistics
+        total_alerts = len(active_alerts)
+        hail_alerts = sum(1 for alert in active_alerts if alert.get('maxHailSize', 0) > 0)
+        wind_alerts = sum(1 for alert in active_alerts if alert.get('maxWindGust', 0) >= 50)
+        radar_indicated = sum(1 for alert in active_alerts if alert.get('radarIndicatedEvent', False))
+        states_affected = len(set(state for alert in active_alerts for state in alert.get('affectedStates', [])))
+        
+        alerts_data = {
+            'alerts': active_alerts,
+            'total_count': total_alerts,
+            'statistics': {
+                'total_alerts': total_alerts,
+                'hail_alerts': hail_alerts,
+                'wind_alerts': wind_alerts,
+                'states_affected': states_affected,
+                'radar_indicated': radar_indicated
+            },
+            'last_updated': datetime.now().isoformat(),
+            'states_filtered': user_states or [],
+            'source': 'live_nws'
+        }
         
         return jsonify(alerts_data)
         
@@ -3792,7 +3826,7 @@ def api_live_radar_alerts_health():
     try:
         from live_radar_service import get_live_radar_service
         
-        service = get_live_radar_service(db.session)
+        service = get_live_radar_service()
         if not service:
             return jsonify({
                 'status': 'error',
