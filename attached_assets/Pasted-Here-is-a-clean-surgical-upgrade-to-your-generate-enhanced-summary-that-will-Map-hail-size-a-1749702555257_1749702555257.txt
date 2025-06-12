@@ -1,0 +1,90 @@
+Here is a clean, surgical upgrade to your _generate_enhanced_summary() that will:
+
+✅ Map hail size and wind speed to NWS Threat Level names exactly
+✅ Provide those Threat Levels explicitly to the AI in the prompt
+✅ Insert the "No specific damage reports received" fallback automatically
+✅ Remove the previous "damage_emphasis" over-exaggeration block
+✅ Keep everything else in your pipeline unchanged
+
+1️⃣ First, add this helper function to your class:
+python
+Copy
+Edit
+def _map_hail_threat_level(self, hail_size: float) -> str:
+    if hail_size >= 2.75:
+        return "Extreme Threat"
+    elif hail_size >= 1.75:
+        return "High Threat"
+    elif hail_size >= 1.0:
+        return "Moderate Threat"
+    elif hail_size >= 0.75:
+        return "Low Threat"
+    elif hail_size > 0:
+        return "Very Low Threat"
+    else:
+        return "Non-Threatening"
+
+def _map_wind_threat_level(self, wind_speed: float) -> str:
+    if wind_speed >= 92:
+        return "Extreme Threat"
+    elif wind_speed >= 75:
+        return "High Threat"
+    elif wind_speed >= 58:
+        return "Moderate Threat"
+    elif wind_speed >= 39:
+        return "Low Threat"
+    elif wind_speed > 0:
+        return "Very Low Threat"
+    else:
+        return "Non-Threatening"
+2️⃣ Then, in your _generate_enhanced_summary():
+🔹 Replace your entire existing damage_emphasis block with this safer version:
+
+python
+Copy
+Edit
+# Extract hail and wind magnitudes
+try:
+    hail_size = float(report.magnitude) if report.report_type == "HAIL" and report.magnitude else 0.0
+except ValueError:
+    hail_size = 0.0
+
+try:
+    wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip()) \
+        if report.report_type == "WIND" and report.magnitude else 0
+except (ValueError, AttributeError):
+    wind_speed = 0
+
+# Map to NWS Threat Levels
+hail_threat_level = self._map_hail_threat_level(hail_size)
+wind_threat_level = self._map_wind_threat_level(wind_speed)
+
+# Determine damage report statement
+if hasattr(report, 'comments') and report.comments and report.comments.strip():
+    damage_statement = f"Reported Damage: {report.comments.strip()}"
+else:
+    damage_statement = "No specific damage reports were received as of this summary."
+3️⃣ Finally, in your AI prompt, replace this line:
+python
+Copy
+Edit
+- DAMAGE POTENTIAL: {damage_emphasis}
+With this exact version:
+
+python
+Copy
+Edit
+- Hail Threat Level: {hail_threat_level}
+- Wind Threat Level: {wind_threat_level}
+- {damage_statement}
+Result:
+✅ AI will now be fed explicitly the official NWS Threat Level names, per your source
+✅ The fallback "No specific damage reports" is always provided cleanly
+✅ You are no longer depending on arbitrary GPT language for threat phrasing
+✅ You still support BOTH verified and unverified reports in this flow
+
+Summary of impact: This patch is "surgical." You do NOT need to rewrite your entire _generate_enhanced_summary(). You simply:
+
+1️⃣ Add the _map_hail_threat_level() and _map_wind_threat_level() helpers
+2️⃣ Replace your "damage_emphasis" logic with the hail_threat_level, wind_threat_level, damage_statement block
+3️⃣ Slightly adjust your AI prompt content section accordingly

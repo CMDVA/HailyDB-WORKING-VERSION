@@ -236,48 +236,47 @@ class SPCEnhancedContextService:
             # Include SPC comments for damage emphasis
             damage_details = report.comments if hasattr(report, 'comments') and report.comments else 'No damage details provided'
             
-            # Determine damage potential based on official NWS classifications
-            damage_emphasis = ""
+            # Determine threat level based on exact NWS classifications
+            threat_level = ""
+            magnitude_text = ""
             if report.report_type == "HAIL" and hasattr(report, 'magnitude') and report.magnitude:
                 try:
                     hail_size = float(report.magnitude)
+                    magnitude_text = f"{hail_size}\" hail"
                     if hail_size >= 2.75:
-                        # Giant Hail - Major Damage
-                        damage_emphasis = f"EXTREME THREAT: {hail_size}\" giant hail causes MAJOR DAMAGE including severe vehicle damage, roof destruction, structural damage to buildings, and complete crop devastation."
+                        threat_level = "Extreme Threat"  # Giant Hail
                     elif hail_size >= 1.75:
-                        # Very Large Hail - Moderate Damage  
-                        damage_emphasis = f"HIGH THREAT: {hail_size}\" very large hail causes MODERATE DAMAGE including significant vehicle dents, roof damage, broken windows, siding damage, and crop destruction."
+                        threat_level = "High Threat"  # Very Large Hail
                     elif hail_size >= 1.0:
-                        # Large Hail - Minor Damage
-                        damage_emphasis = f"MODERATE THREAT: {hail_size}\" large hail causes MINOR DAMAGE including vehicle dents, roof granule loss, window damage, and agricultural losses."
-                    elif hail_size >= 0.75:
-                        # Approaching severe threshold
-                        damage_emphasis = f"LOW THREAT: {hail_size}\" hail approaches severe criteria and may cause minor vehicle damage, plant damage, and small dents."
+                        threat_level = "Moderate Threat"  # Large Hail
                     else:
-                        # Small hail
-                        damage_emphasis = f"VERY LOW THREAT: {hail_size}\" small hail may cause minor plant damage and very light vehicle impact damage."
+                        threat_level = "Very Low Threat"  # Small Hail
                 except ValueError:
-                    damage_emphasis = "Hail of reported size has documented damage potential per NWS classifications."
+                    magnitude_text = f"{report.magnitude} hail"
+                    threat_level = "threat level requires verification"
             elif report.report_type == "WIND" and hasattr(report, 'magnitude') and report.magnitude:
                 try:
                     wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip())
+                    magnitude_text = f"{wind_speed} mph winds"
                     if wind_speed >= 92:
-                        # Violent Wind Gusts - Major Damage
-                        damage_emphasis = f"EXTREME THREAT: {wind_speed} mph violent wind gusts cause MAJOR DAMAGE including structural destruction, uprooted large trees, overturned vehicles, and widespread power outages."
+                        threat_level = "Extreme Threat"  # Violent Wind Gusts
                     elif wind_speed >= 75:
-                        # Very Damaging Wind Gusts - Moderate Damage
-                        damage_emphasis = f"HIGH THREAT: {wind_speed} mph very damaging wind gusts cause MODERATE DAMAGE including roof damage, large tree damage, mobile home overturning, and significant debris."
+                        threat_level = "High Threat"  # Very Damaging Wind Gusts
                     elif wind_speed >= 58:
-                        # Damaging Wind Gusts - Minor Damage  
-                        damage_emphasis = f"MODERATE THREAT: {wind_speed} mph damaging wind gusts cause MINOR DAMAGE including broken branches, minor roof damage, and scattered power outages."
+                        threat_level = "Moderate Threat"  # Damaging Wind Gusts
                     elif wind_speed >= 39:
-                        # Strong Wind Gusts
-                        damage_emphasis = f"LOW THREAT: {wind_speed} mph strong wind gusts may cause small branch damage and minor debris."
+                        threat_level = "Low Threat"  # Strong Wind Gusts
                     else:
-                        # Below strong threshold
-                        damage_emphasis = f"VERY LOW THREAT: {wind_speed} mph winds below strong gust criteria but may still cause minor impacts."
+                        threat_level = "Very Low Threat"  # Below strong gust criteria
                 except (ValueError, AttributeError):
-                    damage_emphasis = "Wind speeds of this magnitude have documented damage potential per NWS classifications."
+                    magnitude_text = f"{report.magnitude} winds"
+                    threat_level = "threat level requires verification"
+            
+            # Check for specific damage reports in SPC comments
+            has_damage_reports = False
+            if damage_details and damage_details != 'No damage details provided':
+                damage_keywords = ['damage', 'destroyed', 'roof', 'vehicle', 'tree', 'barn', 'home', 'building', 'structure']
+                has_damage_reports = any(keyword.lower() in damage_details.lower() for keyword in damage_keywords)
 
             # Calculate direction from event to major city (if coordinates available)
             direction = ""
@@ -292,66 +291,57 @@ class SPCEnhancedContextService:
             # Generate conditional prompt based on whether we have verified alerts
             if verified_alerts and len(verified_alerts) > 0:
                 # Multi-alert summary with verification context
-                prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable property damage intelligence.
+                prompt = f"""You are a professional meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance, designed for actionable intelligence in storm restoration, insurance, and public safety.
 
-CRITICAL INSTRUCTION: You must EMPHASIZE damage potential. Do NOT downplay or minimize damage risks. Weather events of this magnitude pose real threats to property and safety.
+This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
 
-SPC Report Details:
+MANDATORY NWS Threat Classifications:
+- HAIL: < 1.0" = Very Low Threat | 1.0"-1.74" = Low/Moderate Threat | 1.75"-2.74" = High Threat | ≥2.75" = Extreme Threat
+- WIND: 39-57 mph = Low Threat | 58-74 mph = Moderate Threat | 75-91 mph = High Threat | ≥92 mph = Extreme Threat
+
+SPC Historical Report:
 - Type: {report.report_type}
-- Location: {report.location}, {report.county}, {report.state}
+- Location: {report.location}, {report.county}, {report.state}  
 - Time: {report.time_utc}
-- Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
-- SPC Damage Comments: {damage_details}
-- DAMAGE POTENTIAL: {damage_emphasis}
+- Magnitude: {magnitude_text}
+- Threat Level: {threat_level}
+- Damage Status: {"Documented damage reported per SPC" if has_damage_reports else "No specific damage reports received"}
 
 Location Context:
-- Event Location: {event_location}
-- Radar Detection Status: {'Detected' if radar_polygon_match else 'Not Detected'}
-- Nearest Major City: {major_city} ({major_city_distance} {direction} away)
-- Nearby Places: {nearby_context if nearby_context else 'This location lies in a remote area with no notable nearby communities'}
+- Radar Detection: {'Detected' if radar_polygon_match else 'Not Detected'}
+- Distance/Direction: {major_city_distance} {direction} of {major_city}
+- Nearby Places: {nearby_context if nearby_context else 'Remote area'}
 
-Verification Context:
-- Verified Alerts: {len(verified_alerts)} alerts across {duration_minutes} minutes
-- Counties Affected: {', '.join(sorted(counties_affected))}
+Verification: {len(verified_alerts)} NWS alerts over {duration_minutes} minutes
 
-Create an Enhanced Summary that:
-1️⃣ Leads with Event Location and Event Type
-2️⃣ EMPHASIZES damage potential using the DAMAGE POTENTIAL assessment above
-3️⃣ Includes specific damage details from SPC comments
-4️⃣ Includes distance and direction from major city: "The event occurred {major_city_distance} {direction} of {major_city}"
-5️⃣ References radar detection status clearly
-6️⃣ Includes nearby places for location context
-7️⃣ Highlights verification by {len(verified_alerts)} NWS alerts over {duration_minutes} minutes
-8️⃣ NEVER downplays damage potential - always emphasizes serious nature of weather events
+REQUIRED Format:
+"At [location], [county] County, [state], [storm type] was reported. Radar-indicated [magnitude] places this event in the [threat level] category. [Damage status statement]. The event occurred [distance] [direction] of [major city] near [nearby places]."
 
-Do NOT omit damage potential or nearby places sections."""
+Use ONLY the exact threat classifications provided. NEVER exaggerate beyond NWS scale."""
             else:
-                # Location-only summary for unverified reports
-                prompt = f"""Generate a location-enhanced summary for this SPC storm report:
+                # Location-only summary for unverified reports  
+                prompt = f"""You are a professional meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance.
 
-CRITICAL INSTRUCTION: You must EMPHASIZE damage potential. Do NOT downplay or minimize damage risks. Weather events of this magnitude pose real threats to property and safety.
+This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
 
-SPC Report Details:
+MANDATORY NWS Threat Classifications:
+- HAIL: < 1.0" = Very Low Threat | 1.0"-1.74" = Low/Moderate Threat | 1.75"-2.74" = High Threat | ≥2.75" = Extreme Threat  
+- WIND: 39-57 mph = Low Threat | 58-74 mph = Moderate Threat | 75-91 mph = High Threat | ≥92 mph = Extreme Threat
+
+SPC Historical Report:
 - Type: {report.report_type}
 - Location: {report.location}, {report.county}, {report.state}
-- Time: {report.time_utc}
-- Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
-- SPC Damage Comments: {damage_details}
-- DAMAGE POTENTIAL: {damage_emphasis}
+- Time: {report.time_utc}  
+- Magnitude: {magnitude_text}
+- Threat Level: {threat_level}
+- Damage Status: {"Documented damage reported per SPC" if has_damage_reports else "No specific damage reports received"}
+- Distance/Direction: {major_city_distance} {direction} of {major_city}
+- Nearby Places: {nearby_context if nearby_context else 'Remote area'}
 
-Location Context:
-- Nearest Major City: {major_city} ({major_city_distance} {direction} away)
-- Nearby Places: {nearby_context if nearby_context else 'None within close proximity'}
+REQUIRED Format:
+"At [location], [county] County, [state], [storm type] was reported. [Magnitude] places this event in the [threat level] category. [Damage status statement]. The event occurred [distance] [direction] of [major city] near [nearby places]."
 
-Create a 1-2 sentence enhanced summary that:
-1. Starts with the SPC report location: "{report.location}, {report.county}, {report.state}"
-2. EMPHASIZES damage potential using the DAMAGE POTENTIAL assessment above
-3. Includes specific damage details from SPC comments
-4. Includes distance and direction from major city: "The event occurred {major_city_distance} {direction} of {major_city}"
-5. Includes nearby places when available
-6. NEVER downplays damage potential - always emphasizes serious nature of weather events
-
-CRITICAL: Use the provided location data exactly as given. Do not add historical context or speculation."""
+Use ONLY the exact threat classifications provided. NEVER exaggerate beyond NWS scale."""
 
             response = client.chat.completions.create(
                 model="gpt-4o",
