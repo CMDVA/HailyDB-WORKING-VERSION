@@ -72,28 +72,26 @@ class SPCEnhancedContextService:
     def _hail_effect_statement(self, hail_size: float) -> str:
         """Generate NWS official hail classification and damage statement"""
         if hail_size >= 2.75:
-            return "(larger than 2 3/4 inch, larger than baseballs, such as the size of grapefruit or softballs) causing major damage"
+            return "will likely cause major damage to homes, automobiles and personal property"
         elif hail_size >= 1.75:
-            return "(1 3/4 inch to 2 3/4 inch in diameter, from the size of golf balls to baseballs) causing moderate damage"
+            return "will likely cause moderate damage to homes, automobiles and personal property"
         elif hail_size >= 1.0:
-            return "(1 inch to 1 3/4 inch in diameter, from the size of quarters to golf balls) causing minor damage"
+            return "will likely cause minor damage to homes, automobiles and personal property"
         else:
-            return "(less than 1 inch in diameter, from the size of peas to nickels)"
+            return "typically causes minimal damage to property"
 
     def _wind_effect_statement(self, wind_speed: int) -> str:
         """Generate NWS-derived wind effect statement using official classifications"""
         if wind_speed >= 92:
-            return "Violent Wind Gusts (greater than 92 mph, 80 knots or greater) causing major damage."
+            return "will likely cause major damage to homes, automobiles and personal property"
         elif wind_speed >= 75:
-            return "Very Damaging Wind Gusts (75 mph to 91 mph, between 65 knots and 79 knots) causing moderate damage."
+            return "will likely cause moderate damage to homes, automobiles and personal property"
         elif wind_speed >= 58:
-            return "Damaging Wind Gusts (58 mph to 74 mph, between 50 knots and 64 knots) causing minor damage."
+            return "will likely cause minor damage to homes, automobiles and personal property"
         elif wind_speed >= 39:
-            return "Strong Wind Gusts (39 mph to 57 mph, between 34 knots and 49 knots)."
-        elif wind_speed > 0:
-            return f"Wind gusts of {wind_speed} mph reported."
+            return "typically causes minimal damage to property"
         else:
-            return "No wind reported."
+            return "typically has minimal impact on property"
     
     def enrich_spc_report(self, report_id: int) -> Dict[str, Any]:
         """
@@ -464,13 +462,13 @@ CRITICAL: Lead with magnitude first, use exact damage classification from data p
             # Generate template-based summary following exact format
             if report.report_type.upper() == 'HAIL':
                 summary = (f"{hail_size}\" hail{hail_natural_lang} was reported {major_city_distance} {direction} "
-                          f"of {nearest_place} ({report.location}), or approximately {major_city_distance} "
-                          f"{direction} from {major_city}, in {report.county} County, {report.state} at "
+                          f"of {major_city} ({report.location}), or approximately {major_city_distance} "
+                          f"{direction} from {nearest_place}, in {report.county} County, {report.state} at "
                           f"{time_str} on {date_str}. {hail_threat_level} - {damage_statement}.")
             else:
                 summary = (f"{wind_speed} mph wind was reported {major_city_distance} {direction} "
-                          f"of {nearest_place} ({report.location}), or approximately {major_city_distance} "
-                          f"{direction} from {major_city}, in {report.county} County, {report.state} at "
+                          f"of {major_city} ({report.location}), or approximately {major_city_distance} "
+                          f"{direction} from {nearest_place}, in {report.county} County, {report.state} at "
                           f"{time_str} on {date_str}. {wind_threat_level} - {damage_statement}.")
             
             # Add other nearby locations (exclude the first one already used)
