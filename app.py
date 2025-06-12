@@ -3768,13 +3768,28 @@ def api_generate_enhanced_context():
         report_id = data.get('report_id')
         
         if report_id:
-            # Generate for specific report
-            result = enrich_spc_report_context(report_id)
-            return jsonify({
-                "success": True,
-                "report_id": report_id,
-                "enhanced_context": result
-            })
+            # Generate for specific report and ensure database persistence
+            from spc_enhanced_context import SPCEnhancedContextService
+            from models import SPCReport
+            import json
+            
+            service = SPCEnhancedContextService(db.session)
+            result = service.enrich_spc_report(report_id)
+            
+            if result and result.get('enhanced_context'):
+                # Manually ensure database persistence
+                report = db.session.get(SPCReport, report_id)
+                if report:
+                    report.enhanced_context = json.dumps(result['enhanced_context'])
+                    db.session.commit()
+                    
+                return jsonify({
+                    "success": True,
+                    "report_id": report_id,
+                    "enhanced_context": result['enhanced_context']
+                })
+            else:
+                return jsonify({"error": "Failed to generate enhanced context"}), 500
         else:
             # Generate for all verified reports
             result = enrich_all_spc_reports()
