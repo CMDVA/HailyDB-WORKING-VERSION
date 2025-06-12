@@ -59,12 +59,12 @@
                         <input type="text" class="form-control" id="searchFilter" placeholder="Search by location, event type, or description...">
                     </div>
                     
-                    <!-- Load Button -->
+                    <!-- Auto-refresh Status -->
                     <div class="col-md-3">
-                        <label class="form-label">&nbsp;</label>
-                        <button type="button" class="btn btn-primary w-100" onclick="manualLoadAlerts()">
-                            <i class="fas fa-sync me-1"></i>Load Alerts
-                        </button>
+                        <label class="form-label">Status</label>
+                        <div class="alert alert-success mb-0 py-2">
+                            <i class="fas fa-satellite-dish me-1"></i>Auto-refresh Active
+                        </div>
                     </div>
                     
                     <!-- State -->
@@ -341,8 +341,10 @@ async function initializeDashboard() {
     // Load LIVE alerts FIRST (this is what user wants to see)
     await initializeLiveAlerts();
     
-    // Set up auto-refresh to load alerts every 30 seconds
-    window.dashboardInterval = setInterval(loadLiveAlerts, 30000);
+    // Automatically enable auto-refresh on page load
+    autoRefreshEnabled = true;
+    autoRefreshInterval = setInterval(loadLiveAlerts, 30000);
+    console.log('Auto-refresh activated on page load - refreshing every 30 seconds');
     
     console.log('Dashboard initialized successfully');
 }
@@ -630,9 +632,7 @@ function displayError(message) {
     `;
 }
 
-function refreshAlerts() {
-    loadLiveAlerts();
-}
+// Auto-refresh is now enabled by default - no manual refresh needed
 
 function applyFilters() {
     // For now, just refresh the data
