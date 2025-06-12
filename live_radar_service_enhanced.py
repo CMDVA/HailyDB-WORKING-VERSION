@@ -63,6 +63,12 @@ class ProductionLiveRadarService:
         # Default storm restoration focus states (like HailyAI)
         self.target_states = ['FL', 'TX', 'AL', 'GA', 'SC', 'NC', 'LA', 'MS', 'TN', 'AR', 'OK', 'KS']
         
+        # Production-grade instance variables for webhook deduplication
+        self.alerts_store = {}  # In-memory alert storage
+        self.webhook_seen_ids = TTLCache(maxsize=1000, ttl=3600)  # 1-hour webhook TTL
+        self.webhook_suppressions = 0
+        self.last_poll_timestamp = None
+        
     def get_live_alerts_with_state_filtering(self, user_states: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Fetch live NWS alerts with state-based filtering
@@ -802,9 +808,9 @@ Alert Status: Active"""
 # Global service instance
 _live_radar_service: Optional[ProductionLiveRadarService] = None
 
-def get_live_radar_service() -> ProductionLiveRadarService:
+def get_live_radar_service(db_session: Session) -> ProductionLiveRadarService:
     """Get or create global live radar service instance"""
     global _live_radar_service
     if _live_radar_service is None:
-        _live_radar_service = ProductionLiveRadarService()
+        _live_radar_service = ProductionLiveRadarService(db_session)
     return _live_radar_service
