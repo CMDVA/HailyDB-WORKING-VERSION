@@ -307,7 +307,7 @@ Your Enhanced Summary MUST follow these principles:
 1️⃣ Lead with Event Location and Event Type in the first sentence.
 2️⃣ EMPHASIZE damage potential based on magnitude - use the DAMAGE POTENTIAL assessment provided above.
 3️⃣ Include specific damage details from SPC comments - highlight any property damage, homes, structures mentioned.
-4️⃣ Include distance from Nearest Major City: "The event occurred [distance] from [city]"
+4️⃣ Include distance and direction from Nearest Major City: "The event occurred [distance] [direction] of [city]"
 5️⃣ Reference Radar Detection Status in a clear factual sentence.
 6️⃣ Include 2–4 of the Nearby Places to help human users understand location.
 7️⃣ Always positively frame verification — highlight that the event was supported by {len(verified_alerts)} NWS alerts over {duration_minutes} minutes.
@@ -358,10 +358,16 @@ Do NOT omit damage potential or nearby places sections. These are critical featu
             # Include SPC comments for damage emphasis
             damage_details = report.comments if hasattr(report, 'comments') and report.comments else 'No damage details provided'
             
-            # Calculate direction from event to major city
+            # Calculate direction from event to major city (if available from location context)
             direction = ""
             if major_city != 'Unknown' and hasattr(report, 'latitude') and hasattr(report, 'longitude'):
-                direction = self._calculate_direction(report.latitude, report.longitude, major_city)
+                # Try to get major city coordinates from location context
+                major_city_coords = location_context.get('major_city_coordinates', {})
+                if major_city_coords and 'lat' in major_city_coords and 'lon' in major_city_coords:
+                    direction = self._calculate_direction(
+                        report.latitude, report.longitude, 
+                        major_city_coords['lat'], major_city_coords['lon']
+                    )
             
             # Determine damage potential based on official NWS classifications
             damage_emphasis = ""
@@ -584,6 +590,37 @@ Focus on locations that would be relevant for insurance, restoration, or emergen
             except:
                 pass
         return False
+    
+    def _calculate_direction(self, lat1: float, lon1: float, lat2: float, lon2: float) -> str:
+        """Calculate cardinal direction from point 1 to point 2"""
+        import math
+        
+        try:
+            # Convert to radians
+            lat1_rad = math.radians(lat1)
+            lat2_rad = math.radians(lat2)
+            lon_diff = math.radians(lon2 - lon1)
+            
+            # Calculate bearing
+            y = math.sin(lon_diff) * math.cos(lat2_rad)
+            x = math.cos(lat1_rad) * math.sin(lat2_rad) - \
+                math.sin(lat1_rad) * math.cos(lat2_rad) * math.cos(lon_diff)
+            
+            bearing = math.atan2(y, x)
+            bearing = math.degrees(bearing)
+            bearing = (bearing + 360) % 360
+            
+            # Convert to cardinal direction
+            directions = [
+                "north", "northeast", "east", "southeast",
+                "south", "southwest", "west", "northwest"
+            ]
+            index = int((bearing + 22.5) / 45) % 8
+            return directions[index]
+            
+        except Exception as e:
+            logger.warning(f"Could not calculate direction: {e}")
+            return ""
     
     def enrich_all_reports(self, batch_size: int = 50, unenriched_only: bool = True) -> Dict[str, int]:
         """Enrich ALL SPC reports with enhanced context (verified and unverified)"""
