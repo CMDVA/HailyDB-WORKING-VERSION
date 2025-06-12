@@ -473,54 +473,6 @@ async function reEnrichReport(reportId, buttonElement) {
     }
 }
 
-async function regenerateContext(reportId) {
-    const button = event.target;
-    const originalText = button.innerHTML;
-    
-    // Show loading state
-    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Generating...';
-    button.disabled = true;
-    
-    try {
-        const response = await fetch('/api/spc-reports/enhanced-context/generate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                'report_id': reportId
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok && result.success) {
-            // Show success message and reload page to show updated data
-            button.innerHTML = '<i class="fas fa-check me-1"></i>Generated!';
-            button.className = 'btn btn-sm btn-success ms-2';
-            
-            // Reload page after 1 second to show updated enhanced context
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-        } else {
-            throw new Error(result.error || 'Enhanced context generation failed');
-        }
-        
-    } catch (error) {
-        console.error('Enhanced context generation failed:', error);
-        button.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Failed';
-        button.className = 'btn btn-sm btn-danger ms-2';
-        
-        // Reset button after 3 seconds
-        setTimeout(() => {
-            button.innerHTML = originalText;
-            button.className = 'btn btn-sm btn-outline-primary ms-2';
-            button.disabled = false;
-        }, 3000);
-    }
-}
-
 async function generateEnhancedContext(reportId, button) {
     const originalText = button.innerHTML;
     
@@ -542,14 +494,12 @@ async function generateEnhancedContext(reportId, button) {
         const result = await response.json();
         
         if (response.ok && result.success) {
-            // Show success message and reload page to show updated data
+            // Show success and force immediate page reload with cache bypass
             button.innerHTML = '<i class="fas fa-check me-1"></i>Generated!';
             button.className = 'btn btn-success btn-sm';
             
-            // Reload page after 1 second to show updated enhanced context
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+            // Force hard refresh immediately
+            window.location.href = window.location.protocol + '//' + window.location.host + window.location.pathname + '?t=' + new Date().getTime();
         } else {
             throw new Error(result.error || 'Enhanced context generation failed');
         }
@@ -567,5 +517,8 @@ async function generateEnhancedContext(reportId, button) {
         }, 3000);
     }
 }
+
+// Alias for backward compatibility
+const regenerateContext = generateEnhancedContext;
 </script>
 {% endblock %}
