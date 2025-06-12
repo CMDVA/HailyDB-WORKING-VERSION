@@ -3774,16 +3774,14 @@ def api_live_radar_alerts():
         user_states = None
         
     try:
-        from live_radar_service import get_live_radar_service
+        # Reference the live_radar_service instance that's already running
+        from live_radar_service import live_radar_service
         
-        # Get the global service instance
-        service = get_live_radar_service()
-        
-        if not service:
+        if not live_radar_service:
             raise Exception("Live radar service not initialized")
         
         # Get active alerts and filter by states
-        active_alerts = service.get_active_alerts()
+        active_alerts = live_radar_service.get_active_alerts()
         
         # Filter by states if specified
         if user_states:
@@ -3794,10 +3792,10 @@ def api_live_radar_alerts():
                     filtered_alerts.append(alert)
             active_alerts = filtered_alerts
         
-        # Calculate statistics
+        # Calculate statistics with null safety
         total_alerts = len(active_alerts)
-        hail_alerts = sum(1 for alert in active_alerts if alert.get('maxHailSize', 0) > 0)
-        wind_alerts = sum(1 for alert in active_alerts if alert.get('maxWindGust', 0) >= 50)
+        hail_alerts = sum(1 for alert in active_alerts if (alert.get('maxHailSize') or 0) > 0)
+        wind_alerts = sum(1 for alert in active_alerts if (alert.get('maxWindGust') or 0) >= 50)
         radar_indicated = sum(1 for alert in active_alerts if alert.get('radarIndicatedEvent', False))
         states_affected = len(set(state for alert in active_alerts for state in alert.get('affectedStates', [])))
         
