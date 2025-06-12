@@ -1287,15 +1287,77 @@ def view_spc_report_detail(report_id):
         
         # Parse enhanced_context JSON if it exists
         import json
+        enhanced_context_data = None
         if report.enhanced_context:
             try:
                 if isinstance(report.enhanced_context, str):
-                    report.enhanced_context = json.loads(report.enhanced_context)
+                    enhanced_context_data = json.loads(report.enhanced_context)
+                else:
+                    enhanced_context_data = report.enhanced_context
             except (json.JSONDecodeError, TypeError):
                 logger.warning(f"Failed to parse enhanced_context for report {report_id}")
-                report.enhanced_context = None
+                enhanced_context_data = None
         
-        return render_template('spc_report_detail.html', report=report)
+        # Extract location context for template
+        primary_location = None
+        nearest_major_city = None
+        nearby_places = []
+        
+        # First try to get from spc_enrichment (Google Places data)
+        if hasattr(report, 'spc_enrichment') and report.spc_enrichment:
+            try:
+                if isinstance(report.spc_enrichment, str):
+                    enrichment = json.loads(report.spc_enrichment)
+                else:
+                    enrichment = report.spc_enrichment
+                
+                # Get primary location (smallest nearby place)
+                if 'primary_location' in enrichment and enrichment['primary_location']:
+                    primary_location = {
+                        'name': enrichment['primary_location'].get('name', ''),
+                        'distance_miles': enrichment['primary_location'].get('distance_miles', 0)
+                    }
+                
+                # Get nearest major city
+                if 'nearest_major_city' in enrichment and enrichment['nearest_major_city']:
+                    nearest_major_city = {
+                        'name': enrichment['nearest_major_city'].get('name', ''),
+                        'distance_miles': enrichment['nearest_major_city'].get('distance_miles', 0)
+                    }
+                
+                # Get nearby places
+                if 'nearby_places' in enrichment:
+                    nearby_places = enrichment['nearby_places']
+                    
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
+        # Fallback to enhanced_context location data if spc_enrichment unavailable
+        if not primary_location and enhanced_context_data and 'location_context' in enhanced_context_data:
+            location_context = enhanced_context_data['location_context']
+            if 'nearby_places' in location_context and location_context['nearby_places']:
+                # Use smallest/closest place as primary location
+                closest_place = min(location_context['nearby_places'], key=lambda x: x.get('distance_miles', 999))
+                primary_location = {
+                    'name': closest_place.get('name', ''),
+                    'distance_miles': closest_place.get('distance_miles', 0)
+                }
+                nearby_places = location_context['nearby_places']
+        
+        # Final fallback - never show county as primary location for end users
+        if not primary_location:
+            # Use SPC location description instead of county
+            primary_location = {
+                'name': report.location if report.location else f"{report.county} County",
+                'distance_miles': 0
+            }
+        
+        return render_template('spc_report_detail.html', 
+                             report=report,
+                             enhanced_context_data=enhanced_context_data,
+                             primary_location=primary_location,
+                             nearest_major_city=nearest_major_city,
+                             nearby_places=nearby_places)
     except Exception as e:
         logger.error(f"Error viewing SPC report {report_id}: {e}")
         return render_template('error.html', error=str(e))
