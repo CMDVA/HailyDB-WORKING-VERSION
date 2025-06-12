@@ -4205,6 +4205,125 @@ def generate_alert_message_template(props, radar_data, city_names):
     except Exception:
         return f"Weather alert for {props.get('areaDesc', 'your area')}"
 
+@app.route('/api/spc-reports/enhanced-context/generate', methods=['POST'])
+def api_spc_reports_enhanced_context_generate():
+    """
+    Enhanced Context generation endpoint - bypasses circular imports
+    """
+    try:
+        from google_places_service import GooglePlacesService
+        from openai import OpenAI
+        import json
+        
+        data = request.get_json() or {}
+        report_id = data.get('report_id')
+        
+        if not report_id:
+            return jsonify({"error": "report_id required"}), 400
+        
+        # Get the report
+        report = db.session.get(SPCReport, report_id)
+        if not report:
+            return jsonify({"error": "Report not found"}), 404
+        
+        # Initialize services
+        places_service = GooglePlacesService()
+        openai_client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+        
+        # Get nearby places
+        nearby_places = places_service.get_nearby_places(
+            lat=float(report.latitude),
+            lon=float(report.longitude),
+            radius_miles=25
+        )
+        
+        # Filter and prioritize places (non-county first)
+        non_county_places = [p for p in nearby_places if p['type'] != 'county']
+        primary_place = non_county_places[0] if non_county_places else (nearby_places[0] if nearby_places else None)
+        
+        # Generate damage context
+        damage_context = ""
+        if report.magnitude and report.report_type == 'hail':
+            try:
+                size_inches = float(report.magnitude)
+                if size_inches >= 4.0:
+                    damage_context = "This hail size typically causes severe damage to vehicles, roofs, and structures."
+                elif size_inches >= 2.0:
+                    damage_context = "This hail size commonly causes significant damage to vehicles and property."
+                elif size_inches >= 1.0:
+                    damage_context = "This hail size can cause minor to moderate damage to vehicles and vegetation."
+                else:
+                    damage_context = "This hail size typically causes minimal damage."
+            except:
+                damage_context = "Hail damage assessment unavailable."
+        
+        # Create location text
+        if primary_place:
+            location_text = primary_place['name']
+            if primary_place['distance_miles'] > 0.5:
+                location_text += f" ({primary_place['distance_miles']:.1f} miles away)"
+            else:
+                location_text += " (exact location)"
+        else:
+            location_text = f"{report.location}, {report.county} County, {report.state}"
+        
+        # Generate Enhanced Summary
+        prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable insurance and restoration intelligence.
+
+Generate a professional Enhanced Context Summary for this {report.report_type} event:
+
+Location: {location_text}
+Date: {report.date}
+Time: {report.time} UTC
+{f"Magnitude: {report.magnitude} inch hail" if report.report_type == 'hail' and report.magnitude else ""}
+{f"Wind Speed: {report.magnitude} mph" if report.report_type == 'wind' and report.magnitude else ""}
+Comments: {report.comments or 'No additional details provided'}
+
+Context: {damage_context}
+
+Create a 2-3 sentence summary that:
+1. Uses "{location_text}" as the primary location reference
+2. Includes professional damage assessment language
+3. Provides actionable intelligence for insurance/restoration professionals
+4. Never mentions coordinates or technical location details
+
+Focus on impact and professional terminology."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.3
+        )
+        
+        enhanced_summary = response.choices[0].message.content.strip()
+        
+        # Create enhanced context
+        enhanced_context = {
+            "location_context": {
+                "primary_location": primary_place['name'] if primary_place else location_text,
+                "primary_distance": primary_place['distance_miles'] if primary_place else 0.0,
+                "nearby_places": nearby_places
+            },
+            "enhanced_summary": enhanced_summary,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+        
+        # Save to database
+        report.enhanced_context = enhanced_context
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "report_id": report_id,
+            "enhanced_context": enhanced_context,
+            "message": "Enhanced Context generated successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating enhanced context for report {report_id}: {str(e)}")
+        return jsonify({"error": f"Failed to generate enhanced context: {str(e)}"}), 500
+
 if __name__ == '__main__':
     with app.app_context():
         init_scheduler()
