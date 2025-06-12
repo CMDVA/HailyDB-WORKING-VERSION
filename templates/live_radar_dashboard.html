@@ -830,10 +830,10 @@ function getSeverityBadge(hailSize, windSpeed) {
     );
     
     switch(maxSeverity) {
-        case 3: return '<span class="badge bg-danger">Extreme</span>';
-        case 2: return '<span class="badge bg-warning">Severe</span>';
-        case 1: return '<span class="badge bg-info">Moderate</span>';
-        default: return '<span class="badge bg-secondary">Light</span>';
+        case 3: return '<span class="badge severity-severe">Severe</span>';
+        case 2: return '<span class="badge severity-significant">Significant</span>';
+        case 1: return '<span class="badge severity-moderate">Moderate</span>';
+        default: return '<span class="badge severity-minor">Minor</span>';
     }
 }
 
