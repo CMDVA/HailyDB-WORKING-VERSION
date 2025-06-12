@@ -341,12 +341,8 @@ async function loadSPCVerificationTable() {
         const container = document.getElementById('todays-spc-events');
         if (!container) return;
         
-        // Check if table already exists (preserve existing data)
-        const existingTable = container.querySelector('table');
-        if (existingTable && !window.loadingNextWeek) {
-            console.log('SPC verification table already exists - preserving existing data');
-            return;
-        }
+        // Force refresh verification data every time (no caching)
+        // This ensures accurate real-time counts without stale data display
         
         // Get verification data (only for initial load)
         const verifyResponse = await fetch(`/internal/spc-verify-today`);
