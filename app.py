@@ -3783,6 +3783,47 @@ def api_live_radar_alerts():
             'source': 'error_fallback'
         }), 500
 
+@app.route('/api/live-radar-alerts/health', methods=['GET'])
+def api_live_radar_alerts_health():
+    """
+    Health check endpoint for Live Radar Alerts Service
+    Returns service status, statistics, and diagnostic information
+    """
+    try:
+        from live_radar_service import get_live_radar_service
+        
+        service = get_live_radar_service(db.session)
+        if not service:
+            return jsonify({
+                'status': 'error',
+                'message': 'Live radar service not initialized',
+                'service_running': False,
+                'timestamp': datetime.now().isoformat()
+            }), 503
+            
+        # Get active alerts to verify service is working
+        active_alerts = service.get_active_alerts()
+        
+        return jsonify({
+            'status': 'healthy',
+            'service_running': True,
+            'total_active_alerts': len(active_alerts),
+            'service_stats': {
+                'alerts_in_memory': len(active_alerts),
+                'service_type': 'live_radar_service',
+                'poll_interval': 60
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Health check failed: {str(e)}',
+            'service_running': False,
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 def generate_alert_message_template(props, radar_data, city_names):
     """Generate a pre-formatted message template for the alert"""
     try:
