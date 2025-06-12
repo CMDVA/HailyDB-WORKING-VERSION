@@ -9,7 +9,7 @@ import requests
 import threading
 import time
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
@@ -126,7 +126,7 @@ class LiveRadarAlertService:
                 try:
                     alert = self._process_alert_feature(feature)
                     if alert:
-                        self.active_alerts[alert.id] = alert
+                        self.alerts_store[alert.id] = alert
                         processed_count += 1
                         
                         # Optionally store in database with TTL
@@ -199,6 +199,7 @@ class LiveRadarAlertService:
                 affected_states=affected_states,
                 county_names=county_names,
                 certainty=certainty,
+                certainty_raw=certainty,
                 urgency=urgency,
                 severity=severity,
                 radar_indicated_event=radar_indicated,
@@ -210,7 +211,9 @@ class LiveRadarAlertService:
                 geometry=geometry,
                 description=description,
                 instruction=instruction,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc),
+                alert_status="ACTIVE",
+                source="live_nws"
             )
             
         except Exception as e:
@@ -374,10 +377,10 @@ class LiveRadarAlertService:
             
     def _cleanup_expired_alerts(self):
         """Remove expired alerts from active store"""
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         expired_ids = []
         
-        for alert_id, alert in self.active_alerts.items():
+        for alert_id, alert in self.alerts_store.items():
             # Remove if expired or older than 3 hours
             age_hours = (current_time - alert.created_at).total_seconds() / 3600
             
@@ -385,7 +388,7 @@ class LiveRadarAlertService:
                 expired_ids.append(alert_id)
                 
         for alert_id in expired_ids:
-            del self.active_alerts[alert_id]
+            del self.alerts_store[alert_id]
             
         if expired_ids:
             logger.info(f"Cleaned up {len(expired_ids)} expired live alerts")
@@ -488,7 +491,7 @@ class LiveRadarAlertService:
         """Get all currently active live radar alerts"""
         alerts = []
         
-        for alert in self.active_alerts.values():
+        for alert in self.alerts_store.values():
             alerts.append({
                 'id': alert.id,
                 'event': alert.event,
