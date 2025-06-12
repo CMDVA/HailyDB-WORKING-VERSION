@@ -169,7 +169,8 @@ class SPCEnrichmentService:
     
     def _generate_nearby_places(self, lat: float, lon: float, county: str, state: str) -> List[Dict[str, Any]]:
         """
-        Generate location identification and nearby place names with enhanced geographic accuracy
+        Generate location identification using ONLY SPC lat/lon coordinates.
+        Returns publicly identifiable, Google Maps-searchable places in priority order.
         
         Args:
             lat: Latitude of SPC report
@@ -178,171 +179,148 @@ class SPCEnrichmentService:
             state: State abbreviation
             
         Returns:
-            List of places starting with primary location, then nearby places
+            List with Event Location first, then Nearest Major City for context
         """
         try:
-            # First: Identify the primary location where the coordinates are located
-            location_prompt = f"""
-            You are a precise geographic location identifier. For coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}, identify the EXACT location name where these coordinates are positioned.
+            # Primary search: Find the closest publicly identifiable place
+            event_location_prompt = f"""
+            You are a location specialist finding the closest publicly identifiable, Google Maps-searchable place to coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
+
+            PRIORITY ORDER for Event Location:
             
-            PRIORITY IDENTIFICATION ORDER:
-            1. Islands (Davis Island, Harbour Island, etc.)
-            2. Specific neighborhoods (Hyde Park, Ybor City, etc.)
-            3. Districts and areas (Downtown Tampa, etc.)
-            4. Parks, reserves, or landmarks
-            5. General areas if no specific name exists
+            1️⃣ CLOSEST PUBLIC PLACE with known name and address (within 5 miles):
+            - Schools (K-12, colleges, universities)
+            - Hospitals, medical centers
+            - Fire stations, police stations
+            - Parks or public recreation areas
+            - Libraries, civic centers
+            - Named public buildings (city hall, post office)
             
-            CRITICAL REQUIREMENTS:
-            - Identify what geographic feature the coordinates are WITHIN
-            - For Tampa Bay area: Check if coordinates are on Davis Island, Harbour Island, or other islands
-            - Return the most specific location name available
-            - Distance must be 0.0 for primary location
+            2️⃣ IF no public place within 5 miles → CLOSEST NAMED COMMUNITY:
+            - Small communities, CDP (Census Designated Places)
+            - Villages, unincorporated places, townships
+            - Named neighborhoods or districts
             
-            For Tampa Bay coordinates near {lat:.4f}, {lon:.4f}, check specifically for:
-            - Davis Island (south of downtown Tampa)
-            - Harbour Island (near downtown Tampa) 
-            - Hyde Park (west Tampa neighborhood)
-            - Ybor City (northeast Tampa)
+            3️⃣ IF no named place within 5 miles → RURAL FALLBACK:
+            - "Rural area near [Nearest Named Place]"
             
-            Return JSON with exact primary location including coordinates:
+            REQUIREMENTS:
+            ✅ Return Google Maps-searchable names only
+            ✅ Provide exact distance in miles from {lat:.4f}, {lon:.4f}
+            ✅ Include approximate coordinates of the found location
+            ✅ NO land features (rivers, creeks) unless absolutely no other options
+            ✅ NO county or state names as Event Location
+            ✅ Prioritize accuracy and public recognizability
+            
+            Return JSON format:
             {{
-                "primary_location": {{"name": "Davis Island", "approx_lat": 27.9455, "approx_lon": -82.4501, "type": "island"}},
-                "location_type": "island"
+                "event_location": {{
+                    "name": "Roosevelt Elementary School",
+                    "distance_miles": 1.2,
+                    "approx_lat": 27.9200,
+                    "approx_lon": -82.4600,
+                    "type": "school"
+                }}
             }}
             
-            REQUIREMENT: Return the specific place name where {lat:.4f}, {lon:.4f} is located with approximate coordinates. JSON format only.
+            Find the closest publicly identifiable place to {lat:.4f}, {lon:.4f}. JSON format only.
             """
             
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
             # do not change this unless explicitly requested by the user
-            location_response = self.openai_client.chat.completions.create(
+            event_location_response = self.openai_client.chat.completions.create(
                 model="gpt-4o", 
                 messages=[
-                    {"role": "system", "content": "You are a precise geographic location identifier specializing in finding exact location names for coordinates."},
-                    {"role": "user", "content": location_prompt}
+                    {"role": "system", "content": "You are a location specialist finding publicly identifiable places with precise geographic accuracy."},
+                    {"role": "user", "content": event_location_prompt}
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=300,
+                temperature=0.1
+            )
+            
+            event_location_result = json.loads(event_location_response.choices[0].message.content)
+            logger.info(f"Event location search result: {event_location_result}")
+            
+            # Secondary search: Find nearest major city for regional context
+            major_city_prompt = f"""
+            You are a regional context specialist. Find the closest major city to coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
+
+            REQUIREMENTS:
+            - Find the closest major city (population > 10,000) for regional anchor context
+            - Provide exact distance in miles from {lat:.4f}, {lon:.4f}
+            - Include approximate coordinates of the major city
+            - This is for regional context, separate from Event Location
+            
+            Return JSON format:
+            {{
+                "nearest_major_city": {{
+                    "name": "Tampa",
+                    "distance_miles": 8.5,
+                    "approx_lat": 27.9506,
+                    "approx_lon": -82.4572,
+                    "type": "major_city"
+                }}
+            }}
+            
+            Find the nearest major city to {lat:.4f}, {lon:.4f}. JSON format only.
+            """
+            
+            major_city_response = self.openai_client.chat.completions.create(
+                model="gpt-4o", 
+                messages=[
+                    {"role": "system", "content": "You are a regional context specialist with expert knowledge of major cities."},
+                    {"role": "user", "content": major_city_prompt}
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=200,
                 temperature=0.1
             )
             
-            location_result = json.loads(location_response.choices[0].message.content)
-            logging.info(f"Primary location search result: {location_result}")
+            major_city_result = json.loads(major_city_response.choices[0].message.content)
+            logger.info(f"Major city search result: {major_city_result}")
             
-            # Second: Find nearby places using community-focused search
-            nearby_prompt = f"""
-            You are a specialized community locator. Find nearby places within 3 miles of coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
+            # Build final results list
+            places_list = []
             
-            PRIORITY SEARCH ORDER:
-            1. Small communities, villages, neighborhoods, districts
-            2. Historic places and settlements  
-            3. Parks, landmarks, geographic features
-            4. Major cities for regional context
-            
-            GEOGRAPHIC CONSTRAINTS:
-            - Find the 4 closest places within 3 miles
-            - Provide exact coordinates within 0.01 degree accuracy
-            - Include one major city for regional reference
-            
-            Return JSON with nearby places:
-            {{
-                "nearest_city": {{"name": "Major City", "distance_miles": 5.0, "approx_lat": 27.9506, "approx_lon": -82.4572}},
-                "places": [
-                    {{"name": "Nearby Place 1", "distance_miles": 1.2, "approx_lat": 27.9200, "approx_lon": -82.4600}},
-                    {{"name": "Nearby Place 2", "distance_miles": 2.1, "approx_lat": 27.9300, "approx_lon": -82.4700}},
-                    {{"name": "Nearby Place 3", "distance_miles": 2.8, "approx_lat": 27.9400, "approx_lon": -82.4800}}
-                ]
-            }}
-            
-            REQUIREMENT: Find real places near {lat:.4f}, {lon:.4f}. Return valid JSON only.
-            """
-            
-            nearby_response = self.openai_client.chat.completions.create(
-                model="gpt-4o", 
-                messages=[
-                    {"role": "system", "content": "You are a specialized community locator with expert knowledge of local places."},
-                    {"role": "user", "content": nearby_prompt}
-                ],
-                response_format={"type": "json_object"},
-                max_tokens=400,
-                temperature=0.1
-            )
-            
-            nearby_result = json.loads(nearby_response.choices[0].message.content)
-            logging.info(f"Nearby places search result: {nearby_result}")
-            
-            # Combine results: Start with primary location, then add nearby places
-            all_places = []
-            
-            # Add primary location with calculated distance
-            if 'primary_location' in location_result and location_result['primary_location']:
-                primary_loc = location_result['primary_location']
+            # Add Event Location (primary)
+            if 'event_location' in event_location_result and event_location_result['event_location']:
+                event_loc = event_location_result['event_location']
                 
-                # Calculate actual distance to primary location if coordinates are provided
-                primary_distance = 0.0
-                primary_lat, primary_lon = lat, lon
-                
-                # Check if AI provided specific coordinates for the primary location
-                if 'approx_lat' in primary_loc and 'approx_lon' in primary_loc:
-                    primary_lat = primary_loc['approx_lat']
-                    primary_lon = primary_loc['approx_lon']
-                    primary_distance = self._calculate_distance(lat, lon, primary_lat, primary_lon)
-                
-                all_places.append({
-                    'name': primary_loc['name'],
-                    'distance_miles': round(primary_distance, 1),
-                    'approx_lat': primary_lat,
-                    'approx_lon': primary_lon,
-                    'type': 'primary_location'
-                })
-                logging.info(f"Found primary location: {primary_loc['name']} at {primary_distance:.1f} miles")
+                # Validate and calculate actual distance
+                if 'approx_lat' in event_loc and 'approx_lon' in event_loc:
+                    actual_distance = self._calculate_distance(
+                        lat, lon, event_loc['approx_lat'], event_loc['approx_lon']
+                    )
+                    
+                    places_list.append({
+                        'name': event_loc['name'],
+                        'distance_miles': round(actual_distance, 1),
+                        'approx_lat': event_loc['approx_lat'],
+                        'approx_lon': event_loc['approx_lon'],
+                        'type': 'event_location'
+                    })
+                    logger.info(f"Event Location: {event_loc['name']} at {actual_distance:.1f} miles")
             
-            # Add nearby places with recalculated distances
-            if 'places' in nearby_result:
-                for place in nearby_result['places']:
-                    if 'approx_lat' in place and 'approx_lon' in place:
-                        actual_distance = self._calculate_distance(
-                            lat, lon, place['approx_lat'], place['approx_lon']
-                        )
-                        logging.info(f"Found nearby place: {place['name']} at {actual_distance:.1f} miles")
-                        
-                        all_places.append({
-                            'name': place['name'],
-                            'distance_miles': round(actual_distance, 1),
-                            'approx_lat': place['approx_lat'],
-                            'approx_lon': place['approx_lon'],
-                            'type': 'nearby_place'
-                        })
-            
-            # Add nearest city with recalculated distance
-            if 'nearest_city' in nearby_result and nearby_result['nearest_city']:
-                city_data = nearby_result['nearest_city']
+            # Add Nearest Major City (context)
+            if 'nearest_major_city' in major_city_result and major_city_result['nearest_major_city']:
+                city_data = major_city_result['nearest_major_city']
+                
                 if 'approx_lat' in city_data and 'approx_lon' in city_data:
                     actual_distance = self._calculate_distance(
                         lat, lon, city_data['approx_lat'], city_data['approx_lon']
                     )
-                    logging.info(f"Found nearest city: {city_data['name']} at {actual_distance:.1f} miles")
                     
-                    all_places.append({
+                    places_list.append({
                         'name': city_data['name'],
                         'distance_miles': round(actual_distance, 1),
                         'approx_lat': city_data['approx_lat'],
                         'approx_lon': city_data['approx_lon'],
-                        'type': 'nearest_city'
+                        'type': 'nearest_major_city'
                     })
+                    logger.info(f"Nearest Major City: {city_data['name']} at {actual_distance:.1f} miles")
             
-            # Remove duplicates and sort by distance (keeping primary location first)
-            unique_places = {}
-            for place in all_places:
-                place_key = place['name'].lower()
-                if place_key not in unique_places or place['distance_miles'] < unique_places[place_key]['distance_miles']:
-                    unique_places[place_key] = place
-            
-            final_places = list(unique_places.values())
-            # Sort: primary location first, then by distance
-            final_places.sort(key=lambda x: (x['type'] != 'primary_location', x['distance_miles']))
-            
-            return final_places[:6]
+            return places_list
                 
         except Exception as e:
             logger.error(f"Error generating nearby places for {lat}, {lon}: {e}")

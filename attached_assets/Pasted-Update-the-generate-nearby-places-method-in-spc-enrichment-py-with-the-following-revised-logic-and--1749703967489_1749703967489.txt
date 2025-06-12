@@ -1,0 +1,49 @@
+Update the _generate_nearby_places method in spc_enrichment.py with the following revised logic and priorities:
+
+OBJECTIVE:
+Enhance SPC Report Location Context using ONLY the SPC latitude and longitude. Do not rely on SPC-provided text (such as “8 miles NE of Ocala”).
+
+EVENT LOCATION (Primary Location field):
+
+The goal is to populate the "Event Location" field with the closest publicly identifiable, Google Maps-searchable place to the SPC lat/lon.
+
+Prioritize accuracy and public recognizability.
+
+PRIORITY ORDER:
+
+1️⃣ Closest public place with a known name and address:
+- Schools (K-12, colleges, universities)
+- Hospitals, medical centers
+- Fire stations
+- Police stations
+- Parks or public recreation areas
+- Libraries
+- Civic centers
+- Named public buildings (city hall, post office, etc.)
+
+2️⃣ If no public place within 5 miles → fallback to:
+- Closest named small community, CDP (Census Designated Place), village, unincorporated place, township, etc.
+
+3️⃣ If no such place within 5 miles → fallback to:
+- "Rural area near [Nearest Named Place]"
+
+NEAREST MAJOR CITY (Separate field — do NOT change current logic here):
+Keep this as-is → provide the closest major city for regional context.
+
+ADDITIONAL REQUIREMENTS:
+
+✅ Always provide distance in miles from SPC lat/lon to Event Location
+✅ Always provide approximate coordinates (lat/lon) of Event Location
+✅ Return names that are Google Maps-searchable whenever possible
+✅ Do not return land features (rivers, creeks, etc.) unless absolutely no other options
+✅ Do not return counties or state names as Event Location → we want precise, local context
+
+Prompt Adjustment:
+Update the AI prompt inside _generate_nearby_places to reflect this exact logic.
+Adjust your parsing logic if needed to handle this updated priority order and fallback structure.
+
+Once this is done:
+
+✅ "Event Location" field will be highly actionable for field teams and easily mappable.
+✅ "Nearest Major City" will continue to provide anchor context.
+✅ SPC-provided text will not influence the location enrichment.
