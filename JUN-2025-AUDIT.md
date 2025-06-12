@@ -600,4 +600,484 @@ HailyDB represents a **technically sophisticated and commercially viable** weath
 
 The technical foundation is strong enough to support a commercial SaaS platform, and the identified issues are addressable within a reasonable development timeline.
 
-**Final Recommendation:** Proceed with production preparation, addressing critical issues first while planning for the high-priority improvements in subsequent releases.
+**Final Recommendation:** Proceed with production preparation, addressing critical issues first while planning for the high-priority improvements.
+
+---
+
+## 12. System Wireframing and Architecture Flow
+
+### Data Flow Architecture
+```
+NWS API → Ingestion Service → Database → Enrichment → API Layer → Client Applications
+    ↓           ↓               ↓          ↓          ↓
+SPC CSV → SPC Ingest → PostgreSQL → AI Analysis → REST API → Webhooks
+    ↓           ↓               ↓          ↓          ↓
+NOAA → Hurricane Service → Models → Context Gen → JSON Response → Dashboards
+```
+
+### Component Interaction Wireframe
+1. **Data Sources** (External APIs)
+2. **Ingestion Layer** (Background Services)
+3. **Storage Layer** (PostgreSQL with JSON fields)
+4. **Processing Layer** (AI Enrichment & Matching)
+5. **API Layer** (REST endpoints)
+6. **Client Layer** (Web dashboard, external integrations)
+
+### Database Schema Relationships
+- `alerts` ←→ `spc_reports` (many-to-many via JSON)
+- `alerts` → `webhook_events` (one-to-many)
+- `hurricane_tracks` → `hurricane_county_impacts` (one-to-many)
+- `radar_alerts` → `alerts` (foreign key relationship)
+
+---
+
+## 13. Ingestion Processes
+
+### NWS Alert Ingestion
+**Service:** `ingest.py` - `IngestService`
+**Frequency:** Manual trigger (5-minute intervals recommended)
+**Process:**
+1. Poll NWS API (`https://api.weather.gov/alerts/active`)
+2. Parse GeoJSON features
+3. Extract radar-indicated measurements (hail/wind)
+4. Process full geometry and county mappings
+5. Store with deduplication via alert ID
+6. Batch processing (500 records per batch)
+
+**Key Features:**
+- Radar-indicated parsing from NWS parameters
+- Full geometry processing with FIPS code extraction
+- Automatic retry logic with exponential backoff
+- Comprehensive error logging and recovery
+
+### SPC Report Ingestion
+**Service:** `spc_ingest.py` - `SPCIngestService`
+**Frequency:** Systematic polling schedule (T-0 to T-15 days)
+**Process:**
+1. Download daily CSV from SPC (`YYMMDD_rpts_filtered.csv`)
+2. Parse multi-section CSV (tornado, wind, hail)
+3. Handle malformed CSV lines with aggressive recovery
+4. Generate SHA256 hash for duplicate detection
+5. Auto-trigger location enrichment for new reports
+
+**Polling Schedule:**
+- T-0 (today): Every 5 minutes
+- T-1 to T-4: Every 30 minutes  
+- T-5 to T-7: Hourly
+- T-8 to T-15: Daily
+- T-16+: Manual backfill only (data protection)
+
+### Hurricane Track Ingestion
+**Service:** `hurricane_ingest.py` - `HurricaneIngestService`
+**Source:** NOAA HURDAT2 database
+**Process:**
+1. Download complete HURDAT2 dataset
+2. Parse track points with temporal data
+3. Calculate county-level impacts
+4. Generate landfall detection
+5. Store with storm ID indexing
+
+### Live Radar Alert Streaming
+**Service:** `live_radar_service.py` - `LiveRadarAlertService`
+**Frequency:** Real-time (60-second polling)
+**Process:**
+1. Continuous NWS API polling
+2. Filter for radar-indicated events (hail >0" OR wind ≥50mph)
+3. In-memory cache with TTL cleanup
+4. Generate human-readable alert templates
+5. Optional webhook dispatch
+
+---
+
+## 14. Data Sources Integration
+
+### National Weather Service (NWS)
+**Primary Endpoint:** `https://api.weather.gov/alerts/active`
+**Format:** GeoJSON with embedded parameters
+**Coverage:** Real-time weather alerts nationwide
+**Update Frequency:** Continuous (5-minute recommended polling)
+**Key Fields:**
+- Alert metadata (event, severity, urgency, certainty)
+- Geographic polygons with coordinate arrays
+- Radar parameters (maxHailSize, maxWindGust)
+- Temporal data (effective, expires, sent)
+
+### Storm Prediction Center (SPC)
+**Primary Endpoint:** `https://www.spc.noaa.gov/climo/reports/YYMMDD_rpts_filtered.csv`
+**Format:** Multi-section CSV (tornado, wind, hail)
+**Coverage:** Verified storm reports with ground truth
+**Update Schedule:** Real-time during events, archived daily
+**Key Fields:**
+- Event coordinates and timing
+- Magnitude measurements (F-scale, wind speed, hail size)
+- County and state information
+- Damage descriptions and comments
+
+### NOAA Hurricane Database (HURDAT2)
+**Source:** Historical hurricane tracking database
+**Format:** Fixed-width text format
+**Coverage:** Complete Atlantic/Pacific hurricane history
+**Update Frequency:** Seasonal updates
+**Key Fields:**
+- Storm tracks with 6-hour intervals
+- Intensity measurements (wind, pressure)
+- Storm category classifications
+- Landfall detection and timing
+
+### OpenAI GPT-4o Integration
+**Service:** AI-powered content generation
+**Usage:** Alert enrichment and summarization
+**Features:**
+- Natural language summaries
+- Event classification and tagging
+- Context-aware descriptions
+- Damage assessment narratives
+
+---
+
+## 15. Enrichment Methods
+
+### AI Alert Enrichment
+**Service:** `enrich.py` - `EnrichmentService`
+**Provider:** OpenAI GPT-4o
+**Input:** Raw NWS alert properties
+**Output:** Enhanced summaries and classifications
+
+**Enrichment Types:**
+1. **Natural Language Summaries:** Human-readable event descriptions
+2. **Classification Tags:** Automated categorization (severity, type, impact)
+3. **Geographic Context:** Location-specific details and nearby places
+4. **Damage Assessment:** Potential impact analysis based on magnitude
+
+### SPC Location Enrichment
+**Service:** `spc_enrichment.py` - `SPCEnrichmentService`
+**Provider:** Google Places API
+**Input:** SPC report coordinates
+**Output:** Contextual location data
+
+**Enrichment Features:**
+1. **Nearby Places:** Cities, landmarks, and points of interest
+2. **Distance Calculations:** Proximity to major population centers
+3. **Geographic Context:** County, state, and regional information
+4. **Address Resolution:** Reverse geocoding for precise locations
+
+### Enhanced Context Generation
+**Service:** `spc_enhanced_context.py` - `SPCEnhancedContextService`
+**Purpose:** Multi-alert verification and narrative generation
+**Input:** SPC reports with verified NWS alerts
+**Output:** Comprehensive meteorological summaries
+
+**Context Elements:**
+1. **Alert Verification:** Cross-reference with NWS warnings
+2. **Radar Confirmation:** Polygon match status analysis
+3. **Temporal Analysis:** Event duration and progression
+4. **Professional Narratives:** Meteorologist-grade summaries
+
+### Webhook Intelligence
+**Service:** `webhook_service.py` - `WebhookService`
+**Purpose:** Real-time event notifications
+**Triggers:** Configurable thresholds for hail, wind, damage probability
+**Features:**
+- Geographic filtering (state, county, FIPS codes)
+- Threshold-based triggering
+- Retry logic with exponential backoff
+- Comprehensive delivery tracking
+
+---
+
+## 16. API Endpoints and Data Structure
+
+### Core Alert Endpoints
+
+#### GET `/api/alerts/search`
+**Purpose:** Advanced alert search with comprehensive filtering
+**Parameters:**
+- `state`, `county`, `area` - Geographic filters
+- `severity`, `event_type` - Alert classification
+- `active_only` - Boolean for current alerts only
+- `start_date`, `end_date` - Temporal filtering
+- `has_radar_data` - Radar-indicated events only
+- `min_hail`, `min_wind` - Magnitude thresholds
+- `q` - Full-text search across descriptions
+- `page`, `limit` - Pagination controls
+
+**Response Schema:**
+```json
+{
+  "total": 1234,
+  "page": 1,
+  "limit": 50,
+  "alerts": [
+    {
+      "id": "urn:oid:2.49.0.1.840.0.xxx",
+      "event": "Severe Thunderstorm Warning",
+      "severity": "Severe",
+      "area_desc": "Dallas County, TX; Collin County, TX",
+      "effective": "2025-06-12T18:30:00Z",
+      "expires": "2025-06-12T19:30:00Z",
+      "ai_summary": "AI-generated natural language summary",
+      "radar_indicated": {
+        "hail_inches": 1.25,
+        "wind_mph": 70
+      },
+      "geometry": { "type": "Polygon", "coordinates": [...] },
+      "fips_codes": ["48113", "48085"],
+      "county_names": [
+        {"county": "Dallas", "state": "TX"},
+        {"county": "Collin", "state": "TX"}
+      ],
+      "affected_states": ["TX"],
+      "spc_verified": true,
+      "spc_reports": [
+        {
+          "id": 123,
+          "report_type": "hail",
+          "magnitude": {"size_inches": 1.75},
+          "location": "Plano, TX"
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### GET `/api/alerts/{alert_id}`
+**Purpose:** Individual alert with complete details
+**Response:** Full alert object with all enrichment data
+
+#### GET `/api/alerts/active`
+**Purpose:** Currently active alerts nationwide
+**Response:** Real-time active alerts with status indicators
+
+### SPC Report Endpoints
+
+#### GET `/api/spc/reports`
+**Purpose:** Storm reports with verification status
+**Parameters:**
+- `type` - tornado, wind, hail
+- `state`, `county` - Geographic filtering
+- `date` - Specific date (YYYY-MM-DD)
+- `enhanced_context` - Include enhanced summaries
+- `limit`, `offset` - Pagination
+
+**Response Schema:**
+```json
+{
+  "reports": [
+    {
+      "id": 123,
+      "report_date": "2025-06-12",
+      "report_type": "hail",
+      "time_utc": "1830",
+      "location": "Plano, TX",
+      "county": "Collin",
+      "state": "TX",
+      "latitude": 33.0198,
+      "longitude": -96.6989,
+      "magnitude": {
+        "size_inches": 1.75,
+        "size_hundredths": 175
+      },
+      "comments": "Quarter to golf ball size hail reported by trained spotter",
+      "enhanced_context": {
+        "enhanced_summary": "Professional meteorological narrative",
+        "verified_alerts": 2,
+        "radar_confirmed": true,
+        "nearby_locations": [
+          {"name": "Dallas", "distance_miles": 25.2}
+        ]
+      }
+    }
+  ]
+}
+```
+
+#### GET `/api/spc/reports/today`
+**Purpose:** Current SPC day reports with real-time updates
+
+#### GET `/api/reports/{report_id}`
+**Purpose:** Unified production endpoint for complete report data
+**Features:** Single response with all enrichment, context, and metadata
+
+### Hurricane Track Endpoints
+
+#### GET `/api/hurricane-tracks`
+**Parameters:**
+- `storm_id` - Specific storm (AL142020)
+- `year` - Hurricane season
+- `lat`, `lon`, `radius` - Geographic search
+- `landfall_only` - Boolean for landfall events
+
+#### GET `/api/hurricane-tracks/{storm_id}/impacts`
+**Purpose:** County-level impact analysis for insurance applications
+
+### Live Radar Endpoints
+
+#### GET `/api/live-radar-alerts`
+**Purpose:** Real-time radar-detected events
+**Features:** In-memory cache with immediate updates
+**Filtering:** Active alerts with hail >0" OR wind ≥50mph
+
+#### GET `/api/live-radar-alerts/stats`
+**Purpose:** Live radar processing statistics and health metrics
+
+### Webhook Management
+
+#### POST `/api/webhook-rules`
+**Purpose:** Register webhook notifications
+**Rule Types:**
+- Hail thresholds (inches)
+- Wind thresholds (mph)
+- Damage probability (0.0-1.0)
+- Geographic filters (state, county, FIPS)
+
+#### GET `/api/webhook-events`
+**Purpose:** Webhook delivery audit trail with success/failure tracking
+
+### System Status Endpoints
+
+#### GET `/internal/status`
+**Purpose:** Comprehensive system health and operational metrics
+**Response:**
+```json
+{
+  "status": "operational",
+  "database": "connected",
+  "alerts": {
+    "total": 15420,
+    "recent_24h": 187,
+    "active_now": 23
+  },
+  "spc_verification": {
+    "verified_count": 8756,
+    "coverage_percentage": 72.3
+  },
+  "ingestion": {
+    "last_nws_success": "2025-06-12T18:25:00Z",
+    "last_spc_success": "2025-06-12T18:20:00Z"
+  }
+}
+```
+
+---
+
+## 17. Complete Data Points Available
+
+### Alert Data Points
+- **Core Metadata:** ID, event type, severity, urgency, certainty
+- **Temporal:** Effective time, expiration, sent timestamp
+- **Geographic:** Area description, FIPS codes, state/county mapping
+- **Geometry:** Full polygon coordinates, bounds, coordinate count
+- **Radar Measurements:** Hail size (inches), wind speed (mph)
+- **AI Analysis:** Natural language summaries, classification tags
+- **Verification:** SPC cross-reference status, confidence scores
+
+### SPC Report Data Points
+- **Event Details:** Report type, magnitude, location coordinates
+- **Temporal:** Report date, time (HHMM UTC format)
+- **Geographic:** County, state, precise lat/lon coordinates
+- **Damage:** Comments, descriptions, intensity classifications
+- **Enrichment:** Nearby places, distance to cities, enhanced context
+- **Verification:** Matching NWS alerts, radar confirmation status
+
+### Hurricane Track Data Points
+- **Storm Identity:** Storm ID, name, year, track sequence
+- **Temporal:** Timestamp for each track point
+- **Geographic:** Latitude, longitude, affected counties
+- **Intensity:** Wind speed, pressure, category classification
+- **Impact Analysis:** County-level damage assessment, landfall detection
+
+### Live Radar Data Points
+- **Real-time Measurements:** Current hail size, wind speed
+- **Alert Templates:** Human-readable notification messages
+- **Status Indicators:** Active/expired, radar-confirmed flags
+- **Geographic Context:** Affected areas, state/county breakdown
+
+---
+
+## 18. Use Cases and Applications
+
+### Insurance Industry Applications
+
+#### Claims Processing Acceleration
+- **Automated Event Detection:** Real-time hail/wind alerts trigger claim expectations
+- **Geographic Targeting:** FIPS code integration for precise policy holder identification
+- **Damage Assessment:** AI-powered severity analysis for resource allocation
+- **Historical Analysis:** Hurricane track correlation with historical claims data
+
+#### Risk Assessment and Underwriting
+- **Real-time Risk Monitoring:** Live radar alerts for dynamic risk adjustment
+- **Historical Pattern Analysis:** Multi-year SPC data for actuarial modeling
+- **Geographic Risk Scoring:** County-level exposure analysis
+- **Catastrophe Response:** Automated CAT team deployment triggers
+
+### Emergency Management
+
+#### Public Safety Operations
+- **Multi-jurisdictional Alerts:** County-based alert distribution
+- **Resource Deployment:** Magnitude-based response team allocation
+- **Public Notification:** Webhook integration with emergency alert systems
+- **Situational Awareness:** Real-time dashboard for EOC operations
+
+#### Weather Service Coordination
+- **Verification Support:** SPC report correlation with NWS warnings
+- **Post-event Analysis:** Enhanced context for event documentation
+- **Training Data:** Historical radar-indicated events for forecaster education
+
+### Research and Academia
+
+#### Meteorological Research
+- **Climate Pattern Analysis:** Long-term trend identification
+- **Verification Studies:** Radar detection accuracy assessment
+- **Storm Climatology:** Geographic and temporal pattern analysis
+- **Forecast Verification:** Real-time vs. observed event correlation
+
+#### Insurance Research
+- **Loss Model Development:** Damage correlation with meteorological data
+- **Risk Transfer Analysis:** Historical event frequency and severity
+- **Climate Change Impact:** Trend analysis for future risk projection
+
+### Commercial Applications
+
+#### Weather Service Providers
+- **Value-added Services:** Enhanced alerts with AI summaries
+- **B2B Integration:** API access for meteorological consultants
+- **Mobile Applications:** Real-time alert feeds for consumer apps
+- **Agricultural Services:** Crop damage assessment and prediction
+
+#### Media and Broadcasting
+- **Breaking News:** Real-time severe weather notifications
+- **Weather Graphics:** Enhanced context for television weather
+- **Social Media:** Automated severe weather content generation
+- **Documentary Research:** Historical weather event database
+
+### Technology Integration
+
+#### IoT and Smart Home
+- **Automated Protection:** Hail detection triggers protective measures
+- **Smart Insurance:** Dynamic premium adjustment based on real-time risk
+- **Connected Vehicles:** Route optimization during severe weather events
+
+#### Business Intelligence
+- **Supply Chain:** Weather impact assessment for logistics
+- **Retail Analytics:** Weather correlation with consumer behavior
+- **Construction:** Project planning with weather risk assessment
+
+### API Integration Patterns
+
+#### Webhook-Driven Architecture
+- **Event-driven Processing:** Real-time response to threshold events
+- **Microservices Integration:** Loose coupling with external systems
+- **Scalable Notifications:** Distributed alert processing
+
+#### Batch Data Processing
+- **ETL Pipelines:** Historical data extraction for analytics
+- **Data Warehousing:** Integration with enterprise data systems
+- **Machine Learning:** Training data for predictive models
+
+---
+
+**Document Version:** v2.1  
+**Last Updated:** June 12, 2025  
+**Technical Contact:** HailyDB Development Team  
+**Production Status:** Ready for enterprise deploymentements in subsequent releases.
