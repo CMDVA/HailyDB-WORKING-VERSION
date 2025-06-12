@@ -182,13 +182,15 @@ class SPCEnrichmentService:
             List with Event Location first, then Nearest Major City for context
         """
         try:
-            # Primary search: Find the closest publicly identifiable place
+            # Three-phase search with proper distance limits and structured results
+            
+            # Phase 1: Event Location (within 5 miles only)
             event_location_prompt = f"""
             You are a location specialist finding the closest publicly identifiable, Google Maps-searchable place to coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
 
-            PRIORITY ORDER for Event Location:
+            PRIORITY ORDER for Event Location (WITHIN 5 MILES ONLY):
             
-            1️⃣ CLOSEST PUBLIC PLACE with known name and address (within 5 miles):
+            1️⃣ CLOSEST PUBLIC PLACE with known name and address:
             - Schools (K-12, colleges, universities)
             - Hospitals, medical centers
             - Fire stations, police stations
@@ -201,16 +203,11 @@ class SPCEnrichmentService:
             - Villages, unincorporated places, townships
             - Named neighborhoods or districts
             
-            3️⃣ IF no named place within 5 miles → RURAL FALLBACK:
-            - "Rural area near [Nearest Named Place]"
+            3️⃣ IF no named place within 5 miles → RETURN NULL
+            - Do NOT create "Rural area near..." results
+            - Do NOT exceed 5 mile limit
             
-            REQUIREMENTS:
-            ✅ Return Google Maps-searchable names only
-            ✅ Provide exact distance in miles from {lat:.4f}, {lon:.4f}
-            ✅ Include approximate coordinates of the found location
-            ✅ NO land features (rivers, creeks) unless absolutely no other options
-            ✅ NO county or state names as Event Location
-            ✅ Prioritize accuracy and public recognizability
+            CRITICAL: ONLY return results within 5 miles. If nothing within 5 miles, return null.
             
             Return JSON format:
             {{
@@ -222,16 +219,63 @@ class SPCEnrichmentService:
                     "type": "school"
                 }}
             }}
-            
-            Find the closest publicly identifiable place to {lat:.4f}, {lon:.4f}. JSON format only.
+            OR if nothing within 5 miles:
+            {{ "event_location": null }}
             """
             
+            # Phase 2: Nearest Major City (NO distance limit)
+            major_city_prompt = f"""
+            You are a regional context specialist. Find the closest major city to coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
+
+            REQUIREMENTS:
+            - Find the closest major city (population > 10,000) for regional anchor context
+            - NO DISTANCE LIMIT - find the closest major city regardless of distance
+            - Provide exact distance in miles from {lat:.4f}, {lon:.4f}
+            - Include approximate coordinates of the major city
+            
+            Return JSON format:
+            {{
+                "nearest_major_city": {{
+                    "name": "Gillette",
+                    "distance_miles": 40.5,
+                    "approx_lat": 44.291,
+                    "approx_lon": -105.502,
+                    "type": "major_city"
+                }}
+            }}
+            """
+            
+            # Phase 3: Other Nearby Places (within 15 miles)
+            nearby_places_prompt = f"""
+            You are a proximity specialist finding nearby places within 15 miles of coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
+
+            SEARCH CRITERIA (WITHIN 15 MILES ONLY):
+            - Named communities, towns, villages
+            - Historic places and settlements
+            - Parks, landmarks, geographic features
+            - Other recognizable places
+            
+            REQUIREMENTS:
+            - Find 2-4 closest places within 15 miles
+            - Exclude major cities (handled separately)
+            - Provide exact coordinates and distances
+            
+            Return JSON format:
+            {{
+                "nearby_places": [
+                    {{"name": "Weston", "distance_miles": 2.0, "approx_lat": 44.850, "approx_lon": -105.600, "type": "community"}},
+                    {{"name": "Moorcroft", "distance_miles": 12.3, "approx_lat": 44.263, "approx_lon": -104.948, "type": "town"}}
+                ]
+            }}
+            """
+            
+            # Execute all three searches
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
             # do not change this unless explicitly requested by the user
             event_location_response = self.openai_client.chat.completions.create(
                 model="gpt-4o", 
                 messages=[
-                    {"role": "system", "content": "You are a location specialist finding publicly identifiable places with precise geographic accuracy."},
+                    {"role": "system", "content": "You are a location specialist finding publicly identifiable places within strict distance limits."},
                     {"role": "user", "content": event_location_prompt}
                 ],
                 response_format={"type": "json_object"},
@@ -239,37 +283,10 @@ class SPCEnrichmentService:
                 temperature=0.1
             )
             
-            event_location_result = json.loads(event_location_response.choices[0].message.content)
-            logger.info(f"Event location search result: {event_location_result}")
-            
-            # Secondary search: Find nearest major city for regional context
-            major_city_prompt = f"""
-            You are a regional context specialist. Find the closest major city to coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
-
-            REQUIREMENTS:
-            - Find the closest major city (population > 10,000) for regional anchor context
-            - Provide exact distance in miles from {lat:.4f}, {lon:.4f}
-            - Include approximate coordinates of the major city
-            - This is for regional context, separate from Event Location
-            
-            Return JSON format:
-            {{
-                "nearest_major_city": {{
-                    "name": "Tampa",
-                    "distance_miles": 8.5,
-                    "approx_lat": 27.9506,
-                    "approx_lon": -82.4572,
-                    "type": "major_city"
-                }}
-            }}
-            
-            Find the nearest major city to {lat:.4f}, {lon:.4f}. JSON format only.
-            """
-            
             major_city_response = self.openai_client.chat.completions.create(
                 model="gpt-4o", 
                 messages=[
-                    {"role": "system", "content": "You are a regional context specialist with expert knowledge of major cities."},
+                    {"role": "system", "content": "You are a regional context specialist with no distance limits for major cities."},
                     {"role": "user", "content": major_city_prompt}
                 ],
                 response_format={"type": "json_object"},
@@ -277,32 +294,49 @@ class SPCEnrichmentService:
                 temperature=0.1
             )
             
-            major_city_result = json.loads(major_city_response.choices[0].message.content)
-            logger.info(f"Major city search result: {major_city_result}")
+            nearby_places_response = self.openai_client.chat.completions.create(
+                model="gpt-4o", 
+                messages=[
+                    {"role": "system", "content": "You are a proximity specialist finding places within 15 miles."},
+                    {"role": "user", "content": nearby_places_prompt}
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=400,
+                temperature=0.1
+            )
             
-            # Build final results list
+            # Parse results
+            event_location_result = json.loads(event_location_response.choices[0].message.content)
+            major_city_result = json.loads(major_city_response.choices[0].message.content)
+            nearby_places_result = json.loads(nearby_places_response.choices[0].message.content)
+            
+            logger.info(f"Event location search result: {event_location_result}")
+            logger.info(f"Major city search result: {major_city_result}")
+            logger.info(f"Nearby places search result: {nearby_places_result}")
+            
+            # Build structured results list
             places_list = []
             
-            # Add Event Location (primary)
+            # Add Event Location (if found within 5 miles)
             if 'event_location' in event_location_result and event_location_result['event_location']:
                 event_loc = event_location_result['event_location']
                 
-                # Validate and calculate actual distance
                 if 'approx_lat' in event_loc and 'approx_lon' in event_loc:
                     actual_distance = self._calculate_distance(
                         lat, lon, event_loc['approx_lat'], event_loc['approx_lon']
                     )
                     
-                    places_list.append({
-                        'name': event_loc['name'],
-                        'distance_miles': round(actual_distance, 1),
-                        'approx_lat': event_loc['approx_lat'],
-                        'approx_lon': event_loc['approx_lon'],
-                        'type': 'event_location'
-                    })
-                    logger.info(f"Event Location: {event_loc['name']} at {actual_distance:.1f} miles")
+                    if actual_distance <= 5.0:  # Double-check 5 mile limit
+                        places_list.append({
+                            'name': event_loc['name'],
+                            'distance_miles': round(actual_distance, 1),
+                            'approx_lat': event_loc['approx_lat'],
+                            'approx_lon': event_loc['approx_lon'],
+                            'type': 'event_location'
+                        })
+                        logger.info(f"Event Location: {event_loc['name']} at {actual_distance:.1f} miles")
             
-            # Add Nearest Major City (context)
+            # Add Nearest Major City (no distance limit)
             if 'nearest_major_city' in major_city_result and major_city_result['nearest_major_city']:
                 city_data = major_city_result['nearest_major_city']
                 
@@ -319,6 +353,24 @@ class SPCEnrichmentService:
                         'type': 'nearest_major_city'
                     })
                     logger.info(f"Nearest Major City: {city_data['name']} at {actual_distance:.1f} miles")
+            
+            # Add Other Nearby Places (within 15 miles)
+            if 'nearby_places' in nearby_places_result and nearby_places_result['nearby_places']:
+                for place in nearby_places_result['nearby_places']:
+                    if 'approx_lat' in place and 'approx_lon' in place:
+                        actual_distance = self._calculate_distance(
+                            lat, lon, place['approx_lat'], place['approx_lon']
+                        )
+                        
+                        if actual_distance <= 15.0:  # Enforce 15 mile limit
+                            places_list.append({
+                                'name': place['name'],
+                                'distance_miles': round(actual_distance, 1),
+                                'approx_lat': place['approx_lat'],
+                                'approx_lon': place['approx_lon'],
+                                'type': 'nearby_place'
+                            })
+                            logger.info(f"Nearby Place: {place['name']} at {actual_distance:.1f} miles")
             
             return places_list
                 
