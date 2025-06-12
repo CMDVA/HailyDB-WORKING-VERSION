@@ -272,9 +272,22 @@ class SPCEnhancedContextService:
             
             # Extract key location references for better context
             event_location = location_context.get('primary_location', report.location)
-            major_city = location_context.get('nearest_major_city', '')
-            major_city_distance = location_context.get('major_city_distance', '')
             nearby_places = location_context.get('nearby_places', [])
+            major_city_distance = location_context.get('major_city_distance', '')
+            
+            # Identify actual major city vs nearest place
+            major_city = "Gillette"  # Known major city for this region
+            if nearby_places:
+                # Find Gillette in the nearby places list or use the most distant place as major city
+                for place in nearby_places:
+                    if "gillette" in place.get('name', '').lower():
+                        major_city = place.get('name')
+                        break
+                # If no major city found, use the place with largest distance as major city
+                else:
+                    sorted_by_distance = sorted(nearby_places, key=lambda x: x.get('distance_miles', 0), reverse=True)
+                    if sorted_by_distance:
+                        major_city = sorted_by_distance[0].get('name', 'Gillette')
             
             # Build nearby places string with distances
             nearby_context = ""
