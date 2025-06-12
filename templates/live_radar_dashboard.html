@@ -330,8 +330,20 @@ function initializeDashboard() {
     
     console.log('Starting initial alert load...');
     
-    // Load alerts immediately
-    loadLiveAlerts();
+    // Test function availability
+    console.log('loadLiveAlerts function exists:', typeof loadLiveAlerts);
+    
+    // Load alerts immediately with error handling
+    try {
+        if (typeof loadLiveAlerts === 'function') {
+            console.log('Calling loadLiveAlerts...');
+            loadLiveAlerts();
+        } else {
+            console.error('loadLiveAlerts is not a function:', typeof loadLiveAlerts);
+        }
+    } catch (error) {
+        console.error('Error calling loadLiveAlerts:', error);
+    }
     
     // Set up auto-refresh to load alerts every 30 seconds
     window.dashboardInterval = setInterval(loadLiveAlerts, 30000);
