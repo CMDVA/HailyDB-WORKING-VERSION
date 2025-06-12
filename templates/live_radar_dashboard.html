@@ -338,9 +338,14 @@ function initializeDashboard() {
     
     console.log('Starting initial alert load...');
     
-    // Load live alerts directly since they're working
-    console.log('Loading live alerts...');
-    loadLiveAlerts();
+    // Load fallback radar alerts first (fast, guaranteed)
+    loadFallbackRadarAlerts();
+    
+    // Then enhance with live feed in background
+    setTimeout(() => {
+        console.log('Loading live alerts in background...');
+        loadLiveAlerts();
+    }, 1000);
     
     // Set up auto-refresh to load alerts every 30 seconds
     window.dashboardInterval = setInterval(loadLiveAlerts, 30000);
@@ -687,29 +692,51 @@ async function loadFallbackRadarAlerts() {
     console.log('=== LOADING FALLBACK RADAR ALERTS ===');
     
     try {
-        const response = await fetch('/api/direct-radar-alerts?start_date=2025-06-01&end_date=2025-06-12&limit=20');
+        const response = await fetch('/api/radar-alerts?limit=20');
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const data = await response.json();
-        console.log('Fallback radar alerts loaded:', data.alerts?.length || 0, 'alerts');
+        console.log('Fallback radar alerts loaded:', data.events?.length || 0, 'alerts');
         
-        if (data.alerts && data.alerts.length > 0) {
-            window.currentAlerts = data.alerts;
+        if (data.events && data.events.length > 0) {
+            // Convert radar alerts to match the live alerts format
+            const convertedAlerts = data.events.map(event => ({
+                id: event.alert_id,
+                area_desc: event.city_names ? event.city_names.join(', ') : 'Unknown',
+                county_names: event.county_names || [],
+                affected_states: event.affected_states || [],
+                radar_data: {
+                    hail_inches: event.hail_inches || 0,
+                    wind_mph: event.wind_mph || 0
+                },
+                max_hail_size: event.hail_inches || 0,
+                max_wind_gust: event.wind_mph || 0,
+                alert_status: 'HISTORICAL',
+                certainty: 'Radar Detected',
+                created_at: event.created_at,
+                description: `Radar detected ${event.event_type} event`
+            }));
+            
+            window.currentAlerts = convertedAlerts;
             displayAlerts(window.currentAlerts);
             
             // Update statistics
             updateStatistics({
-                total_alerts: data.alerts.length,
-                hail_alerts: data.alerts.filter(a => a.max_hail_inches > 0).length,
-                wind_alerts: data.alerts.filter(a => a.max_wind_mph > 0).length
+                total_alerts: convertedAlerts.length,
+                hail_alerts: convertedAlerts.filter(a => a.radar_data.hail_inches > 0).length,
+                wind_alerts: convertedAlerts.filter(a => a.radar_data.wind_mph > 0).length
             });
             
             updateLastRefreshTime();
         } else {
-            displayError('No recent radar alerts found in database');
+            console.log('No fallback alerts found, showing empty state');
+            const tbody = document.getElementById('liveRadarTableBody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">Loading recent radar alerts...</td></tr>';
+            }
         }
         
     } catch (error) {
