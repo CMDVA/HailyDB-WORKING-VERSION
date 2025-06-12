@@ -370,10 +370,12 @@ REQUIREMENTS:
                 nearby_places_sorted = sorted(location_context['nearby_places'], 
                                             key=lambda x: x['distance_miles'])[:3]
             
-            other_nearby = "Other nearby locations include " + ", ".join([
-                f"{place['name']} ({place['distance_miles']:.1f}mi)" 
-                for place in nearby_places_sorted[1:] if len(nearby_places_sorted) > 1
-            ]) if len(nearby_places_sorted) > 1 else ""
+            other_nearby = ""
+            if len(nearby_places_sorted) > 1:
+                other_nearby = "Other nearby locations include " + ", ".join([
+                    f"{place['name']} ({place['distance_miles']:.1f}mi)" 
+                    for place in nearby_places_sorted[1:]
+                ]) + "."
 
             # Build template using your exact format: magnitude + event type + distance/direction + SPC location + county/state + time/date
             template_summary = f"{magnitude_display} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), in {report.county} County, {report.state} at {time_str} on {date_str}. {other_nearby}"

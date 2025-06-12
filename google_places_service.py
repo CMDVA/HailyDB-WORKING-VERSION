@@ -116,10 +116,40 @@ class GooglePlacesService:
             logger.error(f"Error in Google Places nearby search: {e}")
             return None
     
+    def _is_valid_place_name(self, place_name: str, place_types: List[str]) -> bool:
+        """
+        Filter out large geographical areas like national parks, grasslands, forests
+        Focus on smaller, more specific locations
+        """
+        # Exclude large geographical areas
+        excluded_keywords = [
+            'national park', 'national grassland', 'national forest', 'national monument',
+            'state park', 'wilderness area', 'recreation area', 'wildlife refuge',
+            'grassland', 'forest', 'basin', 'desert', 'mountain range', 'mountains',
+            'prairie', 'plains', 'valley', 'canyon', 'ridge', 'butte', 'mesa'
+        ]
+        
+        place_name_lower = place_name.lower()
+        for keyword in excluded_keywords:
+            if keyword in place_name_lower:
+                return False
+                
+        # Exclude certain place types that tend to be large areas
+        excluded_types = [
+            'natural_feature', 'park', 'establishment'
+        ]
+        
+        # If the place has only excluded types, filter it out
+        if place_types and all(ptype in excluded_types for ptype in place_types):
+            return False
+            
+        return True
+
     def find_nearest_place_by_geocoding(self, lat: float, lon: float) -> Optional[PlaceResult]:
         """
         Phase 2: Fallback to Google Reverse Geocoding
         Returns nearest CDP/town/city name with precise coordinates
+        Filters out large geographical areas
         """
         try:
             url = "https://maps.googleapis.com/maps/api/geocode/json"
@@ -135,37 +165,39 @@ class GooglePlacesService:
             
             if data.get('results'):
                 # Get the most specific place name
-                result = data['results'][0]
-                place_name = None
-                
-                # Extract locality name from address components
-                for component in result['address_components']:
-                    types = component['types']
-                    if 'locality' in types:
-                        place_name = component['long_name']
-                        break
-                    elif 'sublocality' in types:
-                        place_name = component['long_name']
-                        break
-                    elif 'neighborhood' in types:
-                        place_name = component['long_name']
-                        break
-                    elif 'administrative_area_level_3' in types:
-                        place_name = component['long_name']
-                        break
-                
-                if place_name:
-                    place_lat = result['geometry']['location']['lat']
-                    place_lon = result['geometry']['location']['lng']
-                    distance = self._calculate_distance(lat, lon, place_lat, place_lon)
+                for result in data['results']:
+                    place_name = None
+                    place_types = result.get('types', [])
                     
-                    return PlaceResult(
-                        name=place_name,
-                        distance_miles=round(distance, 1),
-                        lat=place_lat,
-                        lon=place_lon,
-                        place_type='locality'
-                    )
+                    # Extract locality name from address components
+                    for component in result['address_components']:
+                        types = component['types']
+                        if 'locality' in types:
+                            place_name = component['long_name']
+                            break
+                        elif 'sublocality' in types:
+                            place_name = component['long_name']
+                            break
+                        elif 'neighborhood' in types:
+                            place_name = component['long_name']
+                            break
+                        elif 'administrative_area_level_3' in types:
+                            place_name = component['long_name']
+                            break
+                    
+                    # Check if this is a valid place name (not a large geographical area)
+                    if place_name and self._is_valid_place_name(place_name, place_types):
+                        place_lat = result['geometry']['location']['lat']
+                        place_lon = result['geometry']['location']['lng']
+                        distance = self._calculate_distance(lat, lon, place_lat, place_lon)
+                        
+                        return PlaceResult(
+                            name=place_name,
+                            distance_miles=round(distance, 1),
+                            lat=place_lat,
+                            lon=place_lon,
+                            place_type='locality'
+                        )
             
             return None
             
@@ -286,6 +318,13 @@ class GooglePlacesService:
                 data = response.json()
                 
                 for result in data.get('results', [])[:5]:  # Limit results per type
+                    place_name = result['name']
+                    result_types = result.get('types', [])
+                    
+                    # Filter out large geographical areas
+                    if not self._is_valid_place_name(place_name, result_types):
+                        continue
+                        
                     distance = self._calculate_distance(
                         lat, lon,
                         result['geometry']['location']['lat'],
@@ -294,7 +333,7 @@ class GooglePlacesService:
                     
                     if distance <= radius_miles:
                         places.append(PlaceResult(
-                            name=result['name'],
+                            name=place_name,
                             distance_miles=round(distance, 1),
                             lat=result['geometry']['location']['lat'],
                             lon=result['geometry']['location']['lng'],
