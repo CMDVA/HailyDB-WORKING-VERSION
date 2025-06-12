@@ -349,25 +349,21 @@ async function initializeDashboard() {
 function startLiveRadar() {
     console.log('=== STARTING LIVE RADAR FEED ===');
     
-    // Hide the modal
+    // Hide the modal with debugging
     const modal = document.getElementById('startModal');
+    console.log('Modal element found:', modal);
     if (modal) {
+        console.log('Hiding modal...');
         modal.style.display = 'none';
+        modal.style.visibility = 'hidden';
+        modal.classList.add('d-none');
+        console.log('Modal hidden successfully');
+    } else {
+        console.error('Modal element not found!');
     }
     
-    // Start loading alerts immediately
-    loadLiveAlerts();
-    
-    // Enable auto-refresh
-    autoRefreshEnabled = true;
-    autoRefreshInterval = setInterval(loadLiveAlerts, 30000);
-    console.log('Live radar feed started - refreshing every 30 seconds');
-    
-    // Update button text to show auto-refresh is active
-    const autoRefreshBtn = document.querySelector('[onclick="enableAutoRefresh()"]');
-    if (autoRefreshBtn) {
-        autoRefreshBtn.innerHTML = '<i class="fas fa-pause me-1"></i>Stop Auto';
-    }
+    // Use the existing enableAutoRefresh function
+    enableAutoRefresh();
 }
 
 function enableAutoRefresh() {
