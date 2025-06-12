@@ -340,6 +340,19 @@ class SPCEnhancedContextService:
             else:
                 magnitude_display = report.magnitude if report.magnitude else 'Unknown magnitude'
 
+            # Build proper nearby places from location context first
+            nearby_places_sorted = []
+            if location_context.get('nearby_places'):
+                nearby_places_sorted = sorted(location_context['nearby_places'], 
+                                            key=lambda x: x['distance_miles'])[:3]
+            
+            other_nearby = ""
+            if len(nearby_places_sorted) > 1:
+                other_nearby = "Other nearby locations include " + ", ".join([
+                    f"{place['name']} ({place['distance_miles']:.1f}mi)" 
+                    for place in nearby_places_sorted[1:]
+                ]) + "."
+
             # Generate prompt using exact template format required
             prompt = f"""Generate a professional meteorological summary using this EXACT template format:
 
@@ -363,19 +376,6 @@ REQUIREMENTS:
 2. Fill in each data field exactly as provided
 3. Keep the professional meteorological language
 4. Do not add extra text or modify the structure"""
-            
-            # Build proper nearby places from location context
-            nearby_places_sorted = []
-            if location_context.get('nearby_places'):
-                nearby_places_sorted = sorted(location_context['nearby_places'], 
-                                            key=lambda x: x['distance_miles'])[:3]
-            
-            other_nearby = ""
-            if len(nearby_places_sorted) > 1:
-                other_nearby = "Other nearby locations include " + ", ".join([
-                    f"{place['name']} ({place['distance_miles']:.1f}mi)" 
-                    for place in nearby_places_sorted[1:]
-                ]) + "."
 
             # Build template using your exact format: magnitude + event type + distance/direction + SPC location + county/state + time/date
             template_summary = f"{magnitude_display} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), in {report.county} County, {report.state} at {time_str} on {date_str}. {other_nearby}"
