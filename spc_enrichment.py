@@ -217,15 +217,24 @@ class SPCEnrichmentService:
             List with Event Location first, then Nearest Major City for context
         """
         try:
+            # Extract SPC reference city first
+            spc_reference_city = self._extract_spc_reference_city(spc_location) if spc_location else None
+            logger.info(f"SPC reference city extracted: {spc_reference_city}")
+            
             # Three-phase search with proper distance limits and structured results
             
-            # Phase 1: Event Location (within 5 miles only)
+            # Phase 1: Event Location (within 5 miles, prioritize SPC reference city)
             event_location_prompt = f"""
             You are a location specialist finding the closest publicly identifiable, Google Maps-searchable place to coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
 
+            SPC REFERENCE PRIORITY: {f"The SPC report references '{spc_reference_city}' - PRIORITIZE this city if it exists within 5 miles" if spc_reference_city else "No SPC city reference provided"}
+
             PRIORITY ORDER for Event Location (WITHIN 5 MILES ONLY):
             
-            1️⃣ CLOSEST PUBLIC PLACE with known name and address:
+            1️⃣ IF SPC REFERENCE CITY EXISTS: "{spc_reference_city if spc_reference_city else 'N/A'}"
+            - If {spc_reference_city} is within 5 miles, use it as Event Location
+            
+            2️⃣ CLOSEST PUBLIC PLACE with known name and address:
             - Schools (K-12, colleges, universities)
             - Hospitals, medical centers
             - Fire stations, police stations
@@ -233,29 +242,24 @@ class SPCEnrichmentService:
             - Libraries, civic centers
             - Named public buildings (city hall, post office)
             
-            2️⃣ IF no public place within 5 miles → CLOSEST NAMED COMMUNITY:
+            3️⃣ IF no public place within 5 miles → CLOSEST NAMED COMMUNITY:
             - Small communities, CDP (Census Designated Places)
             - Villages, unincorporated places, townships
             - Named neighborhoods or districts
             
-            3️⃣ IF no named place within 5 miles → RETURN NULL
-            - Do NOT create "Rural area near..." results
-            - Do NOT exceed 5 mile limit
-            
-            CRITICAL: ONLY return results within 5 miles. If nothing within 5 miles, return null.
+            4️⃣ IF no named place within 5 miles → USE SPC REFERENCE:
+            - Use "{spc_reference_city}" even if slightly beyond 5 miles (up to 10 miles)
             
             Return JSON format:
             {{
                 "event_location": {{
-                    "name": "Roosevelt Elementary School",
-                    "distance_miles": 1.2,
-                    "approx_lat": 27.9200,
-                    "approx_lon": -82.4600,
-                    "type": "school"
+                    "name": "Recluse",
+                    "distance_miles": 6.2,
+                    "approx_lat": 44.900,
+                    "approx_lon": -105.750,
+                    "type": "community"
                 }}
             }}
-            OR if nothing within 5 miles:
-            {{ "event_location": null }}
             """
             
             # Phase 2: Nearest Major City (NO distance limit)
