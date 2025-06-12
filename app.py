@@ -3792,10 +3792,11 @@ def api_live_radar_alerts():
                     filtered_alerts.append(alert)
             active_alerts = filtered_alerts
         
-        # Calculate statistics with null safety
+        # Calculate statistics by primary event type (no double-counting)
         total_alerts = len(active_alerts)
-        hail_alerts = sum(1 for alert in active_alerts if (alert.get('maxHailSize') or 0) > 0)
-        wind_alerts = sum(1 for alert in active_alerts if (alert.get('maxWindGust') or 0) >= 50)
+        hail_alerts = sum(1 for alert in active_alerts if alert.get('event') == 'Special Weather Statement')
+        wind_alerts = sum(1 for alert in active_alerts if alert.get('event') == 'Severe Thunderstorm Warning')
+        tornado_alerts = sum(1 for alert in active_alerts if 'Tornado' in alert.get('event', ''))
         radar_indicated = sum(1 for alert in active_alerts if alert.get('radar_indicated_event', False))
         states_affected = len(set(state for alert in active_alerts for state in alert.get('affected_states', [])))
         
