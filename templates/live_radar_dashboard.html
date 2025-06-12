@@ -333,14 +333,24 @@ function initializeDashboard() {
     // Test immediate call
     console.log('Calling loadLiveAlerts() function...');
     
-    // Call the function and handle any immediate errors
-    try {
-        loadLiveAlerts().catch(error => {
-            console.error('loadLiveAlerts promise rejected:', error);
+    // Simple test first
+    console.log('Testing fetch API...');
+    fetch('/api/live-radar-alerts')
+        .then(response => {
+            console.log('Direct fetch response:', response.status, response.statusText);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Direct fetch success:', data);
+            console.log('Alert count from direct fetch:', data.alerts ? data.alerts.length : 0);
+            
+            // Now try the actual function
+            console.log('Direct fetch succeeded, now calling loadLiveAlerts()...');
+            return loadLiveAlerts();
+        })
+        .catch(error => {
+            console.error('Direct fetch failed:', error);
         });
-    } catch (error) {
-        console.error('loadLiveAlerts synchronous error:', error);
-    }
     
     // Set up auto-refresh to load alerts every 30 seconds
     setInterval(loadLiveAlerts, 30000);
