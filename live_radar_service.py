@@ -158,8 +158,11 @@ class LiveRadarAlertService:
             max_wind_gust = self._extract_wind_parameter(parameters)
             max_hail_size = self._extract_hail_parameter(parameters)
             
-            # Filter: Only process wind >= 50 mph OR hail > 0
-            if not ((max_wind_gust and max_wind_gust >= 50) or (max_hail_size and max_hail_size > 0)):
+            # Filter: Process ANY hail size OR wind >= 50 mph (independent conditions)
+            has_qualifying_hail = max_hail_size is not None and max_hail_size > 0
+            has_qualifying_wind = max_wind_gust is not None and max_wind_gust >= 50
+            
+            if not (has_qualifying_hail or has_qualifying_wind):
                 return None
                 
             # Extract location information
@@ -184,7 +187,7 @@ class LiveRadarAlertService:
             
             # Generate alert message template
             alert_message = self._generate_alert_message_template(
-                radar_indicated, urgency, max_wind_gust, max_hail_size, area_desc
+                radar_indicated, urgency, max_wind_gust, max_hail_size, area_desc, certainty
             )
             
             # Extract geometry
@@ -297,64 +300,80 @@ class LiveRadarAlertService:
             return None
             
     def _determine_radar_indication(self, description: str, certainty: str) -> bool:
-        """Determine if alert is radar-indicated based on description and certainty"""
-        if not description:
+        """
+        Determine if alert is radar-indicated based on NWS certainty and description
+        
+        NWS Certainty Levels:
+        - "Observed": Confirmed radar-indicated event or direct observation
+        - "Likely": High confidence forecast
+        - "Possible": Lower confidence forecast
+        - "Unknown": Insufficient data
+        """
+        if not description and not certainty:
             return False
             
-        description_lower = description.lower()
+        # Primary indicator: NWS certainty field
+        certainty_lower = certainty.lower() if certainty else ''
         
-        # Check for radar indication in description
-        radar_keywords = [
-            'radar indicated', 'radar detected', 'radar showed', 'radar confirmed',
-            'doppler radar', 'radar velocity', 'radar reflectivity'
-        ]
+        # "Observed" is the strongest signal for radar-detected events
+        if certainty_lower == 'observed':
+            return True
+            
+        # Secondary check: radar keywords in description text
+        if description:
+            description_lower = description.lower()
+            radar_keywords = [
+                'radar indicated', 'radar detected', 'radar showed', 'radar confirmed',
+                'doppler radar indicated', 'radar velocity', 'radar reflectivity',
+                'observed by radar', 'detected by radar'
+            ]
+            
+            if any(keyword in description_lower for keyword in radar_keywords):
+                return True
         
-        has_radar_indication = any(keyword in description_lower for keyword in radar_keywords)
-        
-        # Also consider "Observed" certainty as radar-indicated
-        is_observed = certainty.lower() == 'observed'
-        
-        return has_radar_indication or is_observed
+        return False
         
     def _generate_alert_message_template(self, radar_indicated: bool, urgency: str, 
                                        wind_gust: Optional[int], hail_size: Optional[float],
-                                       area_desc: str) -> str:
-        """Generate human-readable alert message template"""
+                                       area_desc: str, certainty: str) -> str:
+        """
+        Generate human-readable alert message template
+        Distinguishes between radar-detected (Observed) vs forecast (Expected) events
+        """
         
         # Parse locations from area description (first 2 locations)
         locations = self._parse_locations_for_template(area_desc)
         
-        # Determine primary hazard
+        # Determine primary hazard with both hail and wind if present
+        hazards = []
         if hail_size and hail_size > 0:
-            hazard_type = "hail"
-            hazard_value = f'{hail_size:.2f}"'
-        elif wind_gust and wind_gust > 0:
-            hazard_type = "wind"
-            hazard_value = f"{wind_gust} mph"
-        else:
+            hazards.append(f'{hail_size:.2f}" hail')
+        if wind_gust and wind_gust >= 50:
+            hazards.append(f"{wind_gust} mph winds")
+            
+        if not hazards:
             return f"Weather advisory issued for {locations}."
             
-        # Generate message based on radar indication and urgency
-        if radar_indicated:
-            if hazard_type == "hail":
-                return f"⚠️ {hazard_value} hail detected by radar near {locations}!"
-            else:
-                return f"⚠️ {hazard_value} winds detected by radar near {locations}!"
-                
+        hazard_text = " and ".join(hazards)
+        
+        # Generate message based on certainty (Observed vs Expected)
+        certainty_lower = certainty.lower() if certainty else ''
+        
+        if certainty_lower == 'observed' or radar_indicated:
+            # Radar-detected/observed events
+            return f"⚠️ {hazard_text} detected by radar near {locations}!"
+            
         elif urgency.lower() == "immediate":
-            if hazard_type == "hail":
-                return f"⚠️ {hazard_value} hail WARNING issued for {locations}!"
-            else:
-                return f"⚠️ {hazard_value} WIND WARNING issued for {locations}!"
-                
+            # Immediate threat but not yet observed
+            return f"⚠️ {hazard_text} WARNING issued for {locations}!"
+            
         elif urgency.lower() == "expected":
-            if hazard_type == "hail":
-                return f"Heads up: Potential {hazard_value} hail expected in {locations}."
-            else:
-                return f"Heads up: Potential {hazard_value} winds expected in {locations}."
-                
+            # Forecast-based threat
+            return f"Heads up: Potential {hazard_text} expected in {locations}."
+        
         else:
-            return f"Weather advisory issued for {locations}."
+            # Default case for other urgency levels
+            return f"Weather alert: {hazard_text} possible in {locations}."
             
     def _parse_locations_for_template(self, area_desc: str) -> str:
         """Parse first 2 city/county names from area description for message template"""
