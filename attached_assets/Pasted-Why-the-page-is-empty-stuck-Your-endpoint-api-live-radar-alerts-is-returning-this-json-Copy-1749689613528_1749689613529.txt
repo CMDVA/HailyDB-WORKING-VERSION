@@ -1,0 +1,48 @@
+Why the page is empty / stuck:
+👉 Your endpoint /api/live-radar-alerts is returning this:
+
+json
+Copy
+Edit
+{"alerts":[],"cache_hit":false,"filtered_states":["FL","TX","AL","GA","SC","NC","LA","MS","TN","AR","OK","KS"],"last_poll_timestamp":"2025-06-12T00:52:33.593328","source":"live_nws","statistics":{"has_severe_thunderstorm_warnings":false,"has_tornado_warnings":false,"last_nws_poll_timestamp":"2025-06-12T00:52:33.593328","severity_breakdown":{},"total_alerts":0},"success":true}
+👉 That means live_radar_service.py’s .get_active_alerts() is returning [] because:
+
+Your in-memory self.active_alerts is empty → it is never being populated → because:
+
+the start_polling() thread is never started in app.py
+
+you are NOT calling LiveRadarAlertService._fetch_and_process_alerts() even once on app load → so no alerts in memory → empty array.
+
+👉 You are seeing the fallback historical table because your frontend tries loadFallbackRadarAlerts() when this happens.
+
+Why this is different from your database /api/radar-alerts
+/api/live-radar-alerts → pulls from in-memory live_radar_service.active_alerts dict → currently EMPTY
+
+/api/radar-alerts → pulls from radar_alerts table → works fine → is why fallback table loads.
+
+Why your live_radar_service.py code is correct:
+✅ The LiveRadarAlertService class is solid.
+✅ The polling works if you call start_polling().
+❌ You are NOT calling start_polling() anywhere in app.py.
+
+Why did this happen:
+👉 Your app.py imports IngestService, SPCIngestService, etc. and initializes them inside with app.app_context():
+
+python
+Copy
+Edit
+with app.app_context():
+    ingest_service = IngestService(db)
+    enrich_service = EnrichmentService(db)
+    spc_ingest_service = SPCIngestService(db.session)
+    spc_matching_service = SPCMatchingService(db.session)
+    hurricane_ingest_service = HurricaneIngestService(db.session)
+    scheduler_service = SchedulerService(db)
+👉 But you never created:
+
+python
+Copy
+Edit
+from live_radar_service import LiveRadarAlertService
+live_radar_service = LiveRadarAlertService(db.session)
+live_radar_service.start_polling()

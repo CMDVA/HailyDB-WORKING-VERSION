@@ -76,25 +76,25 @@ class LiveRadarAlertService:
         
     def start_polling(self):
         """Start continuous polling of NWS active alerts"""
-        if self.running:
+        if self.is_running:
             logger.warning("Live radar alert polling already running")
             return
             
-        self.running = True
+        self.is_running = True
         self.poll_thread = threading.Thread(target=self._poll_loop, daemon=True)
         self.poll_thread.start()
         logger.info("Started live radar alert polling service")
         
     def stop_polling(self):
         """Stop polling service"""
-        self.running = False
+        self.is_running = False
         if self.poll_thread and self.poll_thread.is_alive():
             self.poll_thread.join(timeout=5)
         logger.info("Stopped live radar alert polling service")
         
     def _poll_loop(self):
         """Main polling loop - runs continuously"""
-        while self.running:
+        while self.is_running:
             try:
                 self._fetch_and_process_alerts()
                 self._cleanup_expired_alerts()

@@ -10,6 +10,7 @@ import atexit
 import requests
 import json
 from sqlalchemy import text
+from live_radar_service import LiveRadarAlertService
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -188,6 +189,11 @@ with app.app_context():
     spc_matching_service = SPCMatchingService(db.session)
     hurricane_ingest_service = HurricaneIngestService(db.session)
     scheduler_service = SchedulerService(db)
+    
+    # Initialize live radar service
+    from live_radar_service import LiveRadarAlertService
+    live_radar_service = LiveRadarAlertService(db.session())
+    live_radar_service.start_polling()
     
     # Initialize autonomous scheduler
     from autonomous_scheduler import AutonomousScheduler
