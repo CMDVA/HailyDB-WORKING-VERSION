@@ -1,0 +1,142 @@
+1️⃣ "tbody is not defined" — CRITICAL BUG
+👉 You have two versions of this line in your JS:
+
+js
+Copy
+Edit
+const tbody = document.getElementById('liveRadarTableBody');
+✅ You use this correctly in initializeDashboard()
+✅ You use this correctly in loadLiveAlerts()
+BUT → inside displayAlerts(alerts) → your console log is reporting "tbody is not defined".
+
+👉 The only reason this can happen:
+
+displayAlerts() is being called BEFORE the DOM is fully ready
+
+OR → something is clearing or overwriting the liveRadarTableBody element (bad HTML/JS conflict)
+
+OR → the page has multiple elements with same ID (possible template bug)
+
+👉 Check this first:
+
+js
+Copy
+Edit
+console.log('Table body element found:', tbody ? 'YES' : 'NO');
+→ You ALREADY HAVE THIS LOG — you reported the error happens after this → tbody is null at that point.
+
+✅ Possible reason → loadFallbackRadarAlerts() is triggering displayAlerts() before the page fully finishes rendering.
+
+2️⃣ Wrong Data Source Priority
+👉 You're correct:
+
+You should NOT be loading /api/radar-alerts first and showing it as "live"
+
+Live data should be primary
+
+Fallback is ONLY if /api/live-radar-alerts fails or returns no alerts
+
+Right now your flow is this:
+
+plaintext
+Copy
+Edit
+Page load →
+loadFallbackRadarAlerts() →
+Shows 338 radar_alerts →
+loadLiveAlerts() fires →
+JS error happens in displayAlerts() →
+No update to table →
+Stuck showing old data
+Wrong priority.
+
+👉 Correct flow:
+
+plaintext
+Copy
+Edit
+Page load →
+loadLiveAlerts() → if successful → display live alerts
+If /api/live-radar-alerts fails OR returns no alerts →
+THEN call loadFallbackRadarAlerts() → display historical radar_alerts
+👉 Your current initializeDashboard() runs loadFallbackRadarAlerts() first which is wrong.
+
+3️⃣ Conceptual misunderstanding — Mixing live and historical
+👉 These are two different things:
+
+/api/live-radar-alerts → NWS /active + memory store → LIVE DATA
+
+/api/radar-alerts → radar_alerts table → HISTORICAL DATA (days/weeks ago)
+
+You CANNOT treat them the same in displayAlerts().
+They have different fields → your JS needs to know whether it’s handling live vs. historical alerts.
+
+👉 You're mapping alert.max_hail_size and alert.max_wind_gust but some of your radar_alerts entries don't have those fields consistently → so JS throws parsing errors.
+
+4️⃣ Summary of why it fails RIGHT NOW:
+✅ You are calling loadFallbackRadarAlerts() too early → shows wrong data.
+✅ loadLiveAlerts() is correct but errors in displayAlerts() due to tbody being undefined (timing issue OR HTML bug).
+✅ You do not currently have defensive logic to know whether you’re displaying LIVE or HISTORICAL data → causing JS bugs.
+✅ The flow of your initializeDashboard() is wrong → load live first, fallback second ONLY IF NEEDED.
+
+5️⃣ How to fix it → here is your correct flow:
+js
+Copy
+Edit
+async function initializeDashboard() {
+    console.log('=== INITIALIZING DASHBOARD ===');
+    
+    // Load live alerts FIRST
+    try {
+        console.log('Trying to load live radar alerts first...');
+        await loadLiveAlerts();
+
+        // Check if any live alerts were loaded
+        if (!window.currentAlerts || window.currentAlerts.length === 0) {
+            console.log('No live alerts found, loading fallback radar alerts...');
+            await loadFallbackRadarAlerts();
+        } else {
+            console.log(`Live alerts loaded: ${window.currentAlerts.length}`);
+        }
+    } catch (error) {
+        console.error('Error loading live radar alerts:', error);
+        console.log('Falling back to historical radar alerts...');
+        await loadFallbackRadarAlerts();
+    }
+
+    // Set up auto-refresh
+    autoRefreshInterval = setInterval(loadLiveAlerts, 30000);
+    console.log('Dashboard initialized successfully');
+}
+👉 This guarantees:
+
+✅ You FIRST show LIVE alerts if possible
+✅ You ONLY fallback to historical if live fails or returns zero
+✅ You eliminate the bad priority bug you currently have.
+
+6️⃣ Regarding tbody bug:
+👉 I suspect one of these:
+
+You may have TWO elements with id="liveRadarTableBody" (check full page HTML after template rendering — very common bug when copying templates)
+
+Your HTML may not have finished rendering yet when displayAlerts() is called → this happens if your DOMContentLoaded listener is firing too early.
+
+👉 To force safe execution, wrap initializeDashboard() in:
+
+js
+Copy
+Edit
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        initializeDashboard();
+    }, 200);  // Small delay to ensure DOM is ready
+});
+👉 This is a TEMP FIX — but it will prove if DOM timing is the issue.
+
+7️⃣ Conclusion:
+👉 Your core diagnosis is 100% correct: the page is stuck because:
+
+✅ You are showing the wrong data FIRST (historical)
+✅ JS is failing in displayAlerts() because it’s treating mixed live/historical data the same
+✅ Your fallback flow is inverted → should fallback ONLY if live fails
+✅ tbody undefined → likely timing issue or HTML bug → must check template.

@@ -338,14 +338,8 @@ function initializeDashboard() {
     
     console.log('Starting initial alert load...');
     
-    // Load fallback radar alerts first (fast, guaranteed)
-    loadFallbackRadarAlerts();
-    
-    // Then enhance with live feed in background
-    setTimeout(() => {
-        console.log('Loading live alerts in background...');
-        loadLiveAlerts();
-    }, 1000);
+    // Load LIVE alerts FIRST (this is what user wants to see)
+    await initializeLiveAlerts();
     
     // Set up auto-refresh to load alerts every 30 seconds
     window.dashboardInterval = setInterval(loadLiveAlerts, 30000);
@@ -436,13 +430,40 @@ function displayAlerts(alerts) {
         console.log('Alerts type:', typeof alerts);
         console.log('Alerts length:', alerts ? alerts.length : 'N/A');
         
-        const tbody = document.getElementById('liveRadarTableBody');
-        console.log('Table body element found:', tbody ? 'YES' : 'NO');
+        // Wait for DOM element with retry logic
+        let attempts = 0;
+        const maxAttempts = 10;
         
-        if (!tbody) {
-            console.error('ERROR: Table body element not found!');
-            return;
+        function attemptDisplay() {
+            const tbody = document.getElementById('liveRadarTableBody');
+            console.log(`Attempt ${attempts + 1}: Table body found:`, tbody ? 'YES' : 'NO');
+            
+            if (!tbody) {
+                attempts++;
+                if (attempts < maxAttempts) {
+                    setTimeout(attemptDisplay, 50);
+                    return;
+                } else {
+                    console.error('ERROR: Table body element not found after', maxAttempts, 'attempts!');
+                    return;
+                }
+            }
+            
+            // Element found, proceed with display
+            proceedWithDisplay(tbody, alerts);
         }
+        
+        attemptDisplay();
+        
+    } catch (error) {
+        console.error('=== ERROR in displayAlerts start ===');
+        console.error('Error:', error);
+        return;
+    }
+}
+
+function proceedWithDisplay(tbody, alerts) {
+    try {
         
         if (!alerts || alerts.length === 0) {
             console.log('No alerts received, showing empty message');
@@ -687,7 +708,30 @@ function clearFilters() {
     loadLiveAlerts();
 }
 
-// Load fallback radar alerts from database (fast, guaranteed)
+// Initialize live alerts with proper fallback logic
+async function initializeLiveAlerts() {
+    console.log('=== INITIALIZING LIVE ALERTS ===');
+    
+    // Load LIVE alerts FIRST (this is what user wants to see)
+    try {
+        console.log('Attempting to load live radar alerts...');
+        await loadLiveAlerts();
+        
+        // Check if any live alerts were loaded
+        if (!window.currentAlerts || window.currentAlerts.length === 0) {
+            console.log('No live alerts found, loading fallback historical alerts...');
+            await loadFallbackRadarAlerts();
+        } else {
+            console.log(`Live alerts loaded successfully: ${window.currentAlerts.length} alerts`);
+        }
+    } catch (error) {
+        console.error('Error loading live radar alerts:', error);
+        console.log('Falling back to historical radar alerts...');
+        await loadFallbackRadarAlerts();
+    }
+}
+
+// Load fallback radar alerts from database (ONLY if live alerts fail)
 async function loadFallbackRadarAlerts() {
     console.log('=== LOADING FALLBACK RADAR ALERTS ===');
     
@@ -721,7 +765,11 @@ async function loadFallbackRadarAlerts() {
             }));
             
             window.currentAlerts = convertedAlerts;
-            displayAlerts(window.currentAlerts);
+            
+            // Wait for DOM to be ready before calling displayAlerts
+            setTimeout(() => {
+                displayAlerts(window.currentAlerts);
+            }, 100);
             
             // Update statistics
             updateStatistics({
@@ -733,15 +781,19 @@ async function loadFallbackRadarAlerts() {
             updateLastRefreshTime();
         } else {
             console.log('No fallback alerts found, showing empty state');
-            const tbody = document.getElementById('liveRadarTableBody');
-            if (tbody) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">Loading recent radar alerts...</td></tr>';
-            }
+            setTimeout(() => {
+                const tbody = document.getElementById('liveRadarTableBody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No radar alerts currently available.</td></tr>';
+                }
+            }, 100);
         }
         
     } catch (error) {
         console.error('Error loading fallback radar alerts:', error);
-        displayError('Failed to load radar alerts: ' + error.message);
+        setTimeout(() => {
+            displayError('Failed to load radar alerts: ' + error.message);
+        }, 100);
     }
 }
 
