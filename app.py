@@ -3787,7 +3787,7 @@ def api_live_radar_alerts():
         if user_states:
             filtered_alerts = []
             for alert in active_alerts:
-                alert_states = alert.get('affectedStates', [])
+                alert_states = alert.get('affected_states', [])
                 if any(state in user_states for state in alert_states):
                     filtered_alerts.append(alert)
             active_alerts = filtered_alerts
@@ -3796,8 +3796,8 @@ def api_live_radar_alerts():
         total_alerts = len(active_alerts)
         hail_alerts = sum(1 for alert in active_alerts if (alert.get('maxHailSize') or 0) > 0)
         wind_alerts = sum(1 for alert in active_alerts if (alert.get('maxWindGust') or 0) >= 50)
-        radar_indicated = sum(1 for alert in active_alerts if alert.get('radarIndicatedEvent', False))
-        states_affected = len(set(state for alert in active_alerts for state in alert.get('affectedStates', [])))
+        radar_indicated = sum(1 for alert in active_alerts if alert.get('radar_indicated_event', False))
+        states_affected = len(set(state for alert in active_alerts for state in alert.get('affected_states', [])))
         
         alerts_data = {
             'alerts': active_alerts,
