@@ -286,7 +286,7 @@ class SPCEnhancedContextService:
                 magnitude_display = report.magnitude if report.magnitude else 'Unknown magnitude'
                 threat_classification = "Unknown threat level"
 
-            # Generate prompt with correct NWS classifications
+            # Generate prompt with correct NWS classifications - NO SPC comments
             prompt = f"""You are a professional, truthful meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance, designed for actionable intelligence in storm restoration, insurance, and public safety.
 
 This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
@@ -303,12 +303,13 @@ LOCATION DATA:
 - Nearby: {nearby_context if nearby_context else 'in a remote area'}
 
 CRITICAL REQUIREMENTS:
-1. Use the EXACT NWS threat classification provided (includes potential damage assessment)
-2. Lead with magnitude and location relationship
-3. The NWS classification already contains the complete damage potential
-4. Professional meteorological language only
-5. NO additional damage statements needed - the classification is complete
-6. End with nearby locations if available"""
+1. Use ONLY the NWS threat classification provided (includes potential damage assessment)
+2. DO NOT include any SPC comments, codes, or abbreviations like (UNR), (TSA), etc.
+3. Lead with magnitude and location relationship
+4. The NWS classification contains the complete damage potential assessment
+5. Professional meteorological language only
+6. End with nearby locations if available
+7. EXCLUDE all original SPC source comments entirely"""
             
             # Build proper nearby places from location context
             nearby_places_sorted = []
@@ -321,7 +322,7 @@ CRITICAL REQUIREMENTS:
                 for place in nearby_places_sorted[1:] if len(nearby_places_sorted) > 1
             ]) if len(nearby_places_sorted) > 1 else ""
 
-            # Build your exact template with proper NWS classification
+            # Build template with NWS classification - NO SPC comments included
             template_summary = f"{magnitude_display} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), or approximately {major_city_distance} {direction} from {nearby_context.split(',')[0] if nearby_context else 'nearby locations'}, in {report.county} County, {report.state} at {time_str} on {date_str}. {threat_classification}. {other_nearby}"
 
             # Use OpenAI to polish the template with proper NWS terminology
