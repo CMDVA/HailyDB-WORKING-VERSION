@@ -372,6 +372,8 @@ class SPCReport(db.Model):
     # SPC Report Enrichment
     spc_enrichment = Column(JSONB, default=lambda: {})  # Contextual enrichment data
     enhanced_context = Column(JSONB, default=lambda: {})  # Enhanced multi-alert context
+    enhanced_context_version = Column(String, nullable=True)  # Track AI model/prompt version
+    enhanced_context_generated_at = Column(DateTime, nullable=True)  # Track generation timestamp
     
     # SPC Verification Status  
     spc_verified = Column(Boolean, default=False, index=True)  # Whether this report has verified alerts

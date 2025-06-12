@@ -1,0 +1,224 @@
+1️⃣ FULL SPLIT VERSION OF _generate_enhanced_summary
+You will remove your current _generate_enhanced_summary, and replace it with this pipeline:
+
+Add these new private methods:
+python
+Copy
+Edit
+def _build_prompt_context(self, report, location_context, duration_minutes, counties_affected, nws_office, radar_polygon_match):
+    """Prepare structured prompt context"""
+    # Build your existing magnitude_display logic
+    report_type = report.report_type.upper()
+
+    # Extract magnitude
+    if report_type == "HAIL":
+        magnitude_display = f"{report.magnitude:.2f} inch".replace('.00', '') if report.magnitude else "0.75 inch"
+    elif report_type == "WIND":
+        magnitude_display = f"{report.magnitude} mph" if report.magnitude else "58 mph"
+    else:
+        magnitude_display = str(report.magnitude) if report.magnitude else 'severe weather'
+
+    # Time string
+    if hasattr(report, 'time_utc') and report.time_utc:
+        if isinstance(report.time_utc, str) and len(report.time_utc) == 4:
+            hour = int(report.time_utc[:2])
+            minute = int(report.time_utc[2:])
+            time_str = f"{hour:02d}:{minute:02d} (UTC)"
+        else:
+            time_str = str(report.time_utc)
+    else:
+        time_str = "unknown time"
+
+    # Date string
+    if hasattr(report, 'report_date') and report.report_date:
+        if isinstance(report.report_date, str):
+            date_obj = datetime.strptime(report.report_date, '%Y-%m-%d')
+            date_str = date_obj.strftime('%B %d, %Y')
+        else:
+            date_str = report.report_date.strftime('%B %d, %Y')
+    else:
+        date_str = "unknown date"
+
+    # Nearby places
+    nearby_places_sorted = []
+    if location_context.get('nearby_places'):
+        nearby_places_sorted = sorted(location_context['nearby_places'], key=lambda x: x['distance_miles'])[:3]
+
+    other_nearby = ""
+    if len(nearby_places_sorted) > 1:
+        other_nearby = "Other nearby locations include " + ", ".join([
+            f"{place['name']} ({place['distance_miles']:.1f}mi)"
+            for place in nearby_places_sorted[1:]
+        ]) + "."
+
+    # Damage info
+    if report_type == "HAIL" and report.magnitude:
+        damage_info = self._get_hail_damage_category(float(report.magnitude))
+    elif report_type == "WIND" and report.magnitude:
+        damage_info = self._get_wind_damage_category(float(report.magnitude))
+    else:
+        damage_info = {
+            "category": "Severe Weather Event",
+            "damage_potential": "weather-related damage",
+            "is_severe": False,
+            "comments": "Severe weather event with potential for localized damage."
+        }
+
+    return {
+        "report_type": report_type,
+        "magnitude_display": magnitude_display,
+        "location": report.location,
+        "county": report.county,
+        "state": report.state,
+        "time_str": time_str,
+        "date_str": date_str,
+        "other_nearby": other_nearby,
+        "damage_info": damage_info
+    }
+python
+Copy
+Edit
+def _build_prompt(self, context):
+    """Build plain text prompt from structured context"""
+    return f"""Generate a professional meteorological summary for this severe weather event.
+
+EVENT DATA:
+- Event Type: {context['report_type']}
+- Magnitude: {context['magnitude_display']}
+- Location: {context['location']}, {context['county']} County, {context['state']}
+- Time: {context['time_str']} on {context['date_str']}
+- Damage Info: {context['damage_info']['category']} - {context['damage_info']['damage_potential']} - {context['damage_info']['comments']}
+- Nearby Places: {context['other_nearby']}
+
+REQUIREMENTS:
+1. Start with magnitude and event type.
+2. Use professional NWS meteorological language.
+3. Include location context without distant city references.
+4. Keep summary concise and factual.
+5. Example format: "[magnitude] [event type] was reported in [location], [county] County, [state] at [time] on [date]. [damage assessment]. [nearby context]"
+"""
+python
+Copy
+Edit
+def _call_openai(self, prompt_text, template_summary):
+    """Call OpenAI with retry logic"""
+    from openai import OpenAI
+    import os
+    openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+    max_retries = 3
+    retry_delay = 1
+
+    for attempt in range(max_retries):
+        try:
+            response = openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": prompt_text},
+                    {"role": "user", "content": f"Generate the enhanced summary using this template: {template_summary}"}
+                ],
+                max_tokens=300,
+                temperature=0.1,
+                timeout=30
+            )
+            if response and response.choices:
+                return response.choices[0].message.content.strip()
+            else:
+                return None
+        except Exception as e:
+            logging.warning(f"OpenAI API attempt {attempt + 1} failed: {e}")
+            if attempt == max_retries - 1:
+                logging.error("All OpenAI attempts failed")
+                return None
+            time.sleep(retry_delay * (2 ** attempt))
+python
+Copy
+Edit
+def _parse_ai_response(self, ai_response, fallback):
+    """Clean AI response or fallback"""
+    if ai_response:
+        return ai_response
+    else:
+        return fallback
+Now your _generate_enhanced_summary becomes:
+python
+Copy
+Edit
+def _generate_enhanced_summary(self, report, verified_alerts, duration_minutes, counties_affected, nws_office, location_context, radar_polygon_match):
+    """Orchestrate full enhanced summary pipeline"""
+    try:
+        # Build structured context
+        context = self._build_prompt_context(report, location_context, duration_minutes, counties_affected, nws_office, radar_polygon_match)
+
+        # Build prompt text
+        prompt_text = self._build_prompt(context)
+
+        # Build template summary (always have fallback)
+        template_summary = f"{context['magnitude_display']} {context['report_type'].lower()} was reported in {context['location']}, {context['county']} County, {context['state']} at {context['time_str']} on {context['date_str']}. {context['other_nearby']}"
+
+        # Call OpenAI
+        ai_response = self._call_openai(prompt_text, template_summary)
+
+        # Parse response
+        return self._parse_ai_response(ai_response, template_summary)
+
+    except Exception as e:
+        logging.error(f"Error generating AI summary: {e}")
+        return f"This {report.report_type.lower()} report in {report.county} County, {report.state} was validated by {len(verified_alerts)} NWS alerts spanning {duration_minutes} minutes across {len(counties_affected)} counties."
+🟣 2️⃣ Unit Test Template
+For _build_prompt_context
+python
+Copy
+Edit
+def test_build_prompt_context():
+    service = SPCEnhancedContextService(db_session=None)  # You can pass mock here
+    dummy_report = ...  # Build a dummy SPCReport with required fields populated
+    dummy_location_context = {
+        'nearby_places': [{'name': 'Testville', 'distance_miles': 2.0, 'type': 'city'}]
+    }
+
+    context = service._build_prompt_context(
+        dummy_report, dummy_location_context, duration_minutes=60,
+        counties_affected={'Test County'}, nws_office='NWS Test', radar_polygon_match=True
+    )
+
+    assert 'report_type' in context
+    assert 'magnitude_display' in context
+    assert 'location' in context
+    assert 'county' in context
+    assert 'state' in context
+    assert 'time_str' in context
+    assert 'date_str' in context
+    assert 'other_nearby' in context
+    assert 'damage_info' in context
+For _call_openai (mocking OpenAI)
+python
+Copy
+Edit
+from unittest.mock import patch
+
+@patch('openai.OpenAI.chat.completions.create')
+def test_call_openai(mock_create):
+    service = SPCEnhancedContextService(db_session=None)
+    
+    # Mock OpenAI response
+    mock_create.return_value = type('obj', (object,), {
+        'choices': [type('obj', (object,), {'message': type('obj', (object,), {'content': 'Mocked response'})})]
+    })()
+    
+    prompt_text = "Test prompt"
+    template_summary = "Test template"
+
+    response = service._call_openai(prompt_text, template_summary)
+
+    assert response == 'Mocked response'
+🟣 Final Summary
+✅ Now you will have:
+
+Safe versioned writes
+
+Transaction isolation
+
+Split, testable AI generation pipeline
+
+Unit tests for core components

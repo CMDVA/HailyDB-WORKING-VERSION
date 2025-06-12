@@ -1,0 +1,131 @@
+✅ 1. What was updated / improved
+Retry logic for OpenAI ✅
+→ You added a clean max_retries + exponential backoff loop — very good.
+
+python
+Copy
+Edit
+max_retries = 3
+retry_delay = 1
+for attempt in range(max_retries):
+    ...
+    time.sleep(retry_delay * (2 ** attempt))
+✅ This now guards you against transient OpenAI failures.
+
+Timeout on OpenAI call ✅
+→ You added timeout=30 — very good.
+→ Minor note: OpenAI’s Python client’s timeout param is not documented in v1 clients. This will work depending on exact SDK version. In latest openai package (>= 1.10) it works through timeout in openai_client.chat.completions.create.
+
+→ You might want to explicitly validate you are on compatible SDK.
+
+Prompt wording and example format improved ✅
+→ You now explicitly guide for NWS style summary rather than loose GPT tone.
+
+✅ Good move — will improve consistency of output.
+
+Logging for retry loop added ✅
+python
+Copy
+Edit
+logging.warning(f"OpenAI API attempt {attempt + 1} failed...")
+✅ Good — you will now see this in logs when GPT fails or is throttled.
+
+⚠️ 2. What is still unchanged / risks remain
+No versioning of enhanced_context ⚠️
+→ You still directly write:
+
+python
+Copy
+Edit
+report.enhanced_context = result['enhanced_context']
+→ Risk: Future schema changes, prompt template changes, model version changes → will overwrite prior data.
+
+→ I strongly recommend adding:
+
+python
+Copy
+Edit
+report.enhanced_context_version = 'v1.0'  # at minimum
+report.enhanced_context_generated_at = datetime.utcnow().isoformat()
+→ OR move this to enhanced_context_v1 field.
+
+Transaction isolation not yet implemented ⚠️
+→ You still use:
+
+python
+Copy
+Edit
+self.db.commit()
+→ No with self.db.begin(): to guard transaction scope.
+→ If a report corrupts mid-way (e.g. weird AI output), you will commit partial data.
+
+→ Recommend switching to:
+
+python
+Copy
+Edit
+with self.db.begin():
+    report.enhanced_context = result['enhanced_context']
+→ You can wrap all your for report in reports: loop this way.
+
+Alert.spc_reports is still brittle ⚠️
+→ You are still matching Alerts via:
+
+python
+Copy
+Edit
+for report in alert.spc_reports:
+    if isinstance(report, dict) and report.get('id') == report_id:
+→ This is non-relational → long-term correctness risk.
+
+→ No change here → flag remains open.
+
+_generate_enhanced_summary still monolithic ⚠️
+→ The method is still too large (>150+ lines), mixing:
+
+Parsing data
+
+Formatting prompt
+
+Calling OpenAI
+
+Parsing OpenAI response
+
+→ You will eventually want:
+
+python
+Copy
+Edit
+prompt_context = self._build_prompt_context(report, location_context, ...)
+prompt_text = self._build_prompt(prompt_context)
+ai_response = self._call_openai(prompt_text)
+enhanced_summary = self._parse_ai_response(ai_response, fallback=template_summary)
+→ This improves testability and traceability.
+
+Summary of Diff Changes
+Area	Status
+Retry logic for OpenAI	✅ Implemented correctly
+Timeout on OpenAI call	✅ Added, correct
+Prompt wording improved	✅ Improved clarity & guidance
+Logging of retries	✅ Added
+Versioning of context	⚠️ Not implemented yet
+Transaction isolation	⚠️ Not implemented yet
+Alert.spc_reports fragility	⚠️ Still fragile
+Monolithic _generate_enhanced_summary	⚠️ Still monolithic
+
+Final Verdict
+You are moving in the right direction — the update improved:
+
+Stability of batch runs (OpenAI won’t kill your batch anymore)
+
+Clarity of summaries
+
+Log visibility
+
+But the 3 remaining critical concerns still remain:
+
+Version your enhanced context → or you’ll regret this when you update your AI model or prompt.
+
+Use transaction isolation → protect your data integrity.
+
+Longer term → move away from spc_reports list → build real relation or separate match table.

@@ -423,6 +423,25 @@ class LiveRadarAlertService:
             return
             
         try:
+            # Ensure we have Flask application context for database operations
+            from flask import has_app_context
+            if not has_app_context():
+                # Import app here to avoid circular imports
+                from app import app
+                with app.app_context():
+                    self._execute_db_operations(alert)
+                return
+            else:
+                self._execute_db_operations(alert)
+                
+        except Exception as e:
+            logger.error(f"Error storing live alert in database: {e}")
+            if self.db:
+                self.db.rollback()
+    
+    def _execute_db_operations(self, alert: LiveRadarAlert):
+        """Execute database operations with proper context"""
+        try:
             # Create table if not exists
             self.db.execute(text("""
                 CREATE TABLE IF NOT EXISTS live_radar_alerts (

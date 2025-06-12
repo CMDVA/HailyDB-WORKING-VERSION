@@ -1,0 +1,196 @@
+1️⃣ Add Versioning + Timestamp for Enhanced Context
+Minimal Schema Change (SQLAlchemy / Alembic migration):
+Add these fields to SPCReport:
+
+python
+Copy
+Edit
+enhanced_context_version = Column(String, nullable=True)
+enhanced_context_generated_at = Column(DateTime, nullable=True)
+If you’re not using migrations yet:
+
+sql
+Copy
+Edit
+ALTER TABLE spc_report
+ADD COLUMN enhanced_context_version VARCHAR NULL,
+ADD COLUMN enhanced_context_generated_at TIMESTAMP NULL;
+Update Enrichment Code
+Change this:
+
+python
+Copy
+Edit
+report.enhanced_context = result['enhanced_context']
+→ To this:
+
+python
+Copy
+Edit
+report.enhanced_context = result['enhanced_context']
+report.enhanced_context_version = 'v1.0'  # Change when model/prompt changes
+report.enhanced_context_generated_at = datetime.utcnow()
+Benefit: Now you know:
+
+Which version of the AI + prompt produced this data
+
+When it was last generated
+
+Whether a report is stale when you roll out v1.1, v2.0, etc.
+
+2️⃣ Add Transaction Isolation (Safe Writes)
+Right now you have:
+
+python
+Copy
+Edit
+self.db.commit()
+→ This risks partial writes.
+
+Replace your batch loop with this pattern:
+
+python
+Copy
+Edit
+for report in reports:
+    try:
+        result = self.enrich_spc_report(report.id)
+        if result.get('success'):
+            # Use transaction context to guard writes
+            with self.db.begin():
+                report.enhanced_context = result['enhanced_context']
+                report.enhanced_context_version = 'v1.0'
+                report.enhanced_context_generated_at = datetime.utcnow()
+            enriched_count += 1
+        else:
+            error_count += 1
+            logging.error(f"Failed to enrich report {report.id}: {result.get('error')}")
+    except Exception as e:
+        error_count += 1
+        logging.error(f"Error enriching report {report.id}: {e}")
+        self.db.rollback()
+Why with self.db.begin()?
+
+→ If anything fails inside this block, the DB will not commit partial changes.
+→ This is what gives you "atomic" updates.
+
+3️⃣ Split _generate_enhanced_summary into Clean Pipeline
+Right now _generate_enhanced_summary does 4 jobs in 1.
+
+You want this pattern:
+
+python
+Copy
+Edit
+prompt_context = self._build_prompt_context(report, location_context, ...)
+prompt_text = self._build_prompt(prompt_context)
+ai_response = self._call_openai(prompt_text)
+enhanced_summary = self._parse_ai_response(ai_response, fallback=template_summary)
+Example implementation:
+Add:
+python
+Copy
+Edit
+def _build_prompt_context(self, report, location_context, ...):
+    """Prepare structured prompt context"""
+    return {
+        "report_type": report.report_type.upper(),
+        "magnitude_display": ...,  # Your existing logic for this
+        "location": report.location,
+        "county": report.county,
+        "state": report.state,
+        "time_str": ...,  # Your existing logic for this
+        "date_str": ...,  # Your existing logic for this
+        "other_nearby": ...,  # Your existing logic for this
+        "damage_info": ...,  # Category/comments logic
+        # Add any other fields you pass today
+    }
+Add:
+python
+Copy
+Edit
+def _build_prompt(self, prompt_context):
+    """Build plain text prompt from structured context"""
+    return f"""Generate a professional meteorological summary...
+
+EVENT DATA:
+- Event Type: {prompt_context['report_type']}
+- Magnitude: {prompt_context['magnitude_display']}
+...
+"""
+Add:
+python
+Copy
+Edit
+def _call_openai(self, prompt_text, template_summary):
+    """Call OpenAI with retry logic"""
+    from openai import OpenAI
+    import os
+    openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            response = openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": prompt_text},
+                    {"role": "user", "content": f"Generate the enhanced summary using this template: {template_summary}"}
+                ],
+                max_tokens=300,
+                temperature=0.1,
+                timeout=30
+            )
+            if response and response.choices:
+                return response.choices[0].message.content.strip()
+            else:
+                return None
+        except Exception as e:
+            logging.warning(f"OpenAI API attempt {attempt + 1} failed: {e}")
+            if attempt == max_retries - 1:
+                logging.error("All OpenAI attempts failed")
+                return None
+            time.sleep(retry_delay * (2 ** attempt))
+Finally add:
+python
+Copy
+Edit
+def _parse_ai_response(self, ai_response, fallback):
+    """Clean AI response or fallback"""
+    if ai_response:
+        return ai_response
+    else:
+        return fallback
+Why This Matters
+→ You can now:
+
+unit test _build_prompt_context easily
+
+unit test _build_prompt for correct formatting
+
+mock _call_openai in tests
+
+safely parse or fallback on errors
+
+Summary Action List
+Item	Action Required
+Version enhanced_context	Add 2 columns, update enrichment code
+Transaction isolation	Use with self.db.begin() around updates
+Split _generate_enhanced_summary	Implement _build_prompt_context, _build_prompt, _call_openai, _parse_ai_response
+
+Final Notes
+✅ You have already made great progress (you added retry logic already).
+
+→ These 3 next changes will take you from "good but dangerous" → "safe to scale and track versions."
+
+→ This will let you:
+
+Support future versions of prompt + model without data overwrite
+
+Roll out new summary versions without corrupting old data
+
+Protect against mid-batch corruption
+
+Test your prompt pipeline better
