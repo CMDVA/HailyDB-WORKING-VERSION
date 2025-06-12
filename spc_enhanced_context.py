@@ -358,7 +358,47 @@ Do NOT omit damage potential or nearby places sections. These are critical featu
             # Include SPC comments for damage emphasis
             damage_details = report.comments if hasattr(report, 'comments') and report.comments else 'No damage details provided'
             
+            # Calculate direction from event to major city
+            direction = ""
+            if major_city != 'Unknown' and hasattr(report, 'latitude') and hasattr(report, 'longitude'):
+                direction = self._calculate_direction(report.latitude, report.longitude, major_city)
+            
+            # Determine damage potential based on official NWS classifications
+            damage_emphasis = ""
+            if report.report_type == "HAIL" and hasattr(report, 'magnitude') and report.magnitude:
+                try:
+                    hail_size = float(report.magnitude)
+                    if hail_size >= 2.75:
+                        damage_emphasis = f"EXTREME THREAT: {hail_size}\" giant hail causes MAJOR DAMAGE including severe vehicle damage, roof destruction, structural damage to buildings, and complete crop devastation."
+                    elif hail_size >= 1.75:
+                        damage_emphasis = f"HIGH THREAT: {hail_size}\" very large hail causes MODERATE DAMAGE including significant vehicle dents, roof damage, broken windows, siding damage, and crop destruction."
+                    elif hail_size >= 1.0:
+                        damage_emphasis = f"MODERATE THREAT: {hail_size}\" large hail causes MINOR DAMAGE including vehicle dents, roof granule loss, window damage, and agricultural losses."
+                    elif hail_size >= 0.75:
+                        damage_emphasis = f"LOW THREAT: {hail_size}\" hail approaches severe criteria and may cause minor vehicle damage, plant damage, and small dents."
+                    else:
+                        damage_emphasis = f"VERY LOW THREAT: {hail_size}\" small hail may cause minor plant damage and very light vehicle impact damage."
+                except ValueError:
+                    damage_emphasis = "Hail of reported size has documented damage potential per NWS classifications."
+            elif report.report_type == "WIND" and hasattr(report, 'magnitude') and report.magnitude:
+                try:
+                    wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip())
+                    if wind_speed >= 92:
+                        damage_emphasis = f"EXTREME THREAT: {wind_speed} mph violent wind gusts cause MAJOR DAMAGE including structural destruction, uprooted large trees, overturned vehicles, and widespread power outages."
+                    elif wind_speed >= 75:
+                        damage_emphasis = f"HIGH THREAT: {wind_speed} mph very damaging wind gusts cause MODERATE DAMAGE including roof damage, large tree damage, mobile home overturning, and significant debris."
+                    elif wind_speed >= 58:
+                        damage_emphasis = f"MODERATE THREAT: {wind_speed} mph damaging wind gusts cause MINOR DAMAGE including broken branches, minor roof damage, and scattered power outages."
+                    elif wind_speed >= 39:
+                        damage_emphasis = f"LOW THREAT: {wind_speed} mph strong wind gusts may cause small branch damage and minor debris."
+                    else:
+                        damage_emphasis = f"VERY LOW THREAT: {wind_speed} mph winds below strong gust criteria but may still cause minor impacts."
+                except (ValueError, AttributeError):
+                    damage_emphasis = "Wind speeds of this magnitude have documented damage potential per NWS classifications."
+            
             prompt = f"""Generate a location-enhanced summary for this SPC storm report:
+
+CRITICAL INSTRUCTION: You must EMPHASIZE damage potential. Do NOT downplay or minimize damage risks. Weather events of this magnitude pose real threats to property and safety.
 
 SPC Report Details:
 - Type: {report.report_type}
@@ -366,19 +406,22 @@ SPC Report Details:
 - Time: {report.time_utc}
 - Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
 - SPC Damage Comments: {damage_details}
+- DAMAGE POTENTIAL: {damage_emphasis}
 
 Location Context (USE THIS DATA):
-- Nearest Major City: {major_city} ({major_city_distance} away)
+- Nearest Major City: {major_city} ({major_city_distance} {direction})
 - Nearby Places: {nearby_context if nearby_context else 'None within close proximity'}
 
 Create a 1-2 sentence enhanced summary that:
 1. Starts with the SPC report location: "{report.location}, {report.county}, {report.state}"
-2. Include specific damage details from SPC comments - EMPHASIZE any mention of property damage, homes, structures
-3. Include distance from nearest major city: "The event occurred {major_city_distance} from {major_city}" 
-4. Include nearby places when available: {nearby_context}
-5. Describes the SPC report type and measurement clearly
-6. Makes the location meaningful and accessible to readers
-7. NEVER use the phrase "providing a clearer understanding of the affected area"
+2. EMPHASIZE damage potential based on magnitude - use the DAMAGE POTENTIAL assessment provided above
+3. Include specific damage details from SPC comments - highlight any property damage, homes, structures mentioned
+4. Include distance and direction from nearest major city: "The event occurred {major_city_distance} {direction} of {major_city}" 
+5. Include nearby places when available: {nearby_context}
+6. Describes the SPC report type and measurement clearly
+7. Makes the location meaningful and accessible to readers
+8. NEVER use the phrase "providing a clearer understanding of the affected area"
+9. NEVER downplay damage potential. ALWAYS emphasize the serious nature of these weather events.
 
 CRITICAL: Use the provided location data exactly as given. Do not add historical context or speculation."""
 
