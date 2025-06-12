@@ -340,28 +340,29 @@ class SPCEnhancedContextService:
             else:
                 magnitude_display = report.magnitude if report.magnitude else 'Unknown magnitude'
 
-            # Generate prompt using actual NWS damage lookup data
-            prompt = f"""You are a professional meteorological data analyst. Generate a clean summary with potential damage assessment based on official NWS damage classifications.
+            # Generate prompt using exact template format required
+            prompt = f"""Generate a professional meteorological summary using this EXACT template format:
 
-WEATHER EVENT DATA:
-- Type: {report.report_type}
+REQUIRED TEMPLATE:
+"{magnitude_display} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), in {report.county} County, {report.state} at {time_str} on {date_str}. This event is classified as {damage_info['category']} with {damage_info['damage_potential']} potential. {damage_info['comments']} {other_nearby}"
+
+DATA TO USE:
 - Magnitude: {magnitude_display}
-- Location: {report.location}, {report.county} County, {report.state}  
-- Time: {time_str} on {date_str}
-- Distance from major city: {major_city_distance} {direction} of {major_city}
-
-NWS DAMAGE CLASSIFICATION FOR THIS EVENT:
-- Category: {damage_info['category']}
+- Event Type: {report.report_type.lower()}
+- Distance/Direction: {major_city_distance} {direction} of {major_city}
+- SPC Location: {report.location}
+- County/State: {report.county} County, {report.state}
+- Time/Date: {time_str} on {date_str}
+- NWS Category: {damage_info['category']}
 - Damage Potential: {damage_info['damage_potential']}
-- Severe Weather: {'Yes' if damage_info['is_severe'] else 'No'}
-- Details: {damage_info['comments']}
+- NWS Comments: {damage_info['comments']}
+- Nearby Places: {other_nearby}
 
 REQUIREMENTS:
-1. Generate a clean meteorological summary using the exact location and time data
-2. Include the NWS damage category and potential impacts from the classification above
-3. Use professional meteorological language
-4. Focus on the specific damage potential for this magnitude/category
-5. NO SPC comments or source codes"""
+1. Use the EXACT template format above
+2. Fill in each data field exactly as provided
+3. Keep the professional meteorological language
+4. Do not add extra text or modify the structure"""
             
             # Build proper nearby places from location context
             nearby_places_sorted = []
@@ -374,8 +375,8 @@ REQUIREMENTS:
                 for place in nearby_places_sorted[1:] if len(nearby_places_sorted) > 1
             ]) if len(nearby_places_sorted) > 1 else ""
 
-            # Build simple template for AI to enhance
-            template_summary = f"{magnitude_display} {report.report_type.lower()} was reported at {report.location}, {report.county} County, {report.state} at {time_str} on {date_str}. Located {major_city_distance} {direction} of {major_city}. {other_nearby}"
+            # Build template using your exact format: magnitude + event type + distance/direction + SPC location + county/state + time/date
+            template_summary = f"{magnitude_display} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), in {report.county} County, {report.state} at {time_str} on {date_str}. {other_nearby}"
 
             # Use OpenAI to polish the template with proper NWS terminology
             response = openai_client.chat.completions.create(
