@@ -460,8 +460,6 @@ Use ONLY the exact threat classifications provided. NEVER exaggerate beyond NWS 
                 
                 location_context = {
                     'primary_location': primary_location,
-                    'event_location': event_location,
-                    'event_location_distance': event_location_distance,
                     'nearest_major_city': nearest_major_city,
                     'major_city_distance': major_city_distance,
                     'nearby_places': nearby_place_names,

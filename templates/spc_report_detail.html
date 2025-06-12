@@ -234,7 +234,7 @@
                                             <i class="fas fa-map-pin text-primary me-2 small"></i>
                                             <span class="small fw-bold">{{ place.name }}</span>
                                             {% if place.distance_miles %}
-                                            <span class="badge bg-light text-dark ms-2 small">{{ "%.1f"|format(place.distance_miles) }} mi away</span>
+                                            <span class="badge bg-light text-dark ms-2 small">{{ "%.1f"|format(place.distance_miles) }} mi</span>
                                             {% endif %}
                                         </div>
                                         {% if place.approx_lat and place.approx_lon %}
@@ -246,57 +246,13 @@
                                     {% endfor %}
                                 </div>
                                 {% endif %}
-                            {% elif report.enhanced_context.location_context %}
-                                <!-- Use enhanced_context location_context structured fields -->
-                                {% if report.enhanced_context.location_context.event_location %}
-                                <div class="mb-3 p-3 bg-primary bg-opacity-10 rounded border-start border-primary border-3">
-                                    <div class="d-flex align-items-center">
-                                        <i class="fas fa-map-marker-alt text-primary me-2"></i>
-                                        <span class="fw-bold text-primary">Event Location:</span>
-                                        <span class="ms-2 fw-bold">{{ report.enhanced_context.location_context.event_location }}</span>
-                                        {% if report.enhanced_context.location_context.event_location_distance %}
-                                        <span class="badge bg-primary ms-2">{{ report.enhanced_context.location_context.event_location_distance }}</span>
-                                        {% endif %}
-                                    </div>
-                                    <small class="text-muted d-block mt-1 ms-3">
-                                        Primary location where the event occurred
-                                    </small>
-                                </div>
-                                {% endif %}
-
-                                {% if report.enhanced_context.location_context.nearest_major_city and report.enhanced_context.location_context.nearest_major_city != "Unknown" %}
-                                <div class="mb-3 p-3 bg-light rounded">
-                                    <div class="d-flex align-items-center">
-                                        <i class="fas fa-city text-success me-2"></i>
-                                        <span class="fw-bold text-success">Nearest Major City:</span>
-                                        <span class="ms-2">{{ report.enhanced_context.location_context.nearest_major_city }}</span>
-                                        {% if report.enhanced_context.location_context.major_city_distance %}
-                                        <span class="badge bg-success ms-2">{{ report.enhanced_context.location_context.major_city_distance }}</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                {% endif %}
-
-                                {% if report.enhanced_context.location_context.nearby_places %}
-                                <h6 class="text-muted mb-2 small">Other Nearby Places</h6>
-                                <div class="row">
-                                    {% for place in report.enhanced_context.location_context.nearby_places[:6] %}
-                                    <div class="col-6 mb-2">
-                                        <div class="d-flex align-items-center">
-                                            <i class="fas fa-map-pin text-primary me-2 small"></i>
-                                            <span class="small fw-bold">{{ place.name }}</span>
-                                            {% if place.distance_miles %}
-                                            <span class="badge bg-light text-dark ms-2 small">{{ "%.1f"|format(place.distance_miles) }} mi away</span>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
-
-                                <!-- Final fallback to primary location text -->
-                                {% if not report.enhanced_context.location_context.event_location and report.enhanced_context.location_context.primary_location %}
+                            {% elif report.enhanced_context.location_context and report.enhanced_context.location_context.primary_location %}
+                                <!-- Fallback to enhanced_context location_context -->
                                 <p class="mb-0">{{ report.enhanced_context.location_context.primary_location }}</p>
+                                {% if report.enhanced_context.location_context.nearby_places %}
+                                <small class="text-muted">
+                                    Nearby: {{ report.enhanced_context.location_context.nearby_places|map(attribute='name')|join(', ') }}
+                                </small>
                                 {% endif %}
                             {% else %}
                                 <p class="text-muted small mb-0">{{ report.location }}, {{ report.county }}, {{ report.state }}</p>
