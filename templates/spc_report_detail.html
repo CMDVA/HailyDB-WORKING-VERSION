@@ -174,19 +174,91 @@
                     </div>
                     {% endif %}
                     
-                    {% if report.enhanced_context.location_context and report.enhanced_context.location_context.primary_location %}
                     <div class="row mt-3">
                         <div class="col-12">
                             <h6 class="text-muted mb-2">Location Context</h6>
-                            <p class="mb-0">{{ report.enhanced_context.location_context.primary_location }}</p>
-                            {% if report.enhanced_context.location_context.nearby_places %}
-                            <small class="text-muted">
-                                Nearby: {{ report.enhanced_context.location_context.nearby_places|map(attribute='name')|join(', ') }}
-                            </small>
+                            
+                            <!-- Check if we have enrichment data from spc_enrichment -->
+                            {% if report.spc_enrichment and report.spc_enrichment.nearby_places %}
+                                {% set primary_location = report.spc_enrichment.nearby_places|selectattr('type', 'equalto', 'primary_location')|first %}
+                                {% set nearest_city = report.spc_enrichment.nearby_places|selectattr('type', 'equalto', 'nearest_city')|first %}
+                                
+                                <!-- Event Location -->
+                                {% if primary_location %}
+                                <div class="mb-3 p-3 bg-primary bg-opacity-10 rounded border-start border-primary border-3">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-map-marker-alt text-primary me-2"></i>
+                                        <span class="fw-bold text-primary">Event Location:</span>
+                                        <span class="ms-2 fw-bold">{{ primary_location.name }}</span>
+                                        {% if primary_location.distance_miles is defined and primary_location.distance_miles is not none %}
+                                            {% if primary_location.distance_miles == 0.0 %}
+                                        <span class="badge bg-primary ms-2">at coordinates</span>
+                                            {% else %}
+                                        <span class="badge bg-primary ms-2">{{ "%.1f"|format(primary_location.distance_miles) }} miles away</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted d-block mt-1 ms-3">
+                                        Primary location where the event occurred
+                                    </small>
+                                </div>
+                                {% endif %}
+
+                                <!-- Nearest Major City -->
+                                {% if nearest_city %}
+                                <div class="mb-3 p-3 bg-light rounded">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-city text-success me-2"></i>
+                                        <span class="fw-bold text-success">Nearest Major City:</span>
+                                        <span class="ms-2">{{ nearest_city.name }}</span>
+                                        {% if nearest_city.distance_miles %}
+                                        <span class="badge bg-success ms-2">{{ "%.1f"|format(nearest_city.distance_miles) }} miles away</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if nearest_city.approx_lat and nearest_city.approx_lon %}
+                                    <small class="text-muted d-block mt-1">
+                                        {{ "%.3f"|format(nearest_city.approx_lat) }}, {{ "%.3f"|format(nearest_city.approx_lon) }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+
+                                <!-- Other Nearby Places -->
+                                {% set other_places = report.spc_enrichment.nearby_places|rejectattr('type', 'in', ['primary_location', 'nearest_city'])|list %}
+                                {% if other_places %}
+                                <h6 class="text-muted mb-2 small">Other Nearby Places</h6>
+                                <div class="row">
+                                    {% for place in other_places[:6] %}
+                                    <div class="col-6 mb-2">
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-map-pin text-primary me-2 small"></i>
+                                            <span class="small fw-bold">{{ place.name }}</span>
+                                            {% if place.distance_miles %}
+                                            <span class="badge bg-light text-dark ms-2 small">{{ "%.1f"|format(place.distance_miles) }} mi</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if place.approx_lat and place.approx_lon %}
+                                        <small class="text-muted ms-3 d-block">
+                                            {{ "%.3f"|format(place.approx_lat) }}, {{ "%.3f"|format(place.approx_lon) }}
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            {% elif report.enhanced_context.location_context and report.enhanced_context.location_context.primary_location %}
+                                <!-- Fallback to enhanced_context location_context -->
+                                <p class="mb-0">{{ report.enhanced_context.location_context.primary_location }}</p>
+                                {% if report.enhanced_context.location_context.nearby_places %}
+                                <small class="text-muted">
+                                    Nearby: {{ report.enhanced_context.location_context.nearby_places|map(attribute='name')|join(', ') }}
+                                </small>
+                                {% endif %}
+                            {% else %}
+                                <p class="text-muted small mb-0">{{ report.location }}, {{ report.county }}, {{ report.state }}</p>
                             {% endif %}
                         </div>
                     </div>
-                    {% endif %}
                     
                     <div class="mt-3 pt-2 border-top">
                         <small class="text-muted">
