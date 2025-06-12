@@ -327,12 +327,12 @@
                                     <span class="ms-2 fw-bold">{{ primary_location.name }}</span>
                                     {% if primary_location.distance_miles is defined and primary_location.distance_miles is not none %}
                                         {% if primary_location.distance_miles == 0.0 %}
-                                    <span class="badge bg-primary ms-2">at coordinates</span>
+                                    <span class="badge bg-primary ms-2">0.0 miles</span>
                                         {% else %}
                                     <span class="badge bg-primary ms-2">{{ "%.1f"|format(primary_location.distance_miles) }} miles away</span>
                                         {% endif %}
                                     {% else %}
-                                    <span class="badge bg-primary ms-2">at coordinates</span>
+                                    <span class="badge bg-primary ms-2">0.0 miles</span>
                                     {% endif %}
                                 </div>
                                 <small class="text-muted d-block mt-1 ms-3">
