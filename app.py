@@ -1120,10 +1120,36 @@ def view_spc_report_detail(report_id):
         # Add the verified alerts to the report object
         report.verified_alerts = matching_alerts
         
-        # Parse enhanced_context JSON if it exists
-        if hasattr(report, 'enhanced_context') and report.enhanced_context:
+        # Auto-trigger enrichment if not already done
+        import json
+        
+        # Step 1: Check and trigger Location Enrichment first
+        if not report.spc_enrichment or not report.spc_enrichment:
             try:
-                import json
+                from spc_enrichment import enrich_single_spc_report
+                result = enrich_single_spc_report(report_id)
+                if result.get('successful_enrichments', 0) > 0:
+                    logger.info(f"Auto-triggered Location Enrichment for SPC report {report_id}")
+                    # Refresh the report object to get updated data
+                    db.session.refresh(report)
+            except Exception as e:
+                logger.warning(f"Failed to auto-trigger Location Enrichment for report {report_id}: {e}")
+        
+        # Step 2: Check and trigger Enhanced Context Summary after Location Enrichment
+        if not report.enhanced_context or not report.enhanced_context:
+            try:
+                from spc_enhanced_context import enrich_spc_report_context
+                result = enrich_spc_report_context(report_id)
+                if result:
+                    logger.info(f"Auto-triggered Enhanced Context Summary for SPC report {report_id}")
+                    # Refresh the report object to get updated data
+                    db.session.refresh(report)
+            except Exception as e:
+                logger.warning(f"Failed to auto-trigger Enhanced Context Summary for report {report_id}: {e}")
+        
+        # Parse enhanced_context JSON if it exists
+        if report.enhanced_context:
+            try:
                 if isinstance(report.enhanced_context, str):
                     report.enhanced_context = json.loads(report.enhanced_context)
             except (json.JSONDecodeError, TypeError):
