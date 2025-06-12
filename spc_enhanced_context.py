@@ -60,32 +60,30 @@ class SPCEnhancedContextService:
             return "Non-Threatening"
 
     def _hail_effect_statement(self, hail_size: float) -> str:
-        """Generate NWS-derived hail effect statement"""
+        """Generate NWS-derived hail effect statement using official classifications"""
         if hail_size >= 2.75:
-            return "Giant hail (≥ 2.75\") is likely to cause major property damage including roof destruction, broken windows, and significant vehicle damage."
+            return "Giant Hail (larger than 2 3/4 inch, larger than baseballs such as the size of grapefruit or softballs) causing major damage."
         elif hail_size >= 1.75:
-            return "Very large hail (1.75\"–2.74\") may cause moderate to major damage to vehicles, roofs, and windows."
+            return "Very Large Hail (1 3/4 inch to 2 3/4 inch in diameter, from the size of golf balls to baseballs) causing moderate damage."
         elif hail_size >= 1.0:
-            return "Large hail (1.0\"–1.74\") may cause minor to moderate damage including vehicle dents and roof impacts."
-        elif hail_size >= 0.75:
-            return "Hail near severe threshold (0.75\"–0.99\") may cause isolated minor damage to vehicles and vegetation."
+            return "Large Hail (1 inch to 1 3/4 inch in diameter, from the size of quarters to golf balls) causing minor damage."
         elif hail_size > 0:
-            return "Small hail (< 0.75\") generally not expected to cause significant property damage."
+            return "Small Hail (less than 1 inch in diameter, from the size of peas to nickels)."
         else:
             return "No hail reported."
 
     def _wind_effect_statement(self, wind_speed: int) -> str:
-        """Generate NWS-derived wind effect statement"""
+        """Generate NWS-derived wind effect statement using official classifications"""
         if wind_speed >= 92:
-            return "Violent wind gusts (≥ 92 mph) likely to cause major structural damage and widespread power outages."
+            return "Violent Wind Gusts (greater than 92 mph, 80 knots or greater) causing major damage."
         elif wind_speed >= 75:
-            return "Very damaging wind gusts (75–91 mph) may cause moderate to major damage to structures, large trees, and power infrastructure."
+            return "Very Damaging Wind Gusts (75 mph to 91 mph, between 65 knots and 79 knots) causing moderate damage."
         elif wind_speed >= 58:
-            return "Damaging wind gusts (58–74 mph) may cause minor to moderate damage to roofs, trees, and vehicles."
+            return "Damaging Wind Gusts (58 mph to 74 mph, between 50 knots and 64 knots) causing minor damage."
         elif wind_speed >= 39:
-            return "Strong wind gusts (39–57 mph) may cause minor damage to trees and unsecured structures."
+            return "Strong Wind Gusts (39 mph to 57 mph, between 34 knots and 49 knots)."
         elif wind_speed > 0:
-            return "Sub-severe wind gusts (< 39 mph) generally not expected to cause significant property damage."
+            return f"Wind gusts of {wind_speed} mph reported."
         else:
             return "No wind reported."
     
@@ -334,57 +332,52 @@ class SPCEnhancedContextService:
             # Generate conditional prompt based on whether we have verified alerts
             if verified_alerts and len(verified_alerts) > 0:
                 # Multi-alert summary with verification context
-                prompt = f"""You are a professional meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance, designed for actionable intelligence in storm restoration, insurance, and public safety.
+                prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable insurance restoration and public safety intelligence.
 
 This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
 
-MANDATORY NWS Threat Classifications:
-- HAIL: < 1.0" = Very Low Threat | 1.0"-1.74" = Low/Moderate Threat | 1.75"-2.74" = High Threat | ≥2.75" = Extreme Threat
-- WIND: 39-57 mph = Low Threat | 58-74 mph = Moderate Threat | 75-91 mph = High Threat | ≥92 mph = Extreme Threat
+REQUIRED Summary Format (lead with magnitude and emphasize damage potential):
+"On [date], [magnitude] [storm type] was reported at [location], [county] County, [state]. [NWS Classification Statement with damage emphasis]. The event occurred [distance] [direction] of [major city]{f' near {nearby_context}' if nearby_context else ''}."
 
-SPC Historical Report:
-- Type: {report.report_type}
-- Location: {report.location}, {report.county}, {report.state}  
-- Time: {report.time_utc}
-- Hail Threat Level: {hail_threat_level}
-- Wind Threat Level: {wind_threat_level}
+SPC Historical Report Data:
+- Date: {report.time_utc}
+- Storm Type: {report.report_type}
+- Magnitude: {report.magnitude if report.magnitude else 'Unknown magnitude'}
+- Location: {report.location}, {report.county} County, {report.state}
+- Threat Classification: {hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}
 - {damage_statement}
 
 Location Context:
-- Radar Detection: {'Detected' if radar_polygon_match else 'Not Detected'}
-- Distance/Direction: {major_city_distance} {direction} of {major_city}
-- Nearby Places: {nearby_context if nearby_context else 'Remote area'}
+- Major City Reference: {major_city_distance} {direction} of {major_city}
+- Nearby Places: {nearby_context if nearby_context else 'in a remote area'}
+- Radar Verification: {'Radar-detected' if radar_polygon_match else 'Report-based'}
 
-Verification: {len(verified_alerts)} NWS alerts over {duration_minutes} minutes
+NWS Verification: {len(verified_alerts)} matching alerts spanning {duration_minutes} minutes
 
-REQUIRED Format:
-"At [location], [county] County, [state], [storm type] was reported. Radar-indicated [magnitude] places this event in the [threat level] category. [Damage status statement]. The event occurred [distance] [direction] of [major city] near [nearby places]."
-
-Use ONLY the exact threat classifications provided. NEVER exaggerate beyond NWS scale."""
+CRITICAL: Lead with magnitude first, use exact damage classification from data provided, include directional reference to major city."""
             else:
                 # Location-only summary for unverified reports  
-                prompt = f"""You are a professional meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance.
+                prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable insurance restoration and public safety intelligence.
 
 This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
 
-MANDATORY NWS Threat Classifications:
-- HAIL: < 1.0" = Very Low Threat | 1.0"-1.74" = Low/Moderate Threat | 1.75"-2.74" = High Threat | ≥2.75" = Extreme Threat  
-- WIND: 39-57 mph = Low Threat | 58-74 mph = Moderate Threat | 75-91 mph = High Threat | ≥92 mph = Extreme Threat
+REQUIRED Summary Format (lead with magnitude and emphasize damage potential):
+"On [date], [magnitude] [storm type] was reported at [location], [county] County, [state]. [NWS Classification Statement with damage emphasis]. The event occurred [distance] [direction] of [major city]{f' near {nearby_context}' if nearby_context else ''}."
 
-SPC Historical Report:
-- Type: {report.report_type}
-- Location: {report.location}, {report.county}, {report.state}
-- Time: {report.time_utc}  
-- Hail Threat Level: {hail_threat_level}
-- Wind Threat Level: {wind_threat_level}
+SPC Historical Report Data:
+- Date: {report.time_utc}
+- Storm Type: {report.report_type}
+- Magnitude: {report.magnitude if report.magnitude else 'Unknown magnitude'}
+- Location: {report.location}, {report.county} County, {report.state}
+- Threat Classification: {hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}
 - {damage_statement}
-- Distance/Direction: {major_city_distance} {direction} of {major_city}
-- Nearby Places: {nearby_context if nearby_context else 'Remote area'}
 
-REQUIRED Format:
-"At [location], [county] County, [state], [storm type] was reported. [Magnitude] places this event in the [threat level] category. [Damage status statement]. The event occurred [distance] [direction] of [major city] near [nearby places]."
+Location Context:
+- Major City Reference: {major_city_distance} {direction} of {major_city}
+- Nearby Places: {nearby_context if nearby_context else 'in a remote area'}
+- Verification Status: Unverified (no matching NWS alerts found)
 
-Use ONLY the exact threat classifications provided. NEVER exaggerate beyond NWS scale."""
+CRITICAL: Lead with magnitude first, use exact damage classification from data provided, include directional reference to major city."""
 
             response = client.chat.completions.create(
                 model="gpt-4o",
