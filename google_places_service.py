@@ -290,13 +290,26 @@ class GooglePlacesService:
         
         logger.info(f"Starting Google Places enrichment for {lat:.4f}, {lon:.4f}")
         
-        # Phase 1: Event Location (within 5 miles)
-        event_location = self.find_event_location(lat, lon)
-        if not event_location:
-            # Fallback to reverse geocoding for town/city name
-            event_location = self.find_nearest_place_by_geocoding(lat, lon)
+        # Phase 1: Find ALL potential event locations and select the closest
+        event_location_candidates = []
         
-        if event_location:
+        # Try public places first
+        public_place = self.find_event_location(lat, lon)
+        if public_place:
+            event_location_candidates.append(public_place)
+        
+        # Try reverse geocoding
+        geocoded_place = self.find_nearest_place_by_geocoding(lat, lon)
+        if geocoded_place:
+            event_location_candidates.append(geocoded_place)
+        
+        # Get other nearby places for additional candidates
+        other_places = self.find_other_nearby_places(lat, lon, radius_miles=5)  # Only within 5 miles for event location
+        event_location_candidates.extend(other_places)
+        
+        # Select the closest candidate as Event Location
+        if event_location_candidates:
+            event_location = min(event_location_candidates, key=lambda p: p.distance_miles)
             enrichment['nearby_places'].append({
                 'name': event_location.name,
                 'distance_miles': event_location.distance_miles,
@@ -318,11 +331,11 @@ class GooglePlacesService:
             })
             logger.info(f"Nearest Major City: {major_city.name} at {major_city.distance_miles} miles")
         
-        # Phase 3: Other Nearby Places (within 15 miles)
+        # Phase 3: Other Nearby Places (within 15 miles) - exclude already selected places
         other_places = self.find_other_nearby_places(lat, lon)
+        existing_names = [p['name'] for p in enrichment['nearby_places']]
+        
         for place in other_places:
-            # Skip if already added as primary location or major city
-            existing_names = [p['name'] for p in enrichment['nearby_places']]
             if place.name not in existing_names:
                 enrichment['nearby_places'].append({
                     'name': place.name,
