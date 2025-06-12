@@ -3741,13 +3741,15 @@ def api_live_radar_alerts():
     Uses HailyAI-inspired architecture with 5-minute caching and severity filtering
     Focuses on storm restoration contractor intelligence
     """
+    # Get optional state filtering from query parameters
+    user_states = request.args.get('states')
+    if user_states:
+        user_states = [state.strip().upper() for state in user_states.split(',')]
+    else:
+        user_states = None
+        
     try:
         from live_radar_service_enhanced import ProductionLiveRadarService
-        
-        # Get optional state filtering from query parameters
-        user_states = request.args.get('states')
-        if user_states:
-            user_states = [state.strip().upper() for state in user_states.split(',')]
         
         # Initialize service with database session
         service = ProductionLiveRadarService(db.session)

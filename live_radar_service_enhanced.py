@@ -723,11 +723,11 @@ class ProductionLiveRadarService:
         
         severity_text = " and ".join(severity_parts) if severity_parts else "severe conditions"
         
-        template = f"""🚨 {event}
-📍 {area}
-⚠️ {severity_text.title()}
-🔍 Certainty: {radar_data['certainty']}
-⏰ Alert Status: Active"""
+        template = f"""ALERT: {event}
+Location: {area}
+Conditions: {severity_text.title()}
+Certainty: {radar_data['certainty']}
+Alert Status: Active"""
         
         return template
     
