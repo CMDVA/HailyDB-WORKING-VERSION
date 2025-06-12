@@ -1069,7 +1069,7 @@ def get_unified_report(report_id):
                 if isinstance(report.time_utc, str) and len(report.time_utc) == 4:
                     hour = int(report.time_utc[:2])
                     minute = int(report.time_utc[2:])
-                    dt = date_obj.replace(hour=hour, minute=minute)
+                    dt = datetime.combine(date_obj.date(), datetime.min.time().replace(hour=hour, minute=minute))
                     datetime_info = {
                         "utc": dt.isoformat() + "Z",
                         "display": f"{date_obj.strftime('%B %d, %Y')} at {hour:02d}:{minute:02d} UTC",
