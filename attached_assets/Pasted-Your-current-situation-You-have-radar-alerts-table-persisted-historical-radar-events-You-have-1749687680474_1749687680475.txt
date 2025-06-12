@@ -1,0 +1,105 @@
+Your current situation:
+✅ You have radar_alerts table → persisted historical radar events
+✅ You have /api/live-radar-alerts endpoint → this is hitting:
+
+NWS live API (https://api.weather.gov/alerts/active)
+
+Your in-memory active_alerts dictionary
+
+Possibly also enriching from radar_alerts
+
+🚫 Problem: Your API is currently mixing live + historical badly.
+
+→ It doesn’t guarantee "Here’s the latest we have for page load fallback" → this is why your page hangs.
+
+Why is page load broken?
+When the page loads → you should FIRST show:
+
+Guaranteed radar_alerts fallback → GET /api/radar-alerts/summary or GET /api/radar-alerts
+
+→ this gives your users something visible instantly.
+
+Then → layer in the live radar feed:
+→ You run loadLiveAlerts() in the background — that can take 1s, 2s, etc.
+→ When new live data is parsed, it replaces the fallback display.
+
+Why your current JS is wrong for this flow:
+Your JS only calls /api/live-radar-alerts → and only displays displayAlerts(data.alerts) once it finishes.
+
+→ If that API call is slow → the entire page appears broken.
+→ If NWS live feed is flaky → same problem.
+
+Correct flow should be:
+plaintext
+Copy
+Edit
+1️⃣ On page load:
+
+- Fetch and display /api/radar-alerts (historical fallback)
+- Display immediately in table
+
+2️⃣ In parallel → fire loadLiveAlerts():
+
+- Fetch /api/live-radar-alerts
+- If successful → replace table with fresh live feed
+- If failed → leave fallback display intact + show small error banner ("Live NWS feed unavailable — showing recent radar alerts")
+
+3️⃣ Auto refresh → every 30s only refresh /api/live-radar-alerts
+Why this is better:
+✅ Users ALWAYS see radar alerts on page load
+✅ You avoid blank table on load
+✅ Live feed acts as a progressive enhancement → not the only source
+✅ You protect against NWS API failures
+✅ You guarantee performance → reading from your own DB is instant
+
+How to implement:
+👉 Add a small loadFallbackRadarAlerts() function:
+
+js
+Copy
+Edit
+async function loadFallbackRadarAlerts() {
+    try {
+        const response = await fetch('/api/radar-alerts');
+        const data = await response.json();
+
+        window.currentAlerts = data.alerts || [];
+        displayAlerts(window.currentAlerts);
+
+        updateStatistics(data.statistics || {});
+        updateLastRefreshTime();
+    } catch (error) {
+        console.error('Error loading fallback radar alerts:', error);
+        displayError('Failed to load fallback radar alerts: ' + error.message);
+    }
+}
+👉 In initializeDashboard():
+
+js
+Copy
+Edit
+console.log('Loading fallback radar alerts...');
+loadFallbackRadarAlerts();
+
+// Now run live alerts in background
+console.log('Calling loadLiveAlerts() function...');
+loadLiveAlerts();
+👉 On auto-refresh → you ONLY refresh live feed:
+
+js
+Copy
+Edit
+autoRefreshInterval = setInterval(loadLiveAlerts, 30000);
+Bottom line:
+YES — you are 100% correct.
+👉 Your page should first load guaranteed radar_alerts from DB → always fast.
+👉 Then layer on live NWS feed → replaces table when ready.
+
+Why it’s not happening yet:
+→ Your /api/live-radar-alerts is the only source being queried right now.
+→ It mixes live + historical in a confusing way → unstable.
+→ You don’t yet have loadFallbackRadarAlerts() in JS → trivial to add.
+
+Final point:
+✅ Radar-Alerts → stable, always exists → perfect fallback.
+✅ Live-Radar-Alerts → dynamic, live → great UX if available → should enhance, not block.

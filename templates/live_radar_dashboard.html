@@ -338,7 +338,14 @@ function initializeDashboard() {
     
     console.log('Starting initial alert load...');
     
-    // Remove auto-load - user will use manual button
+    // Load fallback radar alerts first (fast, guaranteed)
+    loadFallbackRadarAlerts();
+    
+    // Then enhance with live feed in background
+    setTimeout(() => {
+        console.log('Loading live alerts in background...');
+        loadLiveAlerts();
+    }, 500);
     
     // Set up auto-refresh to load alerts every 30 seconds
     window.dashboardInterval = setInterval(loadLiveAlerts, 30000);
@@ -507,6 +514,12 @@ function displayAlerts(alerts) {
     
     console.log('Building table rows for', filteredAlerts.length, 'alerts...');
     
+    const tbody = document.getElementById('liveRadarTableBody');
+    if (!tbody) {
+        console.error('Table body element not found!');
+        return;
+    }
+    
     tbody.innerHTML = filteredAlerts.map(alert => {
         // Extract wind and hail data from the correct API response structure
         let hailSize = (alert.radar_data && alert.radar_data.hail_inches) || alert.max_hail_size || 0;
@@ -672,6 +685,42 @@ function clearFilters() {
     document.getElementById('minHailSize').value = '';
     document.getElementById('minWindSpeed').value = '50';
     loadLiveAlerts();
+}
+
+// Load fallback radar alerts from database (fast, guaranteed)
+async function loadFallbackRadarAlerts() {
+    console.log('=== LOADING FALLBACK RADAR ALERTS ===');
+    
+    try {
+        const response = await fetch('/api/radar-alerts/summary?start_date=2025-06-10&end_date=2025-06-12&min_hail_inches=0.5&min_wind_mph=50');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Fallback radar alerts loaded:', data.alerts?.length || 0, 'alerts');
+        
+        if (data.alerts && data.alerts.length > 0) {
+            window.currentAlerts = data.alerts;
+            displayAlerts(window.currentAlerts);
+            
+            // Update statistics
+            updateStatistics({
+                total_alerts: data.alerts.length,
+                hail_alerts: data.alerts.filter(a => a.max_hail_inches > 0).length,
+                wind_alerts: data.alerts.filter(a => a.max_wind_mph > 0).length
+            });
+            
+            updateLastRefreshTime();
+        } else {
+            displayError('No recent radar alerts found in database');
+        }
+        
+    } catch (error) {
+        console.error('Error loading fallback radar alerts:', error);
+        displayError('Failed to load radar alerts: ' + error.message);
+    }
 }
 
 // Manual load function that bypasses filters  
