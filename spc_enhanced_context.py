@@ -281,13 +281,17 @@ class SPCEnhancedContextService:
             # Extract magnitude based on report type
             if report.report_type.upper() == "HAIL" and report.magnitude:
                 try:
+                    print(f"DEBUG: Processing HAIL report {report.id}, magnitude: {repr(report.magnitude)}, type: {type(report.magnitude)}")
                     if isinstance(report.magnitude, str):
                         mag_data = json.loads(report.magnitude)
                         hail_size = mag_data.get('size_inches', 0)
+                        print(f"DEBUG: Parsed JSON magnitude: {mag_data}, extracted hail_size: {hail_size}")
                     else:
                         hail_size = float(report.magnitude)
+                        print(f"DEBUG: Direct float conversion: {hail_size}")
                     wind_speed = 0
-                except (json.JSONDecodeError, ValueError, TypeError):
+                except (json.JSONDecodeError, ValueError, TypeError) as e:
+                    print(f"DEBUG: Exception parsing magnitude: {e}")
                     hail_size = 0
                     wind_speed = 0
             elif report.report_type.upper() == "WIND" and report.magnitude:
