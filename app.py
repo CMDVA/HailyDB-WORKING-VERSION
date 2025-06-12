@@ -952,6 +952,171 @@ def get_unenriched_counts():
             'error': str(e)
         }), 500
 
+@app.route('/api/reports/<int:report_id>')
+def get_unified_report(report_id):
+    """
+    Unified production API endpoint for complete SPC report data
+    Returns all data in single response - optimized for end users
+    """
+    try:
+        report = SPCReport.query.get_or_404(report_id)
+        
+        # Parse enhanced context if available
+        enhanced_context = None
+        if report.enhanced_context:
+            try:
+                if isinstance(report.enhanced_context, str):
+                    enhanced_context = json.loads(report.enhanced_context)
+                else:
+                    enhanced_context = report.enhanced_context
+            except (json.JSONDecodeError, TypeError):
+                enhanced_context = None
+        
+        # Extract magnitude data properly
+        magnitude_data = {"raw": None, "display": None, "value": None, "unit": None}
+        if report.magnitude:
+            try:
+                if isinstance(report.magnitude, dict):
+                    mag_dict = report.magnitude
+                elif isinstance(report.magnitude, str):
+                    mag_dict = json.loads(report.magnitude)
+                else:
+                    mag_dict = {"value": float(report.magnitude)}
+                
+                if report.report_type.upper() == "HAIL" and "size_inches" in mag_dict:
+                    size = mag_dict["size_inches"]
+                    magnitude_data = {
+                        "raw": mag_dict,
+                        "display": f"{size:.2f} inch".replace('.00', ''),
+                        "value": float(size),
+                        "unit": "inches"
+                    }
+                elif report.report_type.upper() == "WIND" and "speed" in mag_dict:
+                    speed = mag_dict["speed"]
+                    magnitude_data = {
+                        "raw": mag_dict,
+                        "display": f"{speed} mph",
+                        "value": int(speed),
+                        "unit": "mph"
+                    }
+            except (json.JSONDecodeError, ValueError, TypeError):
+                pass
+        
+        # Get damage assessment from hail size lookup
+        damage_assessment = {"category": "Severe Weather", "severity": "Weather Event", "description": "Severe weather event with potential for damage."}
+        if report.report_type.upper() == "HAIL" and magnitude_data["value"]:
+            hail_size = magnitude_data["value"]
+            if hail_size >= 4.0:
+                damage_assessment = {
+                    "category": "Giant Hail",
+                    "severity": "Extreme Damage",
+                    "description": "Giant hail causes severe property damage including roof penetration, vehicle destruction, and injury risk."
+                }
+            elif hail_size >= 2.0:
+                damage_assessment = {
+                    "category": "Very Large Hail", 
+                    "severity": "Significant Damage",
+                    "description": "Very large hail causes substantial damage to vehicles, roofing, siding, and outdoor equipment."
+                }
+            elif hail_size >= 1.0:
+                damage_assessment = {
+                    "category": "Large Hail",
+                    "severity": "Minor Damage", 
+                    "description": "Large hail can cause dents to vehicles, cracked windows, damage to roofing materials, siding, and gutters."
+                }
+            else:
+                damage_assessment = {
+                    "category": "Small Hail",
+                    "severity": "Minimal Damage",
+                    "description": "Small hail typically causes minimal damage but can affect crops and outdoor equipment."
+                }
+        elif report.report_type.upper() == "WIND" and magnitude_data["value"]:
+            wind_speed = magnitude_data["value"]
+            if wind_speed >= 75:
+                damage_assessment = {
+                    "category": "Violent Wind",
+                    "severity": "Extreme Damage",
+                    "description": "Violent winds cause widespread damage to structures, trees, and power lines."
+                }
+            elif wind_speed >= 65:
+                damage_assessment = {
+                    "category": "Very Damaging Wind",
+                    "severity": "Significant Damage", 
+                    "description": "Very damaging winds can cause structural damage and widespread power outages."
+                }
+            elif wind_speed >= 58:
+                damage_assessment = {
+                    "category": "Damaging Wind",
+                    "severity": "Moderate Damage",
+                    "description": "Damaging winds can snap tree limbs, damage roofing, and cause power outages."
+                }
+            else:
+                damage_assessment = {
+                    "category": "Strong Wind",
+                    "severity": "Minor Damage",
+                    "description": "Strong winds may cause minor property damage and isolated power outages."
+                }
+        
+        # Format datetime properly
+        datetime_info = {"utc": None, "display": None, "timestamp": None}
+        if report.report_date and report.time_utc:
+            try:
+                if isinstance(report.report_date, str):
+                    date_obj = datetime.strptime(report.report_date, '%Y-%m-%d')
+                else:
+                    date_obj = report.report_date
+                
+                if isinstance(report.time_utc, str) and len(report.time_utc) == 4:
+                    hour = int(report.time_utc[:2])
+                    minute = int(report.time_utc[2:])
+                    dt = date_obj.replace(hour=hour, minute=minute)
+                    datetime_info = {
+                        "utc": dt.isoformat() + "Z",
+                        "display": f"{date_obj.strftime('%B %d, %Y')} at {hour:02d}:{minute:02d} UTC",
+                        "timestamp": int(dt.timestamp())
+                    }
+            except (ValueError, AttributeError):
+                pass
+        
+        # Build unified response
+        response = {
+            "report": {
+                "id": report.id,
+                "type": report.report_type.lower(),
+                "magnitude": magnitude_data,
+                "location": {
+                    "name": report.location,
+                    "county": report.county,
+                    "state": report.state,
+                    "description": f"{report.location}, {report.county} County, {report.state}"
+                },
+                "coordinates": {
+                    "lat": float(report.latitude) if report.latitude else None,
+                    "lon": float(report.longitude) if report.longitude else None
+                },
+                "datetime": datetime_info,
+                "damage_assessment": damage_assessment,
+                "comments": report.comments
+            },
+            "context": {
+                "enhanced_summary": enhanced_context.get("enhanced_summary") if enhanced_context else None,
+                "verified_alerts": enhanced_context.get("alert_count", 0) if enhanced_context else 0,
+                "radar_confirmed": enhanced_context.get("radar_polygon_match", False) if enhanced_context else False,
+                "nearby_locations": enhanced_context.get("location_context", {}).get("nearby_places", []) if enhanced_context else []
+            },
+            "metadata": {
+                "generated_at": enhanced_context.get("generated_at") if enhanced_context else None,
+                "data_quality": "verified" if enhanced_context and enhanced_context.get("has_verified_alerts") else "standard",
+                "enrichment_status": "complete" if enhanced_context else "pending"
+            }
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        logger.error(f"Error in unified report API for {report_id}: {e}")
+        return jsonify({"error": "Internal server error", "report_id": report_id}), 500
+
 @app.route('/api/spc/reports/today')
 def get_spc_reports_today():
     """Get SPC reports for the current SPC day"""
