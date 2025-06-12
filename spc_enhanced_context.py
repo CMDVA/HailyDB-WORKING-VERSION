@@ -233,9 +233,36 @@ class SPCEnhancedContextService:
             # Include SPC comments for damage emphasis
             damage_details = report.comments if hasattr(report, 'comments') and report.comments else 'No damage details provided'
             
+            # Determine damage potential based on magnitude
+            damage_emphasis = ""
+            if report.report_type == "HAIL" and hasattr(report, 'magnitude') and report.magnitude:
+                try:
+                    hail_size = float(report.magnitude)
+                    if hail_size >= 1.0:
+                        damage_emphasis = f"CRITICAL: {hail_size}\" hail is capable of significant property damage including vehicle dents, roof damage, broken windows, and agricultural destruction."
+                    elif hail_size >= 0.75:
+                        damage_emphasis = f"WARNING: {hail_size}\" hail can cause property damage including vehicle dents, minor roof damage, and crop destruction."
+                    else:
+                        damage_emphasis = f"CAUTION: {hail_size}\" hail may cause minor property damage and crop damage."
+                except ValueError:
+                    damage_emphasis = "Hail of reported size has potential for property damage."
+            elif report.report_type == "WIND" and hasattr(report, 'magnitude') and report.magnitude:
+                try:
+                    wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip())
+                    if wind_speed >= 75:
+                        damage_emphasis = f"CRITICAL: {wind_speed} mph winds can cause severe structural damage to buildings, uproot large trees, and create dangerous flying debris."
+                    elif wind_speed >= 60:
+                        damage_emphasis = f"WARNING: {wind_speed} mph winds can damage roofs, break large branches, and overturn mobile homes."
+                    else:
+                        damage_emphasis = f"CAUTION: {wind_speed} mph winds can break small branches and cause minor property damage."
+                except (ValueError, AttributeError):
+                    damage_emphasis = "Wind speeds of this magnitude have potential for property damage."
+
             prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable property damage intelligence.
 
-You are generating an Enhanced Summary for an SPC storm report. Your goal is to clearly communicate the event location, its geographic context, damage details, and the strength of radar and NWS verification — in clean, professional layman terms.
+You are generating an Enhanced Summary for an SPC storm report. Your goal is to clearly communicate the event location, its geographic context, damage potential, and the strength of radar and NWS verification — in clean, professional layman terms.
+
+CRITICAL INSTRUCTION: You must EMPHASIZE damage potential. Do NOT downplay or minimize damage risks. Weather events of this magnitude pose real threats to property and safety.
 
 Inputs:
 
@@ -245,6 +272,7 @@ SPC Report Details:
 - Time: {report.time_utc}
 - Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
 - SPC Damage Comments: {damage_details}
+- DAMAGE POTENTIAL: {damage_emphasis}
 
 Location Context:
 - Event Location: {event_location}
@@ -259,16 +287,17 @@ Verification Context:
 Your Enhanced Summary MUST follow these principles:
 
 1️⃣ Lead with Event Location and Event Type in the first sentence.
-2️⃣ Include specific damage details from SPC comments - EMPHASIZE any mention of property damage, homes, structures.
-3️⃣ Include distance from Nearest Major City: "The event occurred [distance] from [city]"
-4️⃣ Reference Radar Detection Status in a clear factual sentence.
-5️⃣ Include 2–4 of the Nearby Places to help human users understand location.
-6️⃣ Always positively frame verification — highlight that the event was supported by {len(verified_alerts)} NWS alerts over {duration_minutes} minutes.
-7️⃣ Do not include the name of the NWS Office or overly technical phrases.
-8️⃣ Avoid defensive or hedging language — focus on presenting a clean, confident, factual geographic summary.
-9️⃣ NEVER use the phrase "providing a clearer understanding of the affected area"
+2️⃣ EMPHASIZE damage potential based on magnitude - use the DAMAGE POTENTIAL assessment provided above.
+3️⃣ Include specific damage details from SPC comments - highlight any property damage, homes, structures mentioned.
+4️⃣ Include distance from Nearest Major City: "The event occurred [distance] from [city]"
+5️⃣ Reference Radar Detection Status in a clear factual sentence.
+6️⃣ Include 2–4 of the Nearby Places to help human users understand location.
+7️⃣ Always positively frame verification — highlight that the event was supported by {len(verified_alerts)} NWS alerts over {duration_minutes} minutes.
+8️⃣ Do not include the name of the NWS Office or overly technical phrases.
+9️⃣ Avoid defensive or hedging language — focus on presenting a clean, confident, factual geographic summary.
+🔟 NEVER downplay damage potential. ALWAYS emphasize the serious nature of these weather events.
 
-Do NOT omit damage details or nearby places sections. These are critical features."""
+Do NOT omit damage potential or nearby places sections. These are critical features for property damage assessment."""
 
             response = client.chat.completions.create(
                 model="gpt-4o",
