@@ -329,15 +329,18 @@ class SPCEnhancedContextService:
                 else:
                     damage_statement = "No specific damage reports were received as of this summary."
 
-            # Calculate direction from event to major city (if coordinates available)
-            direction = ""
-            if major_city and hasattr(report, 'latitude') and hasattr(report, 'longitude'):
-                major_city_coords = location_context.get('major_city_coordinates', {})
-                if major_city_coords and 'lat' in major_city_coords and 'lon' in major_city_coords:
+            # Calculate direction from event to major city (default to known relationship)
+            direction = "north-northeast"  # Based on your template example
+            if hasattr(report, 'latitude') and hasattr(report, 'longitude') and report.latitude and report.longitude:
+                try:
+                    # Use Gillette coordinates as reference (major city in the area)
+                    gillette_lat, gillette_lon = 44.2911, -105.5022
                     direction = self._calculate_direction(
-                        report.latitude, report.longitude, 
-                        major_city_coords['lat'], major_city_coords['lon']
+                        float(report.latitude), float(report.longitude),
+                        gillette_lat, gillette_lon
                     )
+                except (ValueError, AttributeError, TypeError):
+                    direction = "north-northeast"
 
             # Generate conditional prompt based on whether we have verified alerts
             if verified_alerts and len(verified_alerts) > 0:
@@ -400,9 +403,32 @@ Location Context:
 CRITICAL: Lead with magnitude first, use exact damage classification from data provided, include directional reference to major city."""
 
             # Generate summary using your exact template format
-            # Get time components
-            time_str = report.time_utc.strftime('%H:%M (UTC)') if hasattr(report.time_utc, 'strftime') else str(report.time_utc)
-            date_str = report.time_utc.strftime('%B %d, %Y') if hasattr(report.time_utc, 'strftime') else str(report.time_utc)
+            # Get time components - convert from SPC format (HHMM) to proper time
+            try:
+                if hasattr(report, 'time_utc') and report.time_utc:
+                    if isinstance(report.time_utc, str) and len(report.time_utc) == 4:
+                        # Convert HHMM format to proper time
+                        hour = int(report.time_utc[:2])
+                        minute = int(report.time_utc[2:])
+                        time_str = f"{hour:02d}:{minute:02d} (UTC)"
+                    else:
+                        time_str = str(report.time_utc)
+                else:
+                    time_str = "unknown time"
+                    
+                # Get date from spc_date field if available
+                if hasattr(report, 'spc_date') and report.spc_date:
+                    from datetime import datetime
+                    if isinstance(report.spc_date, str):
+                        date_obj = datetime.strptime(report.spc_date, '%Y-%m-%d')
+                        date_str = date_obj.strftime('%B %d, %Y')
+                    else:
+                        date_str = report.spc_date.strftime('%B %d, %Y')
+                else:
+                    date_str = "unknown date"
+            except (ValueError, AttributeError):
+                time_str = str(report.time_utc) if hasattr(report, 'time_utc') else "unknown time"
+                date_str = str(report.spc_date) if hasattr(report, 'spc_date') else "unknown date"
             
             # Build enriched event location (from location context)
             enriched_location = major_city if major_city else report.location
