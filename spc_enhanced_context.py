@@ -283,30 +283,35 @@ class SPCEnhancedContextService:
             else:
                 magnitude_display = report.magnitude if report.magnitude else 'Unknown magnitude'
 
-            # Generate prompt with correct NWS classifications - NO SPC comments
-            prompt = f"""You are a professional, truthful meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance, designed for actionable intelligence in storm restoration, insurance, and public safety.
+            # Generate prompt for AI damage assessment based on NWS tables
+            prompt = f"""You are a professional meteorological data analyst. Generate a clean summary with potential damage assessment based on official NWS damage tables.
 
-This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
+WEATHER EVENT DATA:
+- Type: {report.report_type}
+- Magnitude: {magnitude_display}
+- Location: {report.location}, {report.county} County, {report.state}  
+- Time: {time_str} on {date_str}
+- Distance from major city: {major_city_distance} {direction} of {major_city}
 
-REQUIRED Summary Format - generate a professional meteorological summary using this template:
-"{magnitude_display} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), or approximately {major_city_distance} {direction} from {nearby_context.split(',')[0] if nearby_context else 'nearby locations'}, in {report.county} County, {report.state} at {time_str} on {date_str}. {threat_classification}."
+NWS DAMAGE TABLES:
+HAIL DAMAGE POTENTIAL:
+- Less than 1": Small hail (peas to nickels) - minimal damage to vehicles/crops
+- 1" to 1.75": Large hail (quarters to golf balls) - minor damage to vehicles, moderate crop damage
+- 1.75" to 2.75": Very large hail (golf balls to baseballs) - moderate vehicle damage, significant crop loss
+- Over 2.75": Giant hail (larger than baseballs) - major vehicle/property damage
 
-NWS THREAT CLASSIFICATION (use this EXACT text):
-{threat_classification}
+WIND DAMAGE POTENTIAL:
+- 39-57 mph: Strong gusts - light debris, small branches
+- 58-74 mph: Damaging gusts - minor structural damage, large branches down
+- 75-91 mph: Very damaging gusts - moderate structural damage, trees uprooted
+- 92+ mph: Violent gusts - major structural damage
 
-LOCATION DATA:
-- Event Location: {report.location}, {report.county} County, {report.state}
-- Reference: {major_city_distance} {direction} of {major_city}
-- Nearby: {nearby_context if nearby_context else 'in a remote area'}
-
-CRITICAL REQUIREMENTS:
-1. Use ONLY the NWS threat classification provided (includes potential damage assessment)
-2. DO NOT include any SPC comments, codes, or abbreviations like (UNR), (TSA), etc.
-3. Lead with magnitude and location relationship
-4. The NWS classification contains the complete damage potential assessment
-5. Professional meteorological language only
-6. End with nearby locations if available
-7. EXCLUDE all original SPC source comments entirely"""
+REQUIREMENTS:
+1. Generate a clean meteorological summary 
+2. Include potential damage assessment based on the magnitude and NWS tables above
+3. Use the location data provided
+4. Professional language only
+5. NO SPC comments or codes"""
             
             # Build proper nearby places from location context
             nearby_places_sorted = []
@@ -319,8 +324,8 @@ CRITICAL REQUIREMENTS:
                 for place in nearby_places_sorted[1:] if len(nearby_places_sorted) > 1
             ]) if len(nearby_places_sorted) > 1 else ""
 
-            # Build template with NWS classification - NO SPC comments included
-            template_summary = f"{magnitude_display} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), or approximately {major_city_distance} {direction} from {nearby_context.split(',')[0] if nearby_context else 'nearby locations'}, in {report.county} County, {report.state} at {time_str} on {date_str}. {threat_classification}. {other_nearby}"
+            # Build simple template for AI to enhance
+            template_summary = f"{magnitude_display} {report.report_type.lower()} was reported at {report.location}, {report.county} County, {report.state} at {time_str} on {date_str}. Located {major_city_distance} {direction} of {major_city}. {other_nearby}"
 
             # Use OpenAI to polish the template with proper NWS terminology
             response = openai_client.chat.completions.create(
