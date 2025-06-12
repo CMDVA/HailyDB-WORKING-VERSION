@@ -176,71 +176,83 @@ class GooglePlacesService:
     def find_nearest_major_city(self, lat: float, lon: float) -> Optional[PlaceResult]:
         """
         Find nearest major city for regional context (no distance limit)
-        Filters out small communities and only returns actual cities
+        Uses direct geocoding for known major cities to bypass API radius limitations
         """
         try:
-            # Known major cities in Wyoming and surrounding areas for filtering
+            # Pre-defined major cities with approximate coordinates for Wyoming region
             major_cities = [
-                'Cheyenne', 'Casper', 'Laramie', 'Gillette', 'Rock Springs', 
-                'Sheridan', 'Green River', 'Evanston', 'Riverton', 'Jackson',
-                'Cody', 'Rawlins', 'Worland', 'Lander', 'Torrington', 'Powell',
-                'Douglas', 'Wheatland', 'Newcastle', 'Buffalo',
-                # Major cities in surrounding states
-                'Denver', 'Colorado Springs', 'Fort Collins', 'Boulder', 'Pueblo',
-                'Billings', 'Great Falls', 'Missoula', 'Bozeman', 'Helena',
-                'Rapid City', 'Sioux Falls', 'Pierre', 'Aberdeen',
-                'Salt Lake City', 'Ogden', 'Provo', 'West Valley City'
+                {'name': 'Gillette', 'lat': 44.2911, 'lon': -105.5022},
+                {'name': 'Casper', 'lat': 42.8668, 'lon': -106.3131},
+                {'name': 'Cheyenne', 'lat': 41.1400, 'lon': -104.8197},
+                {'name': 'Laramie', 'lat': 41.3114, 'lon': -105.5911},
+                {'name': 'Rock Springs', 'lat': 41.5875, 'lon': -109.2029},
+                {'name': 'Sheridan', 'lat': 44.7972, 'lon': -106.9561},
+                {'name': 'Buffalo', 'lat': 44.3483, 'lon': -106.6989},
+                {'name': 'Cody', 'lat': 44.5263, 'lon': -109.0565},
+                {'name': 'Rawlins', 'lat': 41.7911, 'lon': -107.2387},
+                {'name': 'Riverton', 'lat': 43.0242, 'lon': -108.3801},
+                # Major regional cities
+                {'name': 'Billings', 'lat': 45.7833, 'lon': -108.5007},
+                {'name': 'Rapid City', 'lat': 44.0805, 'lon': -103.2310},
+                {'name': 'Denver', 'lat': 39.7392, 'lon': -104.9903},
+                {'name': 'Salt Lake City', 'lat': 40.7608, 'lon': -111.8910}
             ]
             
-            # Search for cities within increasingly larger radii
-            for radius_miles in [25, 50, 100, 200]:
-                radius_meters = int(radius_miles * 1609.34)
+            # Calculate distances to all major cities and find the closest
+            city_distances = []
+            for city in major_cities:
+                distance = self._calculate_distance(lat, lon, city['lat'], city['lon'])
+                city_distances.append({
+                    'name': city['name'],
+                    'distance': distance,
+                    'lat': city['lat'],
+                    'lon': city['lon']
+                })
+            
+            # Return the closest major city
+            if city_distances:
+                closest_city = min(city_distances, key=lambda c: c['distance'])
                 
-                url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-                params = {
-                    'location': f"{lat},{lon}",
-                    'radius': radius_meters,
-                    'type': 'locality',
-                    'key': self.api_key
-                }
-                
-                response = requests.get(url, params=params, timeout=10)
-                response.raise_for_status()
-                data = response.json()
-                
-                if data.get('results'):
-                    # Filter for actual major cities only
-                    major_city_results = []
-                    for result in data['results']:
-                        city_name = result['name']
-                        # Check if it's in our major cities list or has significant ratings indicating size
-                        is_major = (
-                            city_name in major_cities or 
-                            (result.get('user_ratings_total', 0) > 500 and result.get('rating', 0) > 4.0)
-                        )
-                        if is_major:
-                            major_city_results.append(result)
+                # Verify this city exists using Google Places to get exact coordinates
+                try:
+                    url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
+                    params = {
+                        'input': f"{closest_city['name']} city",
+                        'inputtype': 'textquery',
+                        'fields': 'name,geometry',
+                        'key': self.api_key
+                    }
                     
-                    if major_city_results:
-                        closest_city = min(major_city_results, key=lambda p: self._calculate_distance(
+                    response = requests.get(url, params=params, timeout=10)
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    if data.get('candidates') and len(data['candidates']) > 0:
+                        candidate = data['candidates'][0]
+                        exact_distance = self._calculate_distance(
                             lat, lon,
-                            p['geometry']['location']['lat'],
-                            p['geometry']['location']['lng']
-                        ))
-                        
-                        distance = self._calculate_distance(
-                            lat, lon,
-                            closest_city['geometry']['location']['lat'],
-                            closest_city['geometry']['location']['lng']
+                            candidate['geometry']['location']['lat'],
+                            candidate['geometry']['location']['lng']
                         )
                         
                         return PlaceResult(
-                            name=closest_city['name'],
-                            distance_miles=round(distance, 1),
-                            lat=closest_city['geometry']['location']['lat'],
-                            lon=closest_city['geometry']['location']['lng'],
+                            name=candidate['name'],
+                            distance_miles=round(exact_distance, 1),
+                            lat=candidate['geometry']['location']['lat'],
+                            lon=candidate['geometry']['location']['lng'],
                             place_type='major_city'
                         )
+                except Exception as geocode_error:
+                    logger.warning(f"Could not verify coordinates for {closest_city['name']}: {geocode_error}")
+                
+                # Fallback to approximate coordinates if geocoding fails
+                return PlaceResult(
+                    name=closest_city['name'],
+                    distance_miles=round(closest_city['distance'], 1),
+                    lat=closest_city['lat'],
+                    lon=closest_city['lon'],
+                    place_type='major_city'
+                )
             
             return None
             
