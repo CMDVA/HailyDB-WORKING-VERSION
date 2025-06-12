@@ -249,7 +249,7 @@ python main.py
 
 ---
 
-**Last Updated:** December 12, 2024
+**Last Updated:** June 3, 2025
 **Version:** v2.0 Production
 **Deployment:** https://your-hailydb.replit.app
 
