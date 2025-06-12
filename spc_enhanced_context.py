@@ -54,17 +54,15 @@ class SPCEnhancedContextService:
             return "Light Wind"
 
     def _hail_effect_statement(self, hail_size: float) -> str:
-        """Generate NWS-derived hail effect statement using official classifications"""
+        """Generate NWS official hail classification and damage statement"""
         if hail_size >= 2.75:
-            return "Giant Hail (larger than 2 3/4 inch, larger than baseballs such as the size of grapefruit or softballs) causing major damage."
+            return "(larger than 2 3/4 inch, larger than baseballs, such as the size of grapefruit or softballs) causing major damage"
         elif hail_size >= 1.75:
-            return "Very Large Hail (1 3/4 inch to 2 3/4 inch in diameter, from the size of golf balls to baseballs) causing moderate damage."
+            return "(1 3/4 inch to 2 3/4 inch in diameter, from the size of golf balls to baseballs) causing moderate damage"
         elif hail_size >= 1.0:
-            return "Large Hail (1 inch to 1 3/4 inch in diameter, from the size of quarters to golf balls) causing minor damage."
-        elif hail_size > 0:
-            return "Small Hail (less than 1 inch in diameter, from the size of peas to nickels)."
+            return "(1 inch to 1 3/4 inch in diameter, from the size of quarters to golf balls) causing minor damage"
         else:
-            return "No hail reported."
+            return "(less than 1 inch in diameter, from the size of peas to nickels)"
 
     def _wind_effect_statement(self, wind_speed: int) -> str:
         """Generate NWS-derived wind effect statement using official classifications"""
@@ -289,13 +287,23 @@ class SPCEnhancedContextService:
             hail_size = 0.0
             wind_speed = 0
             
-            if report.report_type == "HAIL" and report.magnitude:
+            if report.report_type.upper() == "HAIL" and report.magnitude:
                 try:
-                    # Hail magnitude is stored as inches (float)
-                    hail_size = float(report.magnitude)
-                except (ValueError, TypeError):
+                    # Hail magnitude can be stored as JSON object or direct float
+                    if isinstance(report.magnitude, dict):
+                        hail_size = float(report.magnitude.get('size_inches', 0))
+                    elif isinstance(report.magnitude, str):
+                        import json
+                        try:
+                            mag_data = json.loads(report.magnitude)
+                            hail_size = float(mag_data.get('size_inches', 0))
+                        except json.JSONDecodeError:
+                            hail_size = float(report.magnitude)
+                    else:
+                        hail_size = float(report.magnitude)
+                except (ValueError, TypeError, AttributeError):
                     hail_size = 0.0
-            elif report.report_type == "WIND" and report.magnitude:
+            elif report.report_type.upper() == "WIND" and report.magnitude:
                 try:
                     # Wind magnitude is stored as mph (integer)
                     if isinstance(report.magnitude, str):
@@ -410,7 +418,7 @@ CRITICAL: Lead with magnitude first, use exact damage classification from data p
             enriched_event_location = nearby_places_list[0] if nearby_places_list else report.location
             
             # Generate template-based summary following exact format
-            if report.report_type == 'HAIL':
+            if report.report_type.upper() == 'HAIL':
                 summary = (f"{hail_size}\" hail was reported {major_city_distance} {direction} "
                           f"of {enriched_event_location} ({report.location}), or approximately {major_city_distance} "
                           f"{direction} from {major_city}, in {report.county} County, {report.state} at "
