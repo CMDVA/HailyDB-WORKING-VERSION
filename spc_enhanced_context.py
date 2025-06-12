@@ -39,10 +39,10 @@ class SPCEnhancedContextService:
             return "Moderate Threat"
         elif hail_size >= 0.75:
             return "Low Threat"
-        elif hail_size > 0:
+        elif hail_size >= 0.5:
             return "Very Low Threat"
         else:
-            return "Non-Threatening"
+            return "Minimal Threat"
 
     def _map_wind_threat_level(self, wind_speed: float) -> str:
         """Map wind speed to official NWS threat level"""
@@ -339,13 +339,18 @@ This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
 REQUIRED Summary Format (lead with magnitude and emphasize damage potential):
 "On [date], [magnitude] [storm type] was reported at [location], [county] County, [state]. [NWS Classification Statement with damage emphasis]. The event occurred [distance] [direction] of [major city]{f' near {nearby_context}' if nearby_context else ''}."
 
-SPC Historical Report Data:
-- Date: {report.time_utc}
+COMPLETE SPC HISTORICAL REPORT DATA:
+- Report ID: {report.id}
+- Date/Time: {report.time_utc}
 - Storm Type: {report.report_type}
 - Magnitude: {report.magnitude if report.magnitude else 'Unknown magnitude'}
 - Location: {report.location}, {report.county} County, {report.state}
+- Coordinates: {report.latitude}, {report.longitude}
+- Comments/Details: {report.comments if hasattr(report, 'comments') and report.comments else 'No damage details available'}
+- Source: {report.source if hasattr(report, 'source') else 'SPC'}
+- F-Scale: {report.f_scale if hasattr(report, 'f_scale') else 'N/A'}
 - Threat Classification: {hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}
-- {damage_statement}
+- Damage Assessment: {damage_statement}
 
 Location Context:
 - Major City Reference: {major_city_distance} {direction} of {major_city}
@@ -364,13 +369,18 @@ This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
 REQUIRED Summary Format (lead with magnitude and emphasize damage potential):
 "On [date], [magnitude] [storm type] was reported at [location], [county] County, [state]. [NWS Classification Statement with damage emphasis]. The event occurred [distance] [direction] of [major city]{f' near {nearby_context}' if nearby_context else ''}."
 
-SPC Historical Report Data:
-- Date: {report.time_utc}
+COMPLETE SPC HISTORICAL REPORT DATA:
+- Report ID: {report.id}
+- Date/Time: {report.time_utc}
 - Storm Type: {report.report_type}
 - Magnitude: {report.magnitude if report.magnitude else 'Unknown magnitude'}
 - Location: {report.location}, {report.county} County, {report.state}
+- Coordinates: {report.latitude}, {report.longitude}
+- Comments/Details: {report.comments if hasattr(report, 'comments') and report.comments else 'No damage details available'}
+- Source: {report.source if hasattr(report, 'source') else 'SPC'}
+- F-Scale: {report.f_scale if hasattr(report, 'f_scale') else 'N/A'}
 - Threat Classification: {hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}
-- {damage_statement}
+- Damage Assessment: {damage_statement}
 
 Location Context:
 - Major City Reference: {major_city_distance} {direction} of {major_city}
