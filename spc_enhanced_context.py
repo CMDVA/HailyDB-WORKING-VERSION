@@ -58,6 +58,36 @@ class SPCEnhancedContextService:
             return "Very Low Threat"
         else:
             return "Non-Threatening"
+
+    def _hail_effect_statement(self, hail_size: float) -> str:
+        """Generate NWS-derived hail effect statement"""
+        if hail_size >= 2.75:
+            return "Giant hail (≥ 2.75\") is likely to cause major property damage including roof destruction, broken windows, and significant vehicle damage."
+        elif hail_size >= 1.75:
+            return "Very large hail (1.75\"–2.74\") may cause moderate to major damage to vehicles, roofs, and windows."
+        elif hail_size >= 1.0:
+            return "Large hail (1.0\"–1.74\") may cause minor to moderate damage including vehicle dents and roof impacts."
+        elif hail_size >= 0.75:
+            return "Hail near severe threshold (0.75\"–0.99\") may cause isolated minor damage to vehicles and vegetation."
+        elif hail_size > 0:
+            return "Small hail (< 0.75\") generally not expected to cause significant property damage."
+        else:
+            return "No hail reported."
+
+    def _wind_effect_statement(self, wind_speed: int) -> str:
+        """Generate NWS-derived wind effect statement"""
+        if wind_speed >= 92:
+            return "Violent wind gusts (≥ 92 mph) likely to cause major structural damage and widespread power outages."
+        elif wind_speed >= 75:
+            return "Very damaging wind gusts (75–91 mph) may cause moderate to major damage to structures, large trees, and power infrastructure."
+        elif wind_speed >= 58:
+            return "Damaging wind gusts (58–74 mph) may cause minor to moderate damage to roofs, trees, and vehicles."
+        elif wind_speed >= 39:
+            return "Strong wind gusts (39–57 mph) may cause minor damage to trees and unsecured structures."
+        elif wind_speed > 0:
+            return "Sub-severe wind gusts (< 39 mph) generally not expected to cause significant property damage."
+        else:
+            return "No wind reported."
     
     def enrich_spc_report(self, report_id: int) -> Dict[str, Any]:
         """
@@ -263,9 +293,6 @@ class SPCEnhancedContextService:
                 self._check_radar_confirmation(alert, report) for alert in verified_alerts
             )
 
-            # Include SPC comments for damage emphasis
-            damage_details = report.comments if hasattr(report, 'comments') and report.comments else 'No damage details provided'
-            
             # Extract hail and wind magnitudes
             try:
                 hail_size = float(report.magnitude) if report.report_type == "HAIL" and report.magnitude else 0.0
@@ -282,11 +309,17 @@ class SPCEnhancedContextService:
             hail_threat_level = self._map_hail_threat_level(hail_size)
             wind_threat_level = self._map_wind_threat_level(wind_speed)
 
-            # Determine damage report statement
+            # Include SPC comments if present, otherwise use NWS-derived effects
             if hasattr(report, 'comments') and report.comments and report.comments.strip():
                 damage_statement = f"Reported Damage: {report.comments.strip()}"
             else:
-                damage_statement = "No specific damage reports were received as of this summary."
+                # Fallback to NWS-derived potential effects
+                if report.report_type == "HAIL":
+                    damage_statement = self._hail_effect_statement(hail_size)
+                elif report.report_type == "WIND":
+                    damage_statement = self._wind_effect_statement(wind_speed)
+                else:
+                    damage_statement = "No specific damage reports were received as of this summary."
 
             # Calculate direction from event to major city (if coordinates available)
             direction = ""

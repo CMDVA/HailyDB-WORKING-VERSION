@@ -1,0 +1,76 @@
+This is bad practice and lazy. Here's why:
+
+👉 The line:
+
+python
+Copy
+Edit
+damage_details = report.comments if hasattr(report, 'comments') and report.comments else 'No damage details provided'
+Is assuming that:
+
+1️⃣ SPC comments will contain actionable damage data
+→ Often false — many SPC comments are blank or generic (e.g. "Estimated hail").
+
+2️⃣ It provides no fallback to operational guidance on hail or wind size impact
+→ Which is exactly what your NWS MLB tables provide — a size → effect → threat mapping, which is much more reliable than free-text SPC comments.
+
+The correct behavior should be:
+✅ If comments exist and contain verified damage reports → include them
+✅ If not, explicitly map hail size and wind speed to the threat level and potential effects → This ensures EVERY summary has a consistent, scientifically grounded statement.
+
+Here's what I suggest instead of that line:
+python
+Copy
+Edit
+# Include SPC comments if present
+if hasattr(report, 'comments') and report.comments and report.comments.strip():
+    damage_statement = f"Reported Damage: {report.comments.strip()}"
+else:
+    # Fallback to NWS-derived potential effects
+    if report.report_type == "HAIL":
+        damage_statement = self._hail_effect_statement(hail_size)
+    elif report.report_type == "WIND":
+        damage_statement = self._wind_effect_statement(wind_speed)
+    else:
+        damage_statement = "No specific damage reports were received as of this summary."
+Then you add these helper functions to your class:
+
+python
+Copy
+Edit
+def _hail_effect_statement(self, hail_size: float) -> str:
+    if hail_size >= 2.75:
+        return "Giant hail (≥ 2.75\") is likely to cause major property damage including roof destruction, broken windows, and significant vehicle damage."
+    elif hail_size >= 1.75:
+        return "Very large hail (1.75\"–2.74\") may cause moderate to major damage to vehicles, roofs, and windows."
+    elif hail_size >= 1.0:
+        return "Large hail (1.0\"–1.74\") may cause minor to moderate damage including vehicle dents and roof impacts."
+    elif hail_size >= 0.75:
+        return "Hail near severe threshold (0.75\"–0.99\") may cause isolated minor damage to vehicles and vegetation."
+    elif hail_size > 0:
+        return "Small hail (< 0.75\") generally not expected to cause significant property damage."
+    else:
+        return "No hail reported."
+
+def _wind_effect_statement(self, wind_speed: int) -> str:
+    if wind_speed >= 92:
+        return "Violent wind gusts (≥ 92 mph) likely to cause major structural damage and widespread power outages."
+    elif wind_speed >= 75:
+        return "Very damaging wind gusts (75–91 mph) may cause moderate to major damage to structures, large trees, and power infrastructure."
+    elif wind_speed >= 58:
+        return "Damaging wind gusts (58–74 mph) may cause minor to moderate damage to roofs, trees, and vehicles."
+    elif wind_speed >= 39:
+        return "Strong wind gusts (39–57 mph) may cause minor damage to trees and unsecured structures."
+    elif wind_speed > 0:
+        return "Sub-severe wind gusts (< 39 mph) generally not expected to cause significant property damage."
+    else:
+        return "No wind reported."
+Summary:
+You are absolutely right to reject the lazy fallback to "No damage details provided"
+
+SPC comments are often sparse and inconsistent — your NWS hail/wind threat level tables are authoritative and give us what to say
+
+The correct approach is:
+
+1️⃣ Use SPC comments only if they contain specific damage
+2️⃣ Otherwise, map hail size or wind speed to your official NWS-derived effects language → always returns something meaningful
