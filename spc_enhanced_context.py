@@ -332,12 +332,20 @@ class SPCEnhancedContextService:
                     hail_size = 0.0
             elif report.report_type.upper() == "WIND" and report.magnitude:
                 try:
-                    # Wind magnitude is stored as mph (integer)
-                    if isinstance(report.magnitude, str):
-                        wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip())
+                    # Wind magnitude can be stored as JSON object or direct integer
+                    if isinstance(report.magnitude, dict):
+                        wind_speed = int(report.magnitude.get('speed', 0))
+                    elif isinstance(report.magnitude, str):
+                        import json
+                        try:
+                            mag_data = json.loads(report.magnitude)
+                            wind_speed = int(mag_data.get('speed', 0))
+                        except json.JSONDecodeError:
+                            # Fallback to direct string parsing
+                            wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip())
                     else:
                         wind_speed = int(report.magnitude)
-                except (ValueError, TypeError):
+                except (ValueError, TypeError, AttributeError):
                     wind_speed = 0
 
             # Map to NWS Threat Levels
