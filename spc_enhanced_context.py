@@ -29,6 +29,36 @@ class SPCEnhancedContextService:
     def __init__(self, db_session: Session):
         self.db = db_session
     
+    def _map_hail_threat_level(self, hail_size: float) -> str:
+        """Map hail size to official NWS threat level"""
+        if hail_size >= 2.75:
+            return "Extreme Threat"
+        elif hail_size >= 1.75:
+            return "High Threat"
+        elif hail_size >= 1.0:
+            return "Moderate Threat"
+        elif hail_size >= 0.75:
+            return "Low Threat"
+        elif hail_size > 0:
+            return "Very Low Threat"
+        else:
+            return "Non-Threatening"
+
+    def _map_wind_threat_level(self, wind_speed: float) -> str:
+        """Map wind speed to official NWS threat level"""
+        if wind_speed >= 92:
+            return "Extreme Threat"
+        elif wind_speed >= 75:
+            return "High Threat"
+        elif wind_speed >= 58:
+            return "Moderate Threat"
+        elif wind_speed >= 39:
+            return "Low Threat"
+        elif wind_speed > 0:
+            return "Very Low Threat"
+        else:
+            return "Non-Threatening"
+    
     def enrich_spc_report(self, report_id: int) -> Dict[str, Any]:
         """
         Generate enhanced context for a specific SPC report
@@ -236,47 +266,27 @@ class SPCEnhancedContextService:
             # Include SPC comments for damage emphasis
             damage_details = report.comments if hasattr(report, 'comments') and report.comments else 'No damage details provided'
             
-            # Determine threat level based on exact NWS classifications
-            threat_level = ""
-            magnitude_text = ""
-            if report.report_type == "HAIL" and hasattr(report, 'magnitude') and report.magnitude:
-                try:
-                    hail_size = float(report.magnitude)
-                    magnitude_text = f"{hail_size}\" hail"
-                    if hail_size >= 2.75:
-                        threat_level = "Extreme Threat"  # Giant Hail
-                    elif hail_size >= 1.75:
-                        threat_level = "High Threat"  # Very Large Hail
-                    elif hail_size >= 1.0:
-                        threat_level = "Moderate Threat"  # Large Hail
-                    else:
-                        threat_level = "Very Low Threat"  # Small Hail
-                except ValueError:
-                    magnitude_text = f"{report.magnitude} hail"
-                    threat_level = "threat level requires verification"
-            elif report.report_type == "WIND" and hasattr(report, 'magnitude') and report.magnitude:
-                try:
-                    wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip())
-                    magnitude_text = f"{wind_speed} mph winds"
-                    if wind_speed >= 92:
-                        threat_level = "Extreme Threat"  # Violent Wind Gusts
-                    elif wind_speed >= 75:
-                        threat_level = "High Threat"  # Very Damaging Wind Gusts
-                    elif wind_speed >= 58:
-                        threat_level = "Moderate Threat"  # Damaging Wind Gusts
-                    elif wind_speed >= 39:
-                        threat_level = "Low Threat"  # Strong Wind Gusts
-                    else:
-                        threat_level = "Very Low Threat"  # Below strong gust criteria
-                except (ValueError, AttributeError):
-                    magnitude_text = f"{report.magnitude} winds"
-                    threat_level = "threat level requires verification"
-            
-            # Check for specific damage reports in SPC comments
-            has_damage_reports = False
-            if damage_details and damage_details != 'No damage details provided':
-                damage_keywords = ['damage', 'destroyed', 'roof', 'vehicle', 'tree', 'barn', 'home', 'building', 'structure']
-                has_damage_reports = any(keyword.lower() in damage_details.lower() for keyword in damage_keywords)
+            # Extract hail and wind magnitudes
+            try:
+                hail_size = float(report.magnitude) if report.report_type == "HAIL" and report.magnitude else 0.0
+            except ValueError:
+                hail_size = 0.0
+
+            try:
+                wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip()) \
+                    if report.report_type == "WIND" and report.magnitude else 0
+            except (ValueError, AttributeError):
+                wind_speed = 0
+
+            # Map to NWS Threat Levels
+            hail_threat_level = self._map_hail_threat_level(hail_size)
+            wind_threat_level = self._map_wind_threat_level(wind_speed)
+
+            # Determine damage report statement
+            if hasattr(report, 'comments') and report.comments and report.comments.strip():
+                damage_statement = f"Reported Damage: {report.comments.strip()}"
+            else:
+                damage_statement = "No specific damage reports were received as of this summary."
 
             # Calculate direction from event to major city (if coordinates available)
             direction = ""
@@ -303,9 +313,9 @@ SPC Historical Report:
 - Type: {report.report_type}
 - Location: {report.location}, {report.county}, {report.state}  
 - Time: {report.time_utc}
-- Magnitude: {magnitude_text}
-- Threat Level: {threat_level}
-- Damage Status: {"Documented damage reported per SPC" if has_damage_reports else "No specific damage reports received"}
+- Hail Threat Level: {hail_threat_level}
+- Wind Threat Level: {wind_threat_level}
+- {damage_statement}
 
 Location Context:
 - Radar Detection: {'Detected' if radar_polygon_match else 'Not Detected'}
@@ -332,9 +342,9 @@ SPC Historical Report:
 - Type: {report.report_type}
 - Location: {report.location}, {report.county}, {report.state}
 - Time: {report.time_utc}  
-- Magnitude: {magnitude_text}
-- Threat Level: {threat_level}
-- Damage Status: {"Documented damage reported per SPC" if has_damage_reports else "No specific damage reports received"}
+- Hail Threat Level: {hail_threat_level}
+- Wind Threat Level: {wind_threat_level}
+- {damage_statement}
 - Distance/Direction: {major_city_distance} {direction} of {major_city}
 - Nearby Places: {nearby_context if nearby_context else 'Remote area'}
 
