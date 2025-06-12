@@ -118,7 +118,7 @@
                 </div>
             </div>
 
-            {% if report.enhanced_context and report.enhanced_context.multi_alert_summary %}
+            {% if report.enhanced_context and report.enhanced_context.enhanced_summary %}
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
                     <h6 class="m-0 font-weight-bold text-success">
@@ -134,7 +134,7 @@
                     <div class="row">
                         <div class="col-12 mb-3">
                             <h6 class="text-muted mb-2">Enhanced Summary</h6>
-                            <p class="mb-0">{{ report.enhanced_context.multi_alert_summary }}</p>
+                            <p class="mb-0">{{ report.enhanced_context.enhanced_summary }}</p>
                         </div>
                     </div>
                     
@@ -267,7 +267,7 @@
             {% endif %}
 
             <!-- Enhanced Context Generation Section -->
-            {% if not (report.enhanced_context and report.enhanced_context.multi_alert_summary) %}
+            {% if not (report.enhanced_context and report.enhanced_context.enhanced_summary) %}
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
                     <h6 class="m-0 font-weight-bold text-warning">
