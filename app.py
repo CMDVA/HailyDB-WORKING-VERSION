@@ -36,6 +36,25 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 # Initialize the app with the extension
 db.init_app(app)
 
+# Initialize database tables and services when app starts
+with app.app_context():
+    try:
+        # Create all database tables
+        db.create_all()
+        
+        # Initialize live radar alert service
+        from live_radar_service import init_live_radar_service, start_live_radar_service
+        from sqlalchemy.orm import sessionmaker
+        Session = sessionmaker(bind=db.engine)
+        service_session = Session()
+        
+        init_live_radar_service(service_session)
+        start_live_radar_service()
+        logger.info("Live radar alert service initialized and started")
+        
+    except Exception as e:
+        logger.error(f"Error initializing services: {e}")
+
 # Add custom Jinja2 filters
 @app.template_filter('number_format')
 def number_format(value):
