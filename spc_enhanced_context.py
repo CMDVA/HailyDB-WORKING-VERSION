@@ -479,8 +479,30 @@ REQUIREMENTS:
                             'type': place.get('type', 'unknown')
                         })
                 
-                if 'primary_location' in enrichment:
-                    location_context['primary_location'] = enrichment['primary_location'].get('name', '')
+                # CRITICAL FIX: Use smallest nearby place as primary location, NOT county
+                primary_location_name = None
+                if 'primary_location' in enrichment and enrichment['primary_location']:
+                    primary_location_name = enrichment['primary_location'].get('name', '')
+                
+                # If no primary location or it's a county, find the smallest nearby place
+                if not primary_location_name or 'County' in primary_location_name:
+                    if 'nearby_places' in enrichment and enrichment['nearby_places']:
+                        # Sort by distance and exclude counties/generic locations
+                        valid_places = [
+                            place for place in enrichment['nearby_places'] 
+                            if place.get('type') not in ['county', 'administrative'] 
+                            and 'County' not in place.get('name', '')
+                            and place.get('distance_miles', 999) < 50  # Within reasonable distance
+                        ]
+                        if valid_places:
+                            closest_place = min(valid_places, key=lambda x: x.get('distance_miles', 999))
+                            primary_location_name = closest_place.get('name', '')
+                
+                # Final fallback - use SPC location instead of county
+                if not primary_location_name:
+                    primary_location_name = report.location if hasattr(report, 'location') and report.location else f"{report.county} County"
+                
+                location_context['primary_location'] = primary_location_name
                 
                 if 'nearest_major_city' in enrichment:
                     location_context['nearest_major_city'] = enrichment['nearest_major_city'].get('name', '')
