@@ -1,0 +1,93 @@
+When parsing live alerts:
+In your LiveRadarAlertService, for each alert:
+
+Read:
+
+event
+
+parameters.maxHailSize / parameters.maxWindGust
+
+certainty
+
+urgency
+
+description
+
+areaDesc
+
+Derive a new boolean:
+
+python
+Copy
+Edit
+radar_detection_status = (
+    "radar indicated" in description.lower() or 
+    certainty == "Observed"
+)
+(This is necessary — not all "Observed" are marked clearly — NWS language parsing is required.)
+
+2️⃣ Store in live_radar_alert object:
+json
+Copy
+Edit
+"radar_indicated_event": true/false,
+"event_certainty": "Observed" | "Likely" | etc.,
+"event_urgency": "Immediate" | "Expected" | etc.
+3️⃣ Webhook Message Templates:
+Based on this logic:
+
+radar_indicated_event	Message Template
+true	"⚠️ {size}" hail detected by radar near {locations}!"
+false + Immediate	"⚠️ {size}" hail warning issued for {locations}!"
+false + Expected	"Heads up: {size}" hail possible later today in {locations}."
+
+→ You want this level of semantic clarity — HailTrace and others often fail to distinguish, leading to customer confusion.
+
+4️⃣ API Enhancements for Clients
+In /api/live-radar-alerts:
+
+json
+Copy
+Edit
+{
+  "alerts": [
+    {
+      "id": "...",
+      "event": "Severe Thunderstorm Warning",
+      "radar_indicated_event": true/false,
+      "event_certainty": "Observed",
+      "event_urgency": "Immediate",
+      "alert_message_template": "⚠️ 1.25\" hail detected by radar near West Tocoi, FL!",  // pre-formatted for clients
+      ...
+    }
+  ]
+}
+Providing alert_message_template as pre-generated string is a killer feature → removes burden from client apps.
+
+Internally generate it via your webhook_rules logic → same string used for both API and webhook.
+
+Final Prompt Update for Replit Agent (add to previous prompt)
+Add this to the prompt for /api/live-radar-alerts + LiveRadarAlertService:
+
+Enhance live radar alert processing to parse and expose certainty, urgency, and presence of "radar indicated" in description.
+
+For each live alert, compute and store:
+
+radar_indicated_event: true/false
+
+event_certainty
+
+event_urgency
+
+alert_message_template — dynamically generate based on the combination of hail size, wind speed, certainty, and radar_indicated_event.
+
+Support webhook_rules to differentiate between:
+
+"Hail Warning Issued" (forecast / warning)
+
+"Hail Detected by Radar" (observed)
+
+Ensure alert_message_template is exposed in /api/live-radar-alerts so clients can use pre-formatted messages.
+
+This distinction is critical for differentiating proactive notification (warnings) from reactive (observed/detected) messaging.
+

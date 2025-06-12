@@ -390,9 +390,37 @@ def get_alerts():
     
     return render_template('alerts.html', alerts=alerts, alert_types=alert_types_list)
 
-@app.route('/alerts/<alert_id>')
+def get_live_radar_service():
+    """Get the live radar service instance"""
+    try:
+        from live_radar_service import LiveRadarAlertService
+        return LiveRadarAlertService()
+    except Exception as e:
+        print(f"Error getting live radar service: {e}")
+        return None
+
+@app.route('/alerts/<path:alert_id>')
 def get_alert(alert_id):
-    """Get single enriched alert"""
+    """Get single enriched alert - supports both historical and live radar alerts"""
+    
+    # Check if this is a live radar alert (URN format)
+    if alert_id.startswith('urn:oid:'):
+        live_service = get_live_radar_service()
+        if live_service:
+            # Get live alert from the service
+            live_alerts = live_service.get_active_alerts()
+            live_alert = next((alert for alert in live_alerts if alert.get('id') == alert_id), None)
+            
+            if live_alert:
+                if request.args.get('format') == 'json':
+                    return jsonify(live_alert)
+                return render_template('live_alert_detail.html', alert=live_alert)
+        
+        # Live alert not found
+        return render_template('404.html', 
+                             message=f"Live radar alert {alert_id} not found or expired"), 404
+    
+    # Historical alert lookup
     alert = Alert.query.get_or_404(alert_id)
     
     if request.args.get('format') == 'json':

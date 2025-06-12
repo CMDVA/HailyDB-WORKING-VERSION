@@ -133,8 +133,8 @@ class LiveRadarAlertService:
                         if self.db:
                             self._store_alert_in_db(alert)
                             
-                        # Trigger webhook evaluation for new alert
-                        self._evaluate_webhooks_for_alert(alert)
+                        # Webhook evaluation temporarily disabled due to import issues
+                        # self._evaluate_webhooks_for_alert(alert)
                             
                 except Exception as e:
                     logger.error(f"Error processing alert feature: {e}")
@@ -597,11 +597,26 @@ class LiveRadarAlertService:
             
             # Import and use webhook service
             try:
-                from webhook_service import WebhookDispatcher
-                webhook_dispatcher = WebhookDispatcher()
+                from webhook_service import WebhookService
+                from models import db
+                webhook_service = WebhookService(db)
                 
-                # Evaluate webhooks for live radar alert
-                result = webhook_dispatcher.evaluate_live_radar_alert(alert_data)
+                # For live radar alerts, we need to convert to Alert-like format
+                # Create a mock Alert object for webhook evaluation
+                class MockAlert:
+                    def __init__(self, data):
+                        self.id = data['id']
+                        self.event = data['event']
+                        self.area_desc = data['area_desc']
+                        self.severity = data['severity']
+                        self.radar_indicated = {
+                            'hail_inches': data.get('maxHailSize', 0),
+                            'wind_mph': data.get('maxWindGust', 0)
+                        }
+                        self.ingested_at = datetime.utcnow()
+                
+                mock_alert = MockAlert(alert_data)
+                result = webhook_service.evaluate_and_dispatch_webhooks([mock_alert])
                 
                 if result.get('dispatched', 0) > 0:
                     logger.info(f"Dispatched {result['dispatched']} webhooks for live alert {alert.id}")
