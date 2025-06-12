@@ -337,6 +337,12 @@ async function initializeDashboard() {
     autoRefreshInterval = setInterval(loadLiveAlerts, 30000);
     console.log('Auto-refresh activated on page load - refreshing every 30 seconds');
     
+    // Update button text to show auto-refresh is active
+    const autoRefreshBtn = document.querySelector('[onclick="enableAutoRefresh()"]');
+    if (autoRefreshBtn) {
+        autoRefreshBtn.innerHTML = '<i class="fas fa-pause me-1"></i>Stop Auto';
+    }
+    
     console.log('Dashboard initialized successfully');
 }
 
