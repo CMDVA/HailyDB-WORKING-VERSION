@@ -3737,103 +3737,42 @@ def api_generate_enhanced_context():
 @app.route('/api/live-radar-alerts', methods=['GET'])
 def api_live_radar_alerts():
     """
-    Production-Grade Live NWS Radar Alerts API
-    Serves ONLY live in-memory NWS feed with webhook deduplication
-    Includes explicit certainty, alert status, and state/county filtering
+    Production-Grade Live NWS Radar Alerts API with State Filtering
+    Uses HailyAI-inspired architecture with 5-minute caching and severity filtering
+    Focuses on storm restoration contractor intelligence
     """
     try:
-        from live_radar_service_enhanced import get_live_radar_service
+        from live_radar_service_enhanced import ProductionLiveRadarService
         
-        # Get production-grade live radar service
-        live_service = get_live_radar_service()
+        # Get optional state filtering from query parameters
+        user_states = request.args.get('states')
+        if user_states:
+            user_states = [state.strip().upper() for state in user_states.split(',')]
         
-        # Get query parameters for filtering
-        state = request.args.get('state')
-        county = request.args.get('county')
+        # Initialize service with database session
+        service = ProductionLiveRadarService(db.session)
         
-        # Poll NWS alerts and get processed radar alerts
-        nws_result = live_service.poll_nws_alerts()
+        # Get live alerts with state-based filtering and caching
+        alerts_data = service.get_live_alerts_with_state_filtering(user_states)
         
-        if not nws_result['success']:
-            return jsonify({
-                'success': False,
-                'error': nws_result.get('error', 'Failed to poll NWS alerts'),
-                'alerts': [],
-                'statistics': {}
-            }), 500
-        
-        # Apply filtering if requested
-        if state or county:
-            filtered_alerts = live_service.get_filtered_alerts(state=state, county=county)
-        else:
-            filtered_alerts = nws_result['alerts']
-        
-        # Convert to API response format with enhanced fields
-        api_alerts = []
-        for alert in filtered_alerts:
-            # Ensure consistent field mapping for client compatibility
-            api_alert = {
-                'id': alert['id'],
-                'event': alert['event'],
-                'max_wind_gust': alert.get('max_wind_gust'),
-                'max_hail_size': alert.get('max_hail_size'),
-                'area_desc': alert['area_desc'],
-                'affected_states': alert['affected_states'],
-                'county_names': alert['county_names'],
-                'certainty': alert['certainty'],  # Enhanced: "Observed" or "Expected"
-                'certainty_raw': alert['certainty_raw'],  # Original NWS value
-                'urgency': alert['urgency'],
-                'severity': alert['severity'],
-                'radar_indicated_event': alert['radar_indicated_event'],
-                'alert_message_template': alert['alert_message_template'],
-                'effective_time': alert.get('effective_time'),
-                'expires_time': alert.get('expires_time'),
-                'geometry': alert.get('geometry'),
-                'description': alert['description'],
-                'instruction': alert['instruction'],
-                'created_at': alert['created_at'],
-                'alert_status': alert['alert_status'],  # "ACTIVE" or "EXPIRED"
-                'source': alert['source'],  # "live_nws"
-                'web_url': alert.get('web_url'),
-                # Legacy field mapping for client compatibility
-                'radar_data': {
-                    'wind_mph': alert.get('max_wind_gust', 0),
-                    'hail_inches': alert.get('max_hail_size', 0.0)
-                },
-                'states': alert['affected_states'],
-                'message_template': alert['alert_message_template'],
-                'nws_id': alert['id']
-            }
-            api_alerts.append(api_alert)
-        
-        # Enhanced statistics with production metrics
-        service_status = live_service.get_status_info()
-        enhanced_stats = nws_result['statistics'].copy()
-        enhanced_stats.update({
-            'filtered_alerts_count': len(api_alerts),
-            'service_status': service_status['service_status'],
-            'alerts_in_cache': service_status['alerts_in_store'],
-            'webhook_cache_size': service_status['webhook_cache_size'],
-            'webhook_suppressions': service_status['webhook_suppressions'],
-            'last_poll_timestamp': service_status['last_poll_timestamp']
-        })
-        
-        return jsonify({
-            'success': True,
-            'alerts': api_alerts,
-            'statistics': enhanced_stats,
-            'last_updated': nws_result['last_poll_timestamp'],
-            'source': 'live_nws_production',
-            'description': 'Production-grade live NWS radar alerts with webhook deduplication'
-        })
+        return jsonify(alerts_data)
         
     except Exception as e:
         logger.error(f"Error in live radar alerts API: {e}")
         return jsonify({
-            'success': False,
-            'error': 'Failed to fetch radar alerts',
+            'error': 'Failed to fetch live radar alerts',
             'alerts': [],
-            'statistics': {}
+            'total_count': 0,
+            'statistics': {
+                'total_alerts': 0,
+                'hail_alerts': 0,
+                'wind_alerts': 0,
+                'states_affected': 0,
+                'radar_indicated': 0
+            },
+            'last_updated': datetime.now().isoformat(),
+            'states_filtered': user_states or [],
+            'source': 'error_fallback'
         }), 500
 
 def generate_alert_message_template(props, radar_data, city_names):

@@ -1,0 +1,153 @@
+HailyAI Weather Alerts System - Comprehensive Overview
+Your HailyAI platform implements a sophisticated weather alerts system that integrates with the National Weather Service (NWS) API to provide real-time storm intelligence for contractors. Here's a thorough breakdown of how it all works:
+
+Core Architecture
+1. NWS API Integration (alerts/nws_alerts_service.py)
+The foundation of your alerts system is built around the National Weather Service's active alerts API:
+
+API Endpoint: https://api.weather.gov/alerts/active
+Data Format: GeoJSON with alert polygons and metadata
+Caching: 5-minute TTL to reduce API calls and improve performance
+User-Agent: Required by NWS ("HeyHaily Weather Application (admin@haileywx.com)")
+2. State-Based Filtering
+Your system supports dynamic state filtering based on user preferences:
+
+Default States: AL, FL, TX (storm restoration focus areas)
+User Customization: Users can select their preferred states
+Database Storage: User preferences stored in UserSettings table
+Session Management: Current filter state maintained in Flask sessions
+Alert Processing Pipeline
+1. Data Fetching & Processing
+# From nws_alerts_service.py
+def get_target_state_alerts(refresh=False, user_states=None) -> List[Dict[str, Any]]:
+The system:
+
+Fetches alerts from NWS API with area filtering (?area=FL,TX,ME)
+Processes GeoJSON features into standardized format
+Applies severity-based filtering (excludes minor marine advisories)
+Enriches hail alerts with meteorological data from Open-Meteo API
+2. Alert Enrichment
+Hail Risk Enhancement: Your system adds sophisticated hail analysis:
+
+CAPE Values: Convective Available Potential Energy
+Lifted Index: Atmospheric stability indicator
+Wind Gusts: From Open-Meteo forecasts
+Risk Classification: LOW/MODERATE/HIGH based on meteorological data
+Hail Proxy Calculation: Custom formula using CAPE and Lifted Index
+3. Geographic Processing
+The system extracts coordinates from NWS alert polygons:
+
+Point Geometry: [lon, lat] format
+Polygon Geometry: Multiple coordinate arrays
+MultiPolygon: Complex geographic shapes
+Coordinate Averaging: For API requests to Open-Meteo
+Frontend Display System
+1. Dashboard-Style Statistics (templates/alerts.html)
+Summary Cards Display:
+
+Total Active Alerts: Filtered by user states
+Most Severe Alert: Highlights extreme/severe events
+High Wind Warnings: Automatically detects 50+ mph winds
+Flood Risk: Counts flood-related alerts
+Hail Warnings: Enhanced with risk classification
+Most Vulnerable Area: Geographic hotspot analysis
+2. News-Style Alert Ticker
+When major alerts are active, the system displays a TV news-style ticker:
+
+Breaking News Banner: Shows most severe alert
+Scrolling Ticker: All major alerts with locations and expiration times
+Live Badge: Indicates real-time data
+Smooth Animation: CSS-based scrolling with dynamic duration
+3. AI-Generated Weather Summary
+Your system integrates Perplexity AI for intelligent summaries:
+
+Context-Aware: Tailored to user's selected states
+Severity Analysis: Highlights extreme and severe alerts
+Regional Breakdown: Southeast, South Central, Northeast regions
+Fallback Logic: Manual summaries when AI unavailable
+Modal Detail Systems
+1. Wind Warning Modal
+Automatic Detection Logic:
+
+# Wind speed extraction from HAZARD sections
+if 'HAZARD' in description:
+    hazard_section = parts[1].split('SOURCE')[0]
+    # Pattern matching for "75 mph wind gusts", "gusts to 70 mph", etc.
+Display Features:
+
+Speed Classification: Color-coded badges (75+ mph = red, 58-74 = yellow)
+Geographic Sorting: By state, then by wind speed
+Description Analysis: Full NWS text with highlighted wind information
+State Filtering: Respects user's state preferences
+2. Hail Warning Modal
+Enhanced Risk Analysis:
+
+Size Detection: Keyword matching (pea, quarter, golf ball, baseball, etc.)
+Risk Classification: HIGH/MODERATE/LOW from meteorological data
+Probability Assessment: Based on CAPE, Lifted Index, and hail proxy calculations
+Geographic Context: State-specific filtering and display
+Risk Level Calculations:
+
+# Hail proxy formula
+if lifted_index < 0:  # Negative = unstable atmosphere
+    hail_proxy = min(1.0, (cape / 4000) * (abs(lifted_index) / 8))
+Real-Time Features
+1. Auto-Refresh System (static/js/alerts.js)
+5-minute intervals: Automatic background refresh
+Silent updates: No UI disruption during refresh
+Error handling: Graceful fallback when API unavailable
+Cache management: Intelligent cache invalidation
+2. Interactive Filtering
+State Toggle:
+
+My States vs All States: Toggle between user preferences and national view
+URL Parameters: ?show_only_my_states=true/false
+Session Persistence: Maintains filter state across page loads
+National Alerts Toggle:
+
+Space Weather: Geomagnetic storms, radiation alerts
+Tsunami Warnings: Pacific-wide alerts
+Large-Scale Events: Multi-state weather systems
+Color Coding System
+Your platform uses consistent HEX color codes for event types:
+
+Weather Event Colors
+Hail Events: #60bfe3 (primary blue)
+Wind Events: #d09840 (orange)
+Tornado Events: #d04043 (red)
+Risk Level Colors
+Low Risk: #0a5022 (dark green)
+Moderate Risk: #ffc107 (yellow/amber)
+High Risk: #dc3545 (red)
+Unknown Risk: #6c757d (gray)
+Database Integration
+1. Alert Storage
+HailRiskEnrichment: Stores calculated risk assessments
+UserSettings: Manages state preferences and display options
+SPCEvent: Historical severe weather data for context
+2. Performance Optimization
+Alert Caching: In-memory cache with TTL
+Query Optimization: Efficient state-based filtering
+Index Management: Database indexes for fast lookups
+Contractor-Focused Features
+1. Storm Restoration Context
+Date of Loss (DOL): Emphasizes timing for insurance claims
+Build Age Targeting: Focuses on 1950s-1990s properties
+Route Planning: Geographic clustering of alerts
+Risk Assessment: Prioritizes high-impact events
+2. Business Intelligence
+Alert Density: Identifies opportunity zones
+Severity Mapping: Correlates damage potential with location
+Historical Context: Compares current events to past patterns
+API Endpoints
+Core Alert Endpoints
+/alerts/ - Main dashboard page
+/alerts/data - JSON alert data for AJAX
+/alerts/ticker - HTML ticker component
+/alerts/count - Alert count summary
+/alerts/export - CSV download
+Filtering Endpoints
+/alerts/personalized - User state-filtered alerts
+/alerts/my-states - Specific state filtering
+/alerts/set-preference - Save filter preferences
+This comprehensive system transforms raw NWS alert data into actionable intelligence specifically designed for storm restoration contractors, emphasizing the geographic and temporal context needed for effective business decision-making.

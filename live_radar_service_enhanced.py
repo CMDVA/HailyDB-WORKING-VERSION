@@ -48,6 +48,360 @@ class ProductionRadarAlert:
 
 class ProductionLiveRadarService:
     """
+    Production Live Radar Service with state-based filtering and caching
+    Based on proven HailyAI architecture for contractor-focused storm intelligence
+    """
+    
+    def __init__(self, db_session: Session):
+        self.db = db_session
+        self.cache = TTLCache(maxsize=100, ttl=300)  # 5-minute TTL like HailyAI
+        self.nws_api_url = "https://api.weather.gov/alerts/active"
+        self.headers = {
+            'User-Agent': 'HailyDB-NWS-Ingestion/2.0 (contact@hailydb.com)',
+            'Accept': 'application/geo+json'
+        }
+        # Default storm restoration focus states (like HailyAI)
+        self.target_states = ['FL', 'TX', 'AL', 'GA', 'SC', 'NC', 'LA', 'MS', 'TN', 'AR', 'OK', 'KS']
+        
+    def get_live_alerts_with_state_filtering(self, user_states: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Fetch live NWS alerts with state-based filtering
+        Uses proven caching and filtering approach from HailyAI
+        """
+        try:
+            # Use user states or default target states
+            states = user_states or self.target_states
+            
+            # Create cache key based on states
+            cache_key = f"live_alerts_{'_'.join(sorted(states))}"
+            
+            # Check cache first (5-minute TTL)
+            if cache_key in self.cache:
+                logger.info(f"Returning cached alerts for states: {', '.join(states)}")
+                return self.cache[cache_key]
+            
+            # Fetch from NWS API with area filtering
+            area_param = ','.join(states)
+            params = {
+                'area': area_param,
+                'status': 'actual',  # Only actual alerts, not tests
+                'message_type': 'alert',  # Exclude administrative messages
+            }
+            
+            logger.info(f"Fetching live NWS alerts for states: {area_param}")
+            response = requests.get(self.nws_api_url, headers=self.headers, params=params, timeout=30)
+            
+            if response.status_code != 200:
+                logger.error(f"NWS API request failed: {response.status_code}")
+                return self._empty_response()
+            
+            data = response.json()
+            features = data.get('features', [])
+            
+            logger.info(f"Received {len(features)} raw alerts from NWS")
+            
+            # Process and filter alerts
+            processed_alerts = []
+            for feature in features:
+                alert = self._process_nws_feature(feature)
+                if alert and self._should_include_alert(alert):
+                    processed_alerts.append(asdict(alert))
+            
+            # Create response with statistics
+            response_data = {
+                'alerts': processed_alerts,
+                'total_count': len(processed_alerts),
+                'statistics': self._calculate_statistics(processed_alerts),
+                'last_updated': datetime.now().isoformat(),
+                'states_filtered': states,
+                'source': 'live_nws_with_state_filtering'
+            }
+            
+            # Cache the response
+            self.cache[cache_key] = response_data
+            logger.info(f"Cached {len(processed_alerts)} processed alerts")
+            
+            return response_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching live alerts: {e}")
+            return self._empty_response()
+    
+    def _process_nws_feature(self, feature: Dict[str, Any]) -> Optional[ProductionRadarAlert]:
+        """
+        Process NWS GeoJSON feature into ProductionRadarAlert
+        Handles coordinate extraction and radar detection parsing
+        """
+        try:
+            properties = feature.get('properties', {})
+            geometry = feature.get('geometry', {})
+            
+            alert_id = properties.get('id', '')
+            if not alert_id:
+                return None
+            
+            # Extract radar-indicated wind and hail data
+            wind_gust, hail_size = self._extract_radar_data(properties)
+            
+            # Process geometry coordinates (like HailyAI)
+            processed_geometry = self._process_geometry(geometry)
+            
+            # Extract states from area description
+            affected_states = self._extract_states_from_area_desc(properties.get('areaDesc', ''))
+            
+            # Enhanced certainty mapping
+            certainty_raw = properties.get('certainty', 'Unknown')
+            certainty = self._map_certainty_to_enhanced(certainty_raw)
+            
+            alert = ProductionRadarAlert(
+                id=alert_id,
+                event=properties.get('event', 'Unknown'),
+                max_wind_gust=wind_gust,
+                max_hail_size=hail_size,
+                area_desc=properties.get('areaDesc', ''),
+                affected_states=affected_states,
+                county_names=self._extract_counties(properties.get('areaDesc', '')),
+                certainty=certainty,
+                certainty_raw=certainty_raw,
+                urgency=properties.get('urgency', 'Unknown'),
+                severity=properties.get('severity', 'Unknown'),
+                radar_indicated_event=bool(wind_gust or hail_size),
+                alert_message_template=self._generate_message_template(properties, wind_gust, hail_size),
+                effective_time=self._parse_time(properties.get('effective')),
+                expires_time=self._parse_time(properties.get('expires')),
+                geometry=processed_geometry,
+                description=properties.get('description', ''),
+                instruction=properties.get('instruction', ''),
+                created_at=datetime.now(),
+                alert_status='ACTIVE',
+                source='live_nws',
+                web_url=properties.get('web', '')
+            )
+            
+            return alert
+            
+        except Exception as e:
+            logger.error(f"Error processing NWS feature: {e}")
+            return None
+    
+    def _should_include_alert(self, alert: ProductionRadarAlert) -> bool:
+        """
+        Severity-based filtering to exclude minor advisories (like HailyAI)
+        Focus on actionable storm restoration events
+        """
+        # Exclude minor marine and coastal advisories
+        exclude_events = [
+            'Small Craft Advisory',
+            'Marine Weather Statement',
+            'Coastal Flood Advisory',
+            'Beach Hazards Statement',
+            'Rip Current Statement'
+        ]
+        
+        if alert.event in exclude_events:
+            return False
+        
+        # Include all severe weather events
+        severe_events = [
+            'Tornado Warning',
+            'Tornado Watch',
+            'Severe Thunderstorm Warning', 
+            'Severe Thunderstorm Watch',
+            'Hail',
+            'High Wind Warning',
+            'Wind Advisory'
+        ]
+        
+        if alert.event in severe_events:
+            return True
+        
+        # Include alerts with radar-indicated severe weather
+        if alert.radar_indicated_event:
+            return True
+        
+        # Include based on severity
+        if alert.severity in ['Extreme', 'Severe']:
+            return True
+        
+        return False
+    
+    def _extract_radar_data(self, properties: Dict[str, Any]) -> Tuple[Optional[int], Optional[float]]:
+        """
+        Extract wind gust and hail size from NWS alert text
+        Uses regex patterns to find radar-indicated values
+        """
+        text_fields = [
+            properties.get('description', ''),
+            properties.get('instruction', ''),
+            properties.get('headline', '')
+        ]
+        
+        combined_text = ' '.join(text_fields).upper()
+        
+        # Extract wind gusts
+        wind_gust = None
+        wind_patterns = [
+            r'(\d+)\s*MPH\s*WIND',
+            r'WIND.*?(\d+)\s*MPH',
+            r'GUSTS.*?(\d+)\s*MPH',
+            r'(\d+)\s*MPH\s*GUSTS'
+        ]
+        
+        for pattern in wind_patterns:
+            match = re.search(pattern, combined_text)
+            if match:
+                wind_gust = int(match.group(1))
+                break
+        
+        # Extract hail size
+        hail_size = None
+        hail_keywords = {
+            'PEA': 0.25, 'PENNY': 0.75, 'NICKEL': 0.88, 'QUARTER': 1.0,
+            'HALF DOLLAR': 1.25, 'PING PONG': 1.5, 'GOLF BALL': 1.75,
+            'TENNIS BALL': 2.5, 'BASEBALL': 2.75, 'SOFTBALL': 4.0
+        }
+        
+        for keyword, size in hail_keywords.items():
+            if keyword in combined_text:
+                hail_size = size
+                break
+        
+        # Look for numeric hail size
+        if not hail_size:
+            hail_match = re.search(r'(\d+(?:\.\d+)?)\s*INCH.*?HAIL', combined_text)
+            if hail_match:
+                hail_size = float(hail_match.group(1))
+        
+        return wind_gust, hail_size
+    
+    def _process_geometry(self, geometry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Process NWS alert geometry coordinates
+        Handles Point, Polygon, and MultiPolygon geometries
+        """
+        if not geometry:
+            return None
+        
+        geom_type = geometry.get('type', '')
+        coordinates = geometry.get('coordinates', [])
+        
+        if not coordinates:
+            return None
+        
+        return {
+            'type': geom_type,
+            'coordinates': coordinates,
+            'centroid': self._calculate_centroid(geometry)
+        }
+    
+    def _calculate_centroid(self, geometry: Dict[str, Any]) -> Optional[List[float]]:
+        """Calculate centroid of geometry for API requests"""
+        try:
+            geom = shape(geometry)
+            centroid = geom.centroid
+            return [centroid.x, centroid.y]
+        except:
+            return None
+    
+    def _extract_states_from_area_desc(self, area_desc: str) -> List[str]:
+        """Extract state abbreviations from NWS area description"""
+        # Common state abbreviation pattern
+        state_pattern = r'\b([A-Z]{2})\b'
+        matches = re.findall(state_pattern, area_desc.upper())
+        
+        # Filter to valid US state codes
+        valid_states = {'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 
+                       'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+                       'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+                       'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+                       'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'}
+        
+        return list(set(match for match in matches if match in valid_states))
+    
+    def _extract_counties(self, area_desc: str) -> List[str]:
+        """Extract county names from area description"""
+        # Split by semicolons and commas, clean up
+        parts = re.split('[;,]', area_desc)
+        counties = []
+        
+        for part in parts:
+            part = part.strip()
+            # Remove state abbreviations
+            part = re.sub(r'\s+[A-Z]{2}$', '', part)
+            if part and len(part) > 2:
+                counties.append(part)
+        
+        return counties[:10]  # Limit to prevent excessive data
+    
+    def _map_certainty_to_enhanced(self, certainty_raw: str) -> str:
+        """Map NWS certainty to enhanced display format"""
+        mapping = {
+            'Observed': 'Observed',
+            'Likely': 'Likely', 
+            'Possible': 'Possible',
+            'Unlikely': 'Unlikely'
+        }
+        return mapping.get(certainty_raw, 'Unknown')
+    
+    def _generate_message_template(self, properties: Dict[str, Any], wind_gust: Optional[int], hail_size: Optional[float]) -> str:
+        """Generate pre-formatted alert message template"""
+        event = properties.get('event', 'Weather Alert')
+        area = properties.get('areaDesc', 'Unknown Area')
+        
+        template = f"{event} for {area}"
+        
+        if wind_gust:
+            template += f" - Wind gusts to {wind_gust} mph"
+        
+        if hail_size:
+            if hail_size >= 1.0:
+                template += f" - Hail up to {hail_size} inch diameter"
+            else:
+                template += f" - Hail up to {hail_size} inch"
+        
+        return template
+    
+    def _parse_time(self, time_str: Optional[str]) -> Optional[datetime]:
+        """Parse NWS datetime strings"""
+        if not time_str:
+            return None
+        
+        try:
+            return datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+        except:
+            return None
+    
+    def _calculate_statistics(self, alerts: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Calculate alert statistics for dashboard"""
+        total_alerts = len(alerts)
+        hail_alerts = sum(1 for alert in alerts if alert.get('max_hail_size', 0) > 0)
+        wind_alerts = sum(1 for alert in alerts if alert.get('max_wind_gust', 0) > 0)
+        states_affected = len(set(state for alert in alerts for state in alert.get('affected_states', [])))
+        
+        return {
+            'total_alerts': total_alerts,
+            'hail_alerts': hail_alerts,
+            'wind_alerts': wind_alerts,
+            'states_affected': states_affected,
+            'radar_indicated': sum(1 for alert in alerts if alert.get('radar_indicated_event', False))
+        }
+    
+    def _empty_response(self) -> Dict[str, Any]:
+        """Return empty response structure"""
+        return {
+            'alerts': [],
+            'total_count': 0,
+            'statistics': {
+                'total_alerts': 0,
+                'hail_alerts': 0,
+                'wind_alerts': 0,
+                'states_affected': 0,
+                'radar_indicated': 0
+            },
+            'last_updated': datetime.now().isoformat(),
+            'states_filtered': [],
+            'source': 'live_nws_with_state_filtering'
+        }
     Production-ready Live Radar service with webhook deduplication
     Implements all requirements for client-facing API deployment
     """
