@@ -1,0 +1,163 @@
+I want a 100% comprehensive, lead-engineer level audit of my application as if you were a CTO conducting technical due diligence or a new lead engineer taking ownership of this codebase.
+
+I am not a developer — I need your analysis and recommendations in plain language where possible, but do not hold back technically. You are being asked to act as a responsible technical lead and surface any and all engineering concerns, risks, and opportunities for improvement.
+
+Context:
+
+This is a [describe your app briefly, e.g. “storm tracking + social intelligence dashboard”]
+
+It is built on Replit
+
+It uses [frameworks used, e.g. Flask, PostgreSQL, Bootstrap, Leaflet, APScheduler, etc.]
+
+My goal is to take this to production and eventually offer paid plans to users.
+
+I want you to perform an exhaustive audit covering these areas:
+
+1. Architecture & Design
+Is the architecture sound for its stated use case and scale?
+
+Are the key components (frontend/backend/database) logically separated and well-structured?
+
+Are there clear boundaries and separation of concerns?
+
+Is there technical debt or architecture that will cause scaling/refactoring pain later?
+
+2. Code Quality & Maintainability
+Is the code readable and maintainable?
+
+Are naming conventions consistent?
+
+Are functions/methods/classes appropriately sized and structured?
+
+Are there comments and documentation where needed?
+
+Are there any anti-patterns or “code smells”?
+
+3. Data Handling & Database
+Is the database schema well-designed for current and future needs?
+
+Are indexes appropriate and performant?
+
+Are there risks of data duplication or inconsistency?
+
+Are data ingestion and ETL processes robust and transparent?
+
+Are retention and cleanup policies clear?
+
+4. Scheduling / Automation
+Is the scheduler (APScheduler, cron, or equivalent) robust and fault-tolerant?
+
+Are failure modes handled (timeouts, retries, backoff)?
+
+Are scheduled jobs idempotent and safe to rerun?
+
+5. API Integrations
+Are API integrations well-handled (timeouts, retries, error logging)?
+
+Are API calls efficiently structured?
+
+Is there any risk of API overuse / quota violations?
+
+Is there a clear abstraction layer for external APIs?
+
+6. Security
+Is user data protected?
+
+Are APIs authenticated/authorized correctly?
+
+Are inputs validated and sanitized to avoid injection attacks?
+
+Are sensitive configs (API keys, DB creds) properly managed?
+
+Are auth tokens stored and used securely?
+
+7. Stability & Resilience
+Are failures and exceptions properly caught and logged?
+
+Is there a risk of cascading failures?
+
+Are background processes monitored and recoverable?
+
+Are timeouts configured sensibly throughout the stack?
+
+8. Testing & Observability
+Is there an automated test suite?
+
+What is test coverage (unit, integration, end-to-end)?
+
+Are logging and metrics implemented?
+
+Is error tracking (Sentry, equivalent) in place?
+
+Are alerts configured for critical failures?
+
+9. Performance & Scalability
+Are API endpoints performant?
+
+Is the DB performant under load?
+
+Are the frontend and data visualizations optimized?
+
+What are the current scaling limitations?
+
+Are there known bottlenecks?
+
+10. Deployment & Environment
+Is deployment automated and repeatable?
+
+Is there a CI/CD pipeline?
+
+Are environment configs and secrets well-managed?
+
+Are there differences between dev/test/prod environments?
+
+Is there an established backup and restore process?
+
+11. UX & Accessibility
+Is the UI responsive and usable on all devices?
+
+Are loading times acceptable?
+
+Are there UX dead-ends or confusing flows?
+
+Are basic accessibility (a11y) best practices followed?
+
+12. Regulatory / Legal
+Are data retention and privacy aligned with GDPR/CCPA/etc.?
+
+Are third-party licenses compatible with commercial use?
+
+Are Terms of Service / Privacy Policy considerations clear in the app structure?
+
+13. Refractory / Future-Proofing Concerns
+What parts of the system will become difficult or costly to modify later if not addressed now?
+
+What architectural decisions would you recommend revisiting before scale?
+
+What parts of the codebase are most fragile or poorly isolated?
+
+14. Dev Workflow & Handoff Readiness
+Is the project easy for another developer to pick up and contribute to?
+
+Is onboarding documented?
+
+Are dependencies well-documented and reproducible?
+
+Final Deliverable:
+
+Please deliver your findings as:
+
+A structured report covering all the areas above, with specific observations and examples.
+
+A prioritized recommendation list (Critical → High → Medium → Low priority).
+
+A short "Executive Summary" written for a non-technical founder so I can understand the high-level state of the system.
+
+Notes:
+
+Be candid. I would rather hear hard truths now than later.
+
+You are acting as my trusted technical advisor for this audit.
+
+Assume this system is intended to grow into a commercial-grade SaaS platform.
