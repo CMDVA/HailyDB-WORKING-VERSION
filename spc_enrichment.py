@@ -284,7 +284,7 @@ class SPCEnrichmentService:
                     'approx_lon': lon,
                     'type': 'primary_location'
                 })
-                logging.info(f"Found primary location: {primary_loc['name']} at coordinates")
+                logging.info(f"Found primary location: {primary_loc['name']} at 0.0 miles (event location)")
             
             # Add nearby places with recalculated distances
             if 'places' in nearby_result:
