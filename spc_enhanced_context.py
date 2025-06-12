@@ -409,32 +409,27 @@ class SPCEnhancedContextService:
                     for place in nearby_places_sorted[1:]
                 ]) + "."
 
-            # Generate prompt using exact template format required
-            prompt = f"""Generate a professional meteorological summary using this EXACT template format:
+            # Generate prompt for professional meteorological summary
+            prompt = f"""Generate a professional meteorological summary for this severe weather event.
 
-REQUIRED TEMPLATE:
-"{magnitude_display} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), in {report.county} County, {report.state} at {time_str} on {date_str}. This event is classified as {damage_info['category']} with {damage_info['damage_potential']} potential. {damage_info['comments']} {other_nearby}"
-
-DATA TO USE:
-- Magnitude: {magnitude_display}
+EVENT DATA:
 - Event Type: {report.report_type.lower()}
-- Distance/Direction: {major_city_distance} {direction} of {major_city}
-- SPC Location: {report.location}
-- County/State: {report.county} County, {report.state}
-- Time/Date: {time_str} on {date_str}
-- NWS Category: {damage_info['category']}
-- Damage Potential: {damage_info['damage_potential']}
-- NWS Comments: {damage_info['comments']}
+- Magnitude: {magnitude_display} 
+- Location: {report.location}, {report.county} County, {report.state}
+- Time: {time_str} on {date_str}
 - Nearby Places: {other_nearby}
 
 REQUIREMENTS:
-1. Use the EXACT template format above
-2. Fill in each data field exactly as provided
-3. Keep the professional meteorological language
-4. Do not add extra text or modify the structure"""
+1. Start with magnitude and event type
+2. Use professional NWS meteorological language
+3. Include location context without distant city references
+4. Keep summary concise and factual
+5. Example format: "F2 tornado was reported in [location], [county] County, [state] at [time] on [date]. [damage assessment]. [nearby context]"
 
-            # Build template using your exact format: magnitude + event type + distance/direction + SPC location + county/state + time/date
-            template_summary = f"{magnitude_display} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), in {report.county} County, {report.state} at {time_str} on {date_str}. {other_nearby}"
+Generate a professional summary following meteorological standards."""
+
+            # Build proper local summary without distant city references
+            template_summary = f"{magnitude_display} {report.report_type.lower()} was reported in {report.location}, {report.county} County, {report.state} at {time_str} on {date_str}. {other_nearby}"
 
             # Use OpenAI to polish the template with proper NWS terminology
             response = openai_client.chat.completions.create(
@@ -473,9 +468,20 @@ REQUIREMENTS:
                 if 'nearby_places' in enrichment:
                     location_context['nearby_places'] = []
                     for place in enrichment['nearby_places']:
+                        distance = place.get('distance_miles', 0)
+                        name = place.get('name', '')
+                        
+                        # Filter out distant irrelevant cities (>100 miles for local weather)
+                        if distance > 100:
+                            continue
+                        
+                        # Filter out duplicates of the main location
+                        if name.lower() == report.location.lower():
+                            continue
+                            
                         location_context['nearby_places'].append({
-                            'name': place.get('name', ''),
-                            'distance_miles': place.get('distance_miles', 0),
+                            'name': name,
+                            'distance_miles': distance,
                             'type': place.get('type', 'unknown')
                         })
                 

@@ -1,0 +1,70 @@
+critical validation of the data you provided, including identified errors and issues:
+
+1. Geographic Error
+Nearby Location Issue:
+
+json
+Copy
+Edit
+{"distance_miles":880.8,"name":"Denver","type":"nearest_city"}
+Problem: Denver is not a "nearby city" to George West, TX — they are over 800 miles apart, and Denver is not relevant in this local weather report.
+
+Conclusion: Likely an enrichment or lookup error in your nearby_locations generation. Denver should be removed — it is misleading.
+
+2. Inconsistent Distance Reporting
+George West City Hall listed at 0.3mi — okay.
+
+George West listed at 0.5mi — this is semantically redundant because the tornado is already reported in George West proper. You are double listing the core location as a "nearby_place."
+
+Recommendation: You should deduplicate George West from nearby_locations if it's already the main location.name. Only list distinct landmarks.
+
+3. Datetime Fields Are Incomplete
+json
+Copy
+Edit
+"datetime":{"display":null,"timestamp":null,"utc":null}
+You say the event was at 12:39 UTC on June 12, 2025 in your enhanced_summary:
+
+'f_scale': 'UNK' tornado was reported [...] at 12:39 (UTC) on June 12, 2025.
+
+But your actual datetime object is null / missing data:
+
+ERROR: datetime object should be populated with this known value.
+
+Missing timestamp creates parsing issues in downstream processing.
+
+Fix: Populate datetime.timestamp with 2025-06-12T12:39:00Z.
+
+4. Inconsistent Location Reference
+In enhanced_summary:
+
+880.8 miles north-northeast of Denver (George West), in Live Oak County, TX
+
+Contradiction / Bad Wording: Saying "880.8 miles north-northeast of Denver" but "in George West" is semantically nonsensical.
+
+George West is not 880.8 miles north-northeast of Denver — it's south of Denver.
+
+This is a badly constructed phrase — probably a templating bug.
+
+Fix: Remove this phrase or reword entirely. Example:
+
+"UNK tornado reported in George West, Live Oak County, TX at 12:39 UTC on June 12, 2025."
+
+Do not attempt to calculate distance from a distant city unless contextually meaningful (e.g., metro reporting).
+
+5. Missing Magnitude Fields
+json
+Copy
+Edit
+"magnitude":{"display":null,"raw":null,"unit":null,"value":null}
+Tornadoes typically report EF-scale if known, or explicitly mark as UNK.
+
+You already have 'f_scale': 'UNK' in the enhanced_summary but it's not mapped into your magnitude object.
+
+Fix: Populate magnitude object:
+
+json
+Copy
+Edit
+"magnitude":{"display":"F-Scale: UNK","raw":null,"unit":"F-Scale","value":null}
+Or explicitly mark it as "UNK" in value.
