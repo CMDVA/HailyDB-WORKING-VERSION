@@ -787,11 +787,11 @@ function manualLoadAlerts() {
 
 // Helper functions for formatting display values
 function getHailSizeClass(size) {
-    // All hail badges should be BLUE (bg-primary)
-    if (size >= 2.0) return 'bg-primary';
-    if (size >= 1.0) return 'bg-primary';
-    if (size >= 0.5) return 'bg-primary';
-    return 'bg-primary';
+    // Proper hail color progression: green to yellow to orange to red
+    if (size >= 1.0) return 'hail-quarter'; // Quarter+ = red
+    if (size >= 0.75) return 'hail-penny';  // Penny = orange
+    if (size >= 0.5) return 'hail-marble';  // Marble = yellow
+    return 'hail-pea';                      // Pea = green
 }
 
 function getHailSizeName(size) {
@@ -810,11 +810,10 @@ function getHailSizeName(size) {
 }
 
 function getWindSpeedClass(speed) {
-    // All wind badges should be YELLOW (bg-warning)
-    if (speed >= 75) return 'bg-warning';
-    if (speed >= 65) return 'bg-warning';
-    if (speed >= 50) return 'bg-warning';
-    return 'bg-warning';
+    // Proper wind color system
+    if (speed >= 75) return 'wind-severe';      // Red for severe winds
+    if (speed >= 65) return 'wind-significant'; // Orange for significant winds
+    return 'wind-moderate';                     // Info blue for moderate winds
 }
 
 function getWindSeverity(speed) {
