@@ -576,8 +576,8 @@ class ProductionLiveRadarService:
                 except:
                     pass
         
-        # Apply radar alert criteria: ANY hail OR ANY wind ≥ 30 mph (show all radar-indicated events)
-        is_radar_indicated = (hail_size > 0) or (wind_speed >= 30)
+        # Apply radar alert criteria: ANY hail OR wind ≥ 50 mph (standardized threshold)
+        is_radar_indicated = (hail_size > 0) or (wind_speed >= 50)
         
         # Enhanced certainty determination
         certainty = self._determine_certainty(certainty_raw, description)

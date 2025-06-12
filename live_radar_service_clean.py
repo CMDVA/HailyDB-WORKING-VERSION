@@ -202,8 +202,8 @@ class ProductionLiveRadarService:
                 if size_desc in description:
                     hail_size = max(hail_size, size_val)
         
-        # Apply radar alert criteria: ANY hail OR wind ≥ 30 mph
-        is_radar_indicated = (hail_size > 0) or (wind_speed >= 30)
+        # Apply radar alert criteria: ANY hail OR wind ≥ 50 mph (standardized threshold)
+        is_radar_indicated = (hail_size > 0) or (wind_speed >= 50)
         
         # Enhanced certainty determination
         certainty = self._determine_certainty(certainty_raw, description)
