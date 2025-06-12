@@ -376,22 +376,27 @@ class LiveRadarAlertService:
             return "unknown area"
             
     def _cleanup_expired_alerts(self):
-        """Remove expired alerts from active store"""
+        """Remove alerts older than 3 hours from expiration"""
         current_time = datetime.now(timezone.utc)
         expired_ids = []
         
         for alert_id, alert in self.alerts_store.items():
-            # Remove if expired or older than 3 hours
-            age_hours = (current_time - alert.created_at).total_seconds() / 3600
-            
-            if (alert.expires_time and current_time > alert.expires_time) or age_hours > 3:
-                expired_ids.append(alert_id)
+            # Remove only if more than 3 hours past expiration
+            if alert.expires_time:
+                hours_since_expiry = (current_time - alert.expires_time).total_seconds() / 3600
+                if hours_since_expiry > 3:
+                    expired_ids.append(alert_id)
+            else:
+                # If no expiry time, remove after 6 hours from creation
+                age_hours = (current_time - alert.created_at).total_seconds() / 3600
+                if age_hours > 6:
+                    expired_ids.append(alert_id)
                 
         for alert_id in expired_ids:
             del self.alerts_store[alert_id]
             
         if expired_ids:
-            logger.info(f"Cleaned up {len(expired_ids)} expired live alerts")
+            logger.info(f"Cleaned up {len(expired_ids)} old expired alerts")
             
     def _store_alert_in_db(self, alert: LiveRadarAlert):
         """Store alert in database with automatic TTL cleanup"""
@@ -488,10 +493,22 @@ class LiveRadarAlertService:
             self.db.rollback()
             
     def get_active_alerts(self) -> List[Dict[str, Any]]:
-        """Get all currently active live radar alerts"""
+        """Get all currently active and recently expired live radar alerts"""
         alerts = []
+        current_time = datetime.now(timezone.utc)
         
         for alert in self.alerts_store.values():
+            # Determine if alert is active or expired
+            is_expired = False
+            if alert.expires_time and current_time > alert.expires_time:
+                is_expired = True
+            
+            # Determine status for display
+            if is_expired:
+                status = "Expired"
+            else:
+                status = "Active"
+            
             alerts.append({
                 'id': alert.id,
                 'event': alert.event,
@@ -509,7 +526,9 @@ class LiveRadarAlertService:
                 'alert_message_template': alert.alert_message_template,
                 'effective_time': alert.effective_time.isoformat() if alert.effective_time else None,
                 'expires_time': alert.expires_time.isoformat() if alert.expires_time else None,
-                'geometry': alert.geometry
+                'geometry': alert.geometry,
+                'status': status,
+                'is_expired': is_expired
             })
             
         # Sort by created time (newest first)

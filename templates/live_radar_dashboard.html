@@ -170,12 +170,13 @@
                                 <th>Hail Size</th>
                                 <th>Wind Speed</th>
                                 <th>Severity</th>
+                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="liveRadarTableBody">
                             <tr>
-                                <td colspan="8" class="text-center py-4">
+                                <td colspan="9" class="text-center py-4">
                                     <div class="spinner-border text-primary" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
@@ -466,7 +467,7 @@ function proceedWithDisplay(tbody, alerts) {
         
         if (!alerts || alerts.length === 0) {
             console.log('No alerts received, showing empty message');
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No live radar alerts currently active.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No live radar alerts currently active.</td></tr>';
             return;
         }
         
@@ -519,8 +520,18 @@ function proceedWithDisplay(tbody, alerts) {
         const state = alert.affected_states && alert.affected_states.length > 0 ? 
             alert.affected_states[0] : extractState(alert.area_desc || '');
         
+        // Determine status display
+        const status = alert.status || 'Active';
+        const isExpired = alert.is_expired || false;
+        const statusBadge = isExpired ? 
+            '<span class="badge bg-secondary">Expired</span>' : 
+            '<span class="badge bg-success">Active</span>';
+        
+        // Add visual styling for expired alerts
+        const rowClass = isExpired ? 'class="table-secondary opacity-75"' : '';
+        
         return `
-            <tr>
+            <tr ${rowClass}>
                 <td>${time}</td>
                 <td><span class="badge bg-primary">${alert.event || 'Severe Thunderstorm Warning'}</span></td>
                 <td>${location}</td>
@@ -528,6 +539,7 @@ function proceedWithDisplay(tbody, alerts) {
                 <td>${hailDisplay}</td>
                 <td>${windDisplay}</td>
                 <td>${severity}</td>
+                <td>${statusBadge}</td>
                 <td>
                     <button class="btn btn-outline-primary btn-sm btn-view" onclick="viewAlert('${alert.id}')">
                         <i class="fas fa-eye me-1"></i>View
