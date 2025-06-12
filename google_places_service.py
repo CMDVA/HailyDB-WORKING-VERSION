@@ -292,6 +292,57 @@ class GooglePlacesService:
             logger.error(f"Error finding major city: {e}")
             return None
     
+    def get_nearby_places(self, lat: float, lon: float, radius_miles: float = 25) -> List[Dict[str, Any]]:
+        """
+        Get nearby places using Google Places API for Enhanced Context generation
+        Returns list of places in the format expected by Enhanced Context system
+        """
+        try:
+            # Convert miles to meters for Google API
+            radius_meters = int(radius_miles * 1609.34)
+            
+            url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+            params = {
+                'location': f"{lat},{lon}",
+                'radius': radius_meters,
+                'key': self.api_key,
+                'type': 'establishment'
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            places = []
+            
+            if data.get('results'):
+                for place in data['results'][:20]:  # Limit to top 20 results
+                    place_lat = place['geometry']['location']['lat']
+                    place_lon = place['geometry']['location']['lng']
+                    distance = self._calculate_distance(lat, lon, place_lat, place_lon)
+                    
+                    # Determine place type
+                    place_types = place.get('types', [])
+                    is_county = any(keyword in place['name'].lower() for keyword in ['county', 'township', 'parish'])
+                    
+                    place_type = 'county' if is_county else 'establishment'
+                    
+                    places.append({
+                        'name': place['name'],
+                        'distance_miles': round(distance, 1),
+                        'type': place_type,
+                        'lat': place_lat,
+                        'lon': place_lon,
+                        'place_id': place.get('place_id', '')
+                    })
+            
+            # Sort by distance and return
+            return sorted(places, key=lambda x: x['distance_miles'])
+            
+        except Exception as e:
+            logger.error(f"Error getting nearby places: {e}")
+            return []
+
     def find_other_nearby_places(self, lat: float, lon: float, radius_miles: float = 15) -> List[PlaceResult]:
         """
         Phase 3: Find other nearby places within 15 miles
