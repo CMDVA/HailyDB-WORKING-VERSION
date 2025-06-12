@@ -39,6 +39,22 @@ class SPCEnhancedContextService:
             return "Large Hail"
         else:
             return "Small Hail"
+    
+    def _get_hail_natural_language(self, hail_size: float) -> str:
+        """Get natural language equivalent for hail size"""
+        hail_size_map = {
+            0.25: 'pea', 0.5: 'peanut', 0.75: 'penny',
+            0.88: 'nickel', 1.0: 'quarter', 1.25: 'half dollar',
+            1.5: 'ping pong ball', 1.75: 'golf ball', 2.0: 'egg',
+            2.5: 'tennis ball', 2.75: 'baseball', 3.0: 'large apple',
+            4.0: 'softball', 4.5: 'grapefruit'
+        }
+        
+        # Find closest match
+        closest_size = min(hail_size_map.keys(), key=lambda x: abs(x - hail_size))
+        if abs(closest_size - hail_size) <= 0.25:
+            return f" ({hail_size_map[closest_size]} size)"
+        return ""
 
     def _map_wind_threat_level(self, wind_speed: float) -> str:
         """Map wind speed to NWS official classification for historical reports"""
@@ -430,37 +446,38 @@ CRITICAL: Lead with magnitude first, use exact damage classification from data p
                 time_str = str(report.time_utc) if hasattr(report, 'time_utc') else "unknown time"
                 date_str = str(report.spc_date) if hasattr(report, 'spc_date') else "unknown date"
             
-            # Build enriched event location (from location context)
-            enriched_location = major_city if major_city else report.location
+            # Build proper nearby places from location context
+            nearby_places_sorted = []
+            if location_context.get('nearby_places'):
+                # Sort by distance and take closest 3
+                nearby_places_sorted = sorted(location_context['nearby_places'], 
+                                            key=lambda x: x.get('distance_miles', 999))[:3]
             
-            # Get nearest major city with direction (limit to top 3 nearby places)
-            nearby_places_list = []
-            if nearby_context:
-                # Parse nearby context to get individual places with distances
-                places = nearby_context.split(', ')[:3]  # Limit to 3
-                nearby_places_list = places
+            # Get nearest place for location reference
+            nearest_place = nearby_places_sorted[0]['name'] if nearby_places_sorted else major_city
             
-            # Get the first enriched location or fallback to nearest place
-            enriched_event_location = nearby_places_list[0] if nearby_places_list else report.location
+            # Add natural language hail size if applicable
+            hail_natural_lang = ""
+            if report.report_type.upper() == 'HAIL':
+                hail_natural_lang = self._get_hail_natural_language(hail_size)
             
             # Generate template-based summary following exact format
             if report.report_type.upper() == 'HAIL':
-                summary = (f"{hail_size}\" hail was reported {major_city_distance} {direction} "
-                          f"of {enriched_event_location} ({report.location}), or approximately {major_city_distance} "
+                summary = (f"{hail_size}\" hail{hail_natural_lang} was reported {major_city_distance} {direction} "
+                          f"of {nearest_place} ({report.location}), or approximately {major_city_distance} "
                           f"{direction} from {major_city}, in {report.county} County, {report.state} at "
                           f"{time_str} on {date_str}. {hail_threat_level} - {damage_statement}.")
             else:
                 summary = (f"{wind_speed} mph wind was reported {major_city_distance} {direction} "
-                          f"of {enriched_event_location} ({report.location}), or approximately {major_city_distance} "
+                          f"of {nearest_place} ({report.location}), or approximately {major_city_distance} "
                           f"{direction} from {major_city}, in {report.county} County, {report.state} at "
                           f"{time_str} on {date_str}. {wind_threat_level} - {damage_statement}.")
             
-            # Add nearby locations (max 3, exclude the first one already used)
-            if len(nearby_places_list) > 1:
+            # Add other nearby locations (exclude the first one already used)
+            if len(nearby_places_sorted) > 1:
                 other_locations = []
-                for i, place in enumerate(nearby_places_list[1:4]):  # Skip first, take next 3
-                    distance = location_context.get('nearby_places', [])[i+1].get('distance_miles', 0)
-                    other_locations.append(f"{place} ({distance} mi)")
+                for place in nearby_places_sorted[1:4]:  # Skip first, take next 2-3
+                    other_locations.append(f"{place['name']} ({place['distance_miles']:.1f}mi)")
                 if other_locations:
                     summary += f" Other nearby locations include {', '.join(other_locations)}."
             
