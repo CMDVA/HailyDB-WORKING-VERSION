@@ -1,0 +1,13 @@
+HAIL DAMAGE LOOKUP TABLE (with Comments)
+Category	Min Diameter (inches)	Max Diameter (inches)	Damage Potential	Severe?	Comments
+Small Hail	0.00	0.99	(from peas to nickels) — not specified	Not Severe	Small hail can cause minor cosmetic damage to plants, vehicles, and lightweight structures but typically does not impact well-built homes or permanent property.
+Large Hail	1.00	1.74	Minor Damage	Severe	Large hail can cause dents to vehicles, cracked windows, damage to roofing materials, siding, and gutters. Personal property left exposed is vulnerable to damage.
+Very Large Hail	1.75	2.74	Moderate Damage	Severe	Very large hail can cause punctures to roofing, shatter windows, severely damage siding, and break outdoor fixtures. Homes may sustain structural and cosmetic impacts.
+Giant Hail	2.75	100.00 (assumed cap)	Major Damage	Severe	Giant hail can cause catastrophic damage to roofs, windows, and siding of homes. Vehicles may be destroyed, and outdoor personal property is highly susceptible to severe impacts.
+
+WIND DAMAGE LOOKUP TABLE (with Comments)
+Category	Min Wind Speed (mph)	Max Wind Speed (mph)	Damage Potential	Severe?	Comments
+Strong Wind Gusts	39	57	None / Minimal	Not Severe	Strong wind gusts can cause minor tree limb breakage and may blow around unsecured lightweight objects, but generally do not cause structural damage to homes.
+Damaging Wind Gusts	58	74	Minor Damage	Severe	Damaging wind gusts can tear off shingles, damage siding, break large tree branches, and cause localized power outages. Personal property outdoors is at risk.
+Very Damaging Wind Gusts	75	91	Moderate Damage	Severe	Very damaging wind gusts can strip large portions of roofing, topple trees, break windows, and cause widespread power outages. Homes and personal property are at significant risk.
+Violent Wind Gusts	92	300 (assumed cap)	Major Damage	Severe	Violent wind gusts can cause total roof failure, structural wall collapse, widespread tree and power infrastructure damage. Homes and personal property face extreme, often devastating impacts.

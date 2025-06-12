@@ -20,16 +20,41 @@ class SPCEnhancedContextService:
     def __init__(self, db_session: Session):
         self.db = db_session
     
-    def _map_hail_threat_level(self, hail_size: float) -> str:
-        """Map hail size to NWS official classification for historical reports"""
-        if hail_size >= 2.75:
-            return "Giant Hail - Hail larger than 2 3/4 inch (larger than baseballs, such as the size of grapefruit or softballs) causing major damage"
-        elif hail_size >= 1.75:
-            return "Very Large Hail - Hail from 1 3/4 inch to 2 3/4 inch in diameter (from the size of golf balls to baseballs) causing moderate damage"
-        elif hail_size >= 1.0:
-            return "Large Hail - Hail from 1 inch to 1 3/4 inch in diameter (from the size of quarters to golf balls) causing minor damage"
-        else:
-            return "Small Hail - Hail less than 1 inch in diameter (from the size of peas to nickels)"
+    def _get_hail_damage_category(self, hail_size: float) -> dict:
+        """Get hail damage category from NWS lookup table"""
+        try:
+            from sqlalchemy import text
+            result = self.db.execute(text("""
+                SELECT category, damage_potential, is_severe, comments 
+                FROM nws_hail_damage_lookup 
+                WHERE :hail_size >= min_diameter_inches AND :hail_size <= max_diameter_inches
+                LIMIT 1
+            """), {"hail_size": hail_size}).fetchone()
+            
+            if result:
+                return {
+                    "category": result[0],
+                    "damage_potential": result[1], 
+                    "is_severe": result[2],
+                    "comments": result[3]
+                }
+            else:
+                # Fallback for edge cases
+                return {
+                    "category": "Unknown Hail",
+                    "damage_potential": "Unknown",
+                    "is_severe": False,
+                    "comments": "Hail size outside standard categories"
+                }
+        except Exception as e:
+            import logging
+            logging.error(f"Error querying hail damage lookup: {e}")
+            return {
+                "category": "Small Hail",
+                "damage_potential": "Minimal",
+                "is_severe": False,
+                "comments": "Unable to determine damage category"
+            }
     
     def _get_hail_natural_language(self, hail_size: float) -> str:
         """Get natural language equivalent for hail size"""
@@ -54,18 +79,41 @@ class SPCEnhancedContextService:
             return f" ({hail_size_map[closest_size]} size)"
         return ""
 
-    def _map_wind_threat_level(self, wind_speed: float) -> str:
-        """Map wind speed to NWS official classification for historical reports"""
-        if wind_speed >= 92:
-            return "Violent Wind Gusts - Severe thunderstorm wind gusts greater than 92 mph (80 knots or greater) causing major damage"
-        elif wind_speed >= 75:
-            return "Very Damaging Wind Gusts - Severe thunderstorm wind gusts between 75 mph and 91 mph (between 65 knots and 79 knots) causing moderate damage"
-        elif wind_speed >= 58:
-            return "Damaging Wind Gusts - Severe thunderstorm wind gusts between 58 mph and 74 mph (between 50 knots and 64 knots) causing minor damage"
-        elif wind_speed >= 39:
-            return "Strong Wind Gusts - Thunderstorm wind gusts between 39 mph and 57 mph (between 34 knots and 49 knots)"
-        else:
-            return "Light Wind Gusts"
+    def _get_wind_damage_category(self, wind_speed: float) -> dict:
+        """Get wind damage category from NWS lookup table"""
+        try:
+            from sqlalchemy import text
+            result = self.db.execute(text("""
+                SELECT category, damage_potential, is_severe, comments 
+                FROM nws_wind_damage_lookup 
+                WHERE :wind_speed >= min_wind_speed_mph AND :wind_speed <= max_wind_speed_mph
+                LIMIT 1
+            """), {"wind_speed": wind_speed}).fetchone()
+            
+            if result:
+                return {
+                    "category": result[0],
+                    "damage_potential": result[1],
+                    "is_severe": result[2], 
+                    "comments": result[3]
+                }
+            else:
+                # Fallback for edge cases
+                return {
+                    "category": "Unknown Wind",
+                    "damage_potential": "Unknown",
+                    "is_severe": False,
+                    "comments": "Wind speed outside standard categories"
+                }
+        except Exception as e:
+            import logging
+            logging.error(f"Error querying wind damage lookup: {e}")
+            return {
+                "category": "Light Wind",
+                "damage_potential": "Minimal",
+                "is_severe": False,
+                "comments": "Unable to determine damage category"
+            }
 
     def enrich_spc_report(self, report_id: int) -> Dict[str, Any]:
         """
@@ -229,9 +277,18 @@ class SPCEnhancedContextService:
                 hail_size = 0
                 wind_speed = 0
             
-            # Map to NWS Threat Levels
-            hail_threat_level = self._map_hail_threat_level(hail_size)
-            wind_threat_level = self._map_wind_threat_level(wind_speed)
+            # Get NWS damage categories from lookup tables
+            if report.report_type.upper() == "HAIL" and hail_size > 0:
+                damage_info = self._get_hail_damage_category(hail_size)
+            elif report.report_type.upper() == "WIND" and wind_speed > 0:
+                damage_info = self._get_wind_damage_category(wind_speed)
+            else:
+                damage_info = {
+                    "category": "Unknown",
+                    "damage_potential": "Unknown",
+                    "is_severe": False,
+                    "comments": "Unable to determine damage category"
+                }
 
             # Generate AI potential damage assessment based on NWS threat levels
             damage_statement = ""  # Will be generated by AI based on threat classification
@@ -283,8 +340,8 @@ class SPCEnhancedContextService:
             else:
                 magnitude_display = report.magnitude if report.magnitude else 'Unknown magnitude'
 
-            # Generate prompt for AI damage assessment based on NWS tables
-            prompt = f"""You are a professional meteorological data analyst. Generate a clean summary with potential damage assessment based on official NWS damage tables.
+            # Generate prompt using actual NWS damage lookup data
+            prompt = f"""You are a professional meteorological data analyst. Generate a clean summary with potential damage assessment based on official NWS damage classifications.
 
 WEATHER EVENT DATA:
 - Type: {report.report_type}
@@ -293,25 +350,18 @@ WEATHER EVENT DATA:
 - Time: {time_str} on {date_str}
 - Distance from major city: {major_city_distance} {direction} of {major_city}
 
-NWS DAMAGE TABLES:
-HAIL DAMAGE POTENTIAL:
-- Less than 1": Small hail (peas to nickels) - minimal damage to vehicles/crops
-- 1" to 1.75": Large hail (quarters to golf balls) - minor damage to vehicles, moderate crop damage
-- 1.75" to 2.75": Very large hail (golf balls to baseballs) - moderate vehicle damage, significant crop loss
-- Over 2.75": Giant hail (larger than baseballs) - major vehicle/property damage
-
-WIND DAMAGE POTENTIAL:
-- 39-57 mph: Strong gusts - light debris, small branches
-- 58-74 mph: Damaging gusts - minor structural damage, large branches down
-- 75-91 mph: Very damaging gusts - moderate structural damage, trees uprooted
-- 92+ mph: Violent gusts - major structural damage
+NWS DAMAGE CLASSIFICATION FOR THIS EVENT:
+- Category: {damage_info['category']}
+- Damage Potential: {damage_info['damage_potential']}
+- Severe Weather: {'Yes' if damage_info['is_severe'] else 'No'}
+- Details: {damage_info['comments']}
 
 REQUIREMENTS:
-1. Generate a clean meteorological summary 
-2. Include potential damage assessment based on the magnitude and NWS tables above
-3. Use the location data provided
-4. Professional language only
-5. NO SPC comments or codes"""
+1. Generate a clean meteorological summary using the exact location and time data
+2. Include the NWS damage category and potential impacts from the classification above
+3. Use professional meteorological language
+4. Focus on the specific damage potential for this magnitude/category
+5. NO SPC comments or source codes"""
             
             # Build proper nearby places from location context
             nearby_places_sorted = []
@@ -346,8 +396,6 @@ REQUIREMENTS:
             
             # Fallback with proper formatting without AI
             magnitude_display = report.magnitude if report.magnitude else 'Unknown magnitude'
-            threat_level = self._map_hail_threat_level(hail_size) if report.report_type == 'HAIL' else self._map_wind_threat_level(wind_speed)
-            
             return f"This {report.report_type.lower()} report in {report.county} County, {report.state} was validated by {len(verified_alerts)} NWS alerts spanning {duration_minutes} minutes across {len(counties_affected)} counties."
 
     def _get_location_context(self, report) -> Dict[str, Any]:
