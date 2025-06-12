@@ -338,14 +338,9 @@ function initializeDashboard() {
     
     console.log('Starting initial alert load...');
     
-    // Load fallback radar alerts first (fast, guaranteed)
-    loadFallbackRadarAlerts();
-    
-    // Then enhance with live feed in background
-    setTimeout(() => {
-        console.log('Loading live alerts in background...');
-        loadLiveAlerts();
-    }, 500);
+    // Load live alerts directly since they're working
+    console.log('Loading live alerts...');
+    loadLiveAlerts();
     
     // Set up auto-refresh to load alerts every 30 seconds
     window.dashboardInterval = setInterval(loadLiveAlerts, 30000);
@@ -692,7 +687,7 @@ async function loadFallbackRadarAlerts() {
     console.log('=== LOADING FALLBACK RADAR ALERTS ===');
     
     try {
-        const response = await fetch('/api/radar-alerts/summary?start_date=2025-06-10&end_date=2025-06-12&min_hail_inches=0.5&min_wind_mph=50');
+        const response = await fetch('/api/direct-radar-alerts?start_date=2025-06-01&end_date=2025-06-12&limit=20');
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
