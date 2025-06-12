@@ -145,9 +145,10 @@ class SPCEnhancedContextService:
         # Extract NWS office
         nws_office = self._extract_nws_office(verified_alerts)
         
-        # Generate multi-alert summary
-        multi_alert_summary = self._generate_multi_alert_summary(
-            report, verified_alerts, duration_minutes, counties_affected, nws_office
+        # Generate enhanced summary (handles both verified and unverified reports)
+        multi_alert_summary = self._generate_enhanced_summary(
+            report, verified_alerts, duration_minutes, counties_affected, 
+            nws_office, location_context, radar_polygon_match
         )
         
         # Get location context
@@ -186,13 +187,11 @@ class SPCEnhancedContextService:
                     return sender.replace("NWS ", "").strip()
         return "Unknown"
     
-    def _generate_multi_alert_summary(self, report, verified_alerts: List, 
-                                    duration_minutes: int, counties_affected: set, nws_office: str) -> str:
-        """Generate AI-powered enhanced summary with location context"""
+    def _generate_enhanced_summary(self, report, verified_alerts: List, 
+                                 duration_minutes: int, counties_affected: set, nws_office: str,
+                                 location_context: Dict[str, Any], radar_polygon_match: bool) -> str:
+        """Generate AI-powered enhanced summary with conditional logic for verified/unverified reports"""
         try:
-            # Get location context for enhanced summary
-            location_context = self._get_location_context(report)
-            
             # Prepare context for AI
             alert_details = []
             for alert in verified_alerts:
@@ -276,13 +275,22 @@ class SPCEnhancedContextService:
                 except (ValueError, AttributeError):
                     damage_emphasis = "Wind speeds of this magnitude have documented damage potential per NWS classifications."
 
-            prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable property damage intelligence.
+            # Calculate direction from event to major city (if coordinates available)
+            direction = ""
+            if major_city and hasattr(report, 'latitude') and hasattr(report, 'longitude'):
+                major_city_coords = location_context.get('major_city_coordinates', {})
+                if major_city_coords and 'lat' in major_city_coords and 'lon' in major_city_coords:
+                    direction = self._calculate_direction(
+                        report.latitude, report.longitude, 
+                        major_city_coords['lat'], major_city_coords['lon']
+                    )
 
-You are generating an Enhanced Summary for an SPC storm report. Your goal is to clearly communicate the event location, its geographic context, damage potential, and the strength of radar and NWS verification — in clean, professional layman terms.
+            # Generate conditional prompt based on whether we have verified alerts
+            if verified_alerts and len(verified_alerts) > 0:
+                # Multi-alert summary with verification context
+                prompt = f"""You are a meteorological data analyst specializing in location-enhanced weather summaries for actionable property damage intelligence.
 
 CRITICAL INSTRUCTION: You must EMPHASIZE damage potential. Do NOT downplay or minimize damage risks. Weather events of this magnitude pose real threats to property and safety.
-
-Inputs:
 
 SPC Report Details:
 - Type: {report.report_type}
@@ -295,27 +303,51 @@ SPC Report Details:
 Location Context:
 - Event Location: {event_location}
 - Radar Detection Status: {'Detected' if radar_polygon_match else 'Not Detected'}
-- Nearest Major City: {major_city} ({major_city_distance} away)
+- Nearest Major City: {major_city} ({major_city_distance} {direction} away)
 - Nearby Places: {nearby_context if nearby_context else 'This location lies in a remote area with no notable nearby communities'}
 
 Verification Context:
 - Verified Alerts: {len(verified_alerts)} alerts across {duration_minutes} minutes
 - Counties Affected: {', '.join(sorted(counties_affected))}
 
-Your Enhanced Summary MUST follow these principles:
+Create an Enhanced Summary that:
+1️⃣ Leads with Event Location and Event Type
+2️⃣ EMPHASIZES damage potential using the DAMAGE POTENTIAL assessment above
+3️⃣ Includes specific damage details from SPC comments
+4️⃣ Includes distance and direction from major city: "The event occurred {major_city_distance} {direction} of {major_city}"
+5️⃣ References radar detection status clearly
+6️⃣ Includes nearby places for location context
+7️⃣ Highlights verification by {len(verified_alerts)} NWS alerts over {duration_minutes} minutes
+8️⃣ NEVER downplays damage potential - always emphasizes serious nature of weather events
 
-1️⃣ Lead with Event Location and Event Type in the first sentence.
-2️⃣ EMPHASIZE damage potential based on magnitude - use the DAMAGE POTENTIAL assessment provided above.
-3️⃣ Include specific damage details from SPC comments - highlight any property damage, homes, structures mentioned.
-4️⃣ Include distance and direction from Nearest Major City: "The event occurred [distance] [direction] of [city]"
-5️⃣ Reference Radar Detection Status in a clear factual sentence.
-6️⃣ Include 2–4 of the Nearby Places to help human users understand location.
-7️⃣ Always positively frame verification — highlight that the event was supported by {len(verified_alerts)} NWS alerts over {duration_minutes} minutes.
-8️⃣ Do not include the name of the NWS Office or overly technical phrases.
-9️⃣ Avoid defensive or hedging language — focus on presenting a clean, confident, factual geographic summary.
-🔟 NEVER downplay damage potential. ALWAYS emphasize the serious nature of these weather events.
+Do NOT omit damage potential or nearby places sections."""
+            else:
+                # Location-only summary for unverified reports
+                prompt = f"""Generate a location-enhanced summary for this SPC storm report:
 
-Do NOT omit damage potential or nearby places sections. These are critical features for property damage assessment."""
+CRITICAL INSTRUCTION: You must EMPHASIZE damage potential. Do NOT downplay or minimize damage risks. Weather events of this magnitude pose real threats to property and safety.
+
+SPC Report Details:
+- Type: {report.report_type}
+- Location: {report.location}, {report.county}, {report.state}
+- Time: {report.time_utc}
+- Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
+- SPC Damage Comments: {damage_details}
+- DAMAGE POTENTIAL: {damage_emphasis}
+
+Location Context:
+- Nearest Major City: {major_city} ({major_city_distance} {direction} away)
+- Nearby Places: {nearby_context if nearby_context else 'None within close proximity'}
+
+Create a 1-2 sentence enhanced summary that:
+1. Starts with the SPC report location: "{report.location}, {report.county}, {report.state}"
+2. EMPHASIZES damage potential using the DAMAGE POTENTIAL assessment above
+3. Includes specific damage details from SPC comments
+4. Includes distance and direction from major city: "The event occurred {major_city_distance} {direction} of {major_city}"
+5. Includes nearby places when available
+6. NEVER downplays damage potential - always emphasizes serious nature of weather events
+
+CRITICAL: Use the provided location data exactly as given. Do not add historical context or speculation."""
 
             response = client.chat.completions.create(
                 model="gpt-4o",
@@ -334,120 +366,7 @@ Do NOT omit damage potential or nearby places sections. These are critical featu
             # Fallback summary
             return f"This {report.report_type} report in {report.county} County, {report.state} was validated by {len(verified_alerts)} NWS alerts spanning {duration_minutes} minutes across {len(counties_affected)} counties."
     
-    def _generate_location_only_summary(self, report, location_context: Dict[str, Any]) -> str:
-        """Generate location-enriched summary for reports without verified alerts"""
-        try:
-            # Extract key location references for better context
-            event_location = location_context.get('primary_location', report.location)
-            major_city = location_context.get('nearest_major_city', 'Unknown')
-            major_city_distance = location_context.get('major_city_distance', '')
-            nearby_places = location_context.get('nearby_places', [])
-            
-            # Build nearby places string with distances for location-only summary
-            nearby_context = ""
-            if nearby_places:
-                closest_places = []
-                for place in nearby_places[:3]:
-                    name = place.get('name', '')
-                    distance = place.get('distance_miles', 0)
-                    if name and distance:
-                        closest_places.append(f"{name} ({distance:.1f}mi)")
-                if closest_places:
-                    nearby_context = f"near {', '.join(closest_places)}"
 
-            # Include SPC comments for damage emphasis
-            damage_details = report.comments if hasattr(report, 'comments') and report.comments else 'No damage details provided'
-            
-            # Calculate direction from event to major city (if available from location context)
-            direction = ""
-            if major_city != 'Unknown' and hasattr(report, 'latitude') and hasattr(report, 'longitude'):
-                # Try to get major city coordinates from location context
-                major_city_coords = location_context.get('major_city_coordinates', {})
-                if major_city_coords and 'lat' in major_city_coords and 'lon' in major_city_coords:
-                    direction = self._calculate_direction(
-                        report.latitude, report.longitude, 
-                        major_city_coords['lat'], major_city_coords['lon']
-                    )
-            
-            # Determine damage potential based on official NWS classifications
-            damage_emphasis = ""
-            if report.report_type == "HAIL" and hasattr(report, 'magnitude') and report.magnitude:
-                try:
-                    hail_size = float(report.magnitude)
-                    if hail_size >= 2.75:
-                        damage_emphasis = f"EXTREME THREAT: {hail_size}\" giant hail causes MAJOR DAMAGE including severe vehicle damage, roof destruction, structural damage to buildings, and complete crop devastation."
-                    elif hail_size >= 1.75:
-                        damage_emphasis = f"HIGH THREAT: {hail_size}\" very large hail causes MODERATE DAMAGE including significant vehicle dents, roof damage, broken windows, siding damage, and crop destruction."
-                    elif hail_size >= 1.0:
-                        damage_emphasis = f"MODERATE THREAT: {hail_size}\" large hail causes MINOR DAMAGE including vehicle dents, roof granule loss, window damage, and agricultural losses."
-                    elif hail_size >= 0.75:
-                        damage_emphasis = f"LOW THREAT: {hail_size}\" hail approaches severe criteria and may cause minor vehicle damage, plant damage, and small dents."
-                    else:
-                        damage_emphasis = f"VERY LOW THREAT: {hail_size}\" small hail may cause minor plant damage and very light vehicle impact damage."
-                except ValueError:
-                    damage_emphasis = "Hail of reported size has documented damage potential per NWS classifications."
-            elif report.report_type == "WIND" and hasattr(report, 'magnitude') and report.magnitude:
-                try:
-                    wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip())
-                    if wind_speed >= 92:
-                        damage_emphasis = f"EXTREME THREAT: {wind_speed} mph violent wind gusts cause MAJOR DAMAGE including structural destruction, uprooted large trees, overturned vehicles, and widespread power outages."
-                    elif wind_speed >= 75:
-                        damage_emphasis = f"HIGH THREAT: {wind_speed} mph very damaging wind gusts cause MODERATE DAMAGE including roof damage, large tree damage, mobile home overturning, and significant debris."
-                    elif wind_speed >= 58:
-                        damage_emphasis = f"MODERATE THREAT: {wind_speed} mph damaging wind gusts cause MINOR DAMAGE including broken branches, minor roof damage, and scattered power outages."
-                    elif wind_speed >= 39:
-                        damage_emphasis = f"LOW THREAT: {wind_speed} mph strong wind gusts may cause small branch damage and minor debris."
-                    else:
-                        damage_emphasis = f"VERY LOW THREAT: {wind_speed} mph winds below strong gust criteria but may still cause minor impacts."
-                except (ValueError, AttributeError):
-                    damage_emphasis = "Wind speeds of this magnitude have documented damage potential per NWS classifications."
-            
-            prompt = f"""Generate a location-enhanced summary for this SPC storm report:
-
-CRITICAL INSTRUCTION: You must EMPHASIZE damage potential. Do NOT downplay or minimize damage risks. Weather events of this magnitude pose real threats to property and safety.
-
-SPC Report Details:
-- Type: {report.report_type}
-- Location: {report.location}, {report.county}, {report.state}
-- Time: {report.time_utc}
-- Magnitude: {report.magnitude if hasattr(report, 'magnitude') else 'N/A'}
-- SPC Damage Comments: {damage_details}
-- DAMAGE POTENTIAL: {damage_emphasis}
-
-Location Context (USE THIS DATA):
-- Nearest Major City: {major_city} ({major_city_distance} {direction})
-- Nearby Places: {nearby_context if nearby_context else 'None within close proximity'}
-
-Create a 1-2 sentence enhanced summary that:
-1. Starts with the SPC report location: "{report.location}, {report.county}, {report.state}"
-2. EMPHASIZE damage potential based on magnitude - use the DAMAGE POTENTIAL assessment provided above
-3. Include specific damage details from SPC comments - highlight any property damage, homes, structures mentioned
-4. Include distance and direction from nearest major city: "The event occurred {major_city_distance} {direction} of {major_city}" 
-5. Include nearby places when available: {nearby_context}
-6. Describes the SPC report type and measurement clearly
-7. Makes the location meaningful and accessible to readers
-8. NEVER use the phrase "providing a clearer understanding of the affected area"
-9. NEVER downplay damage potential. ALWAYS emphasize the serious nature of these weather events.
-
-CRITICAL: Use the provided location data exactly as given. Do not add historical context or speculation."""
-
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are a meteorological data analyst specializing in location-enhanced weather summaries. Create clear, location-focused summaries that make storm reports more accessible."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=150,
-                temperature=0.2
-            )
-            
-            return response.choices[0].message.content.strip()
-            
-        except Exception as e:
-            logger.error(f"Error generating location-only summary: {e}")
-            # Fallback with location context
-            location_ref = location_context.get('primary_location', f"{report.location}, {report.county}, {report.state}")
-            return f"This {report.report_type} report occurred at {location_ref} at {report.time_utc}."
     
     def _get_location_context(self, report) -> Dict[str, Any]:
         """Get location context from existing enrichment data"""
