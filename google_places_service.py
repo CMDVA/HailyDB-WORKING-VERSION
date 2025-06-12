@@ -1,0 +1,336 @@
+"""
+Google Places API Service for Accurate Location Enrichment
+Replaces OpenAI geocoding with precise Google Maps data
+"""
+
+import logging
+import requests
+import math
+import os
+from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class PlaceResult:
+    name: str
+    distance_miles: float
+    lat: float
+    lon: float
+    place_type: str
+    place_id: str = None
+
+class GooglePlacesService:
+    """
+    Accurate location enrichment using Google Places API
+    Implements 3-tier fallback architecture for precise distance calculations
+    """
+    
+    def __init__(self):
+        self.api_key = os.environ.get("GOOGLE_PLACES_API_KEY")
+        if not self.api_key:
+            raise ValueError("GOOGLE_PLACES_API_KEY not found in environment")
+        
+        # Priority place types for Event Location search
+        self.priority_place_types = [
+            'school',
+            'hospital', 
+            'fire_station',
+            'library',
+            'park',
+            'city_hall',
+            'police',
+            'post_office',
+            'community_center',
+            'university'
+        ]
+        
+    def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """
+        Calculate precise distance using Haversine formula
+        """
+        R = 3959.87433  # Earth's radius in miles
+        
+        # Convert to radians
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        
+        # Haversine formula
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        
+        return R * c
+    
+    def find_event_location(self, lat: float, lon: float, radius_miles: float = 5) -> Optional[PlaceResult]:
+        """
+        Phase 1: Find Event Location using Google Places Nearby Search
+        Prioritizes public places within 5 miles
+        """
+        try:
+            # Convert miles to meters for Google API
+            radius_meters = int(radius_miles * 1609.34)
+            
+            for place_type in self.priority_place_types:
+                url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+                params = {
+                    'location': f"{lat},{lon}",
+                    'radius': radius_meters,
+                    'type': place_type,
+                    'key': self.api_key
+                }
+                
+                response = requests.get(url, params=params, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+                
+                if data.get('results'):
+                    # Get closest place of this type
+                    closest_place = min(data['results'], key=lambda p: self._calculate_distance(
+                        lat, lon, 
+                        p['geometry']['location']['lat'], 
+                        p['geometry']['location']['lng']
+                    ))
+                    
+                    distance = self._calculate_distance(
+                        lat, lon,
+                        closest_place['geometry']['location']['lat'],
+                        closest_place['geometry']['location']['lng']
+                    )
+                    
+                    if distance <= radius_miles:
+                        return PlaceResult(
+                            name=closest_place['name'],
+                            distance_miles=round(distance, 1),
+                            lat=closest_place['geometry']['location']['lat'],
+                            lon=closest_place['geometry']['location']['lng'],
+                            place_type=place_type,
+                            place_id=closest_place.get('place_id')
+                        )
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error in Google Places nearby search: {e}")
+            return None
+    
+    def find_nearest_place_by_geocoding(self, lat: float, lon: float) -> Optional[PlaceResult]:
+        """
+        Phase 2: Fallback to Google Reverse Geocoding
+        Returns nearest CDP/town/city name with precise coordinates
+        """
+        try:
+            url = "https://maps.googleapis.com/maps/api/geocode/json"
+            params = {
+                'latlng': f"{lat},{lon}",
+                'key': self.api_key,
+                'result_type': 'locality|sublocality|neighborhood|administrative_area_level_3'
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get('results'):
+                # Get the most specific place name
+                result = data['results'][0]
+                place_name = None
+                
+                # Extract locality name from address components
+                for component in result['address_components']:
+                    types = component['types']
+                    if 'locality' in types:
+                        place_name = component['long_name']
+                        break
+                    elif 'sublocality' in types:
+                        place_name = component['long_name']
+                        break
+                    elif 'neighborhood' in types:
+                        place_name = component['long_name']
+                        break
+                    elif 'administrative_area_level_3' in types:
+                        place_name = component['long_name']
+                        break
+                
+                if place_name:
+                    place_lat = result['geometry']['location']['lat']
+                    place_lon = result['geometry']['location']['lng']
+                    distance = self._calculate_distance(lat, lon, place_lat, place_lon)
+                    
+                    return PlaceResult(
+                        name=place_name,
+                        distance_miles=round(distance, 1),
+                        lat=place_lat,
+                        lon=place_lon,
+                        place_type='locality'
+                    )
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error in Google reverse geocoding: {e}")
+            return None
+    
+    def find_nearest_major_city(self, lat: float, lon: float) -> Optional[PlaceResult]:
+        """
+        Find nearest major city for regional context (no distance limit)
+        """
+        try:
+            # Search for cities within increasingly larger radii
+            for radius_miles in [25, 50, 100, 200]:
+                radius_meters = int(radius_miles * 1609.34)
+                
+                url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+                params = {
+                    'location': f"{lat},{lon}",
+                    'radius': radius_meters,
+                    'type': 'locality',
+                    'key': self.api_key
+                }
+                
+                response = requests.get(url, params=params, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+                
+                if data.get('results'):
+                    # Find cities, prioritize by prominence/rating
+                    cities = [r for r in data['results'] if r.get('rating', 0) > 3.5 or r.get('user_ratings_total', 0) > 100]
+                    if not cities:
+                        cities = data['results']
+                    
+                    if cities:
+                        closest_city = min(cities, key=lambda p: self._calculate_distance(
+                            lat, lon,
+                            p['geometry']['location']['lat'],
+                            p['geometry']['location']['lng']
+                        ))
+                        
+                        distance = self._calculate_distance(
+                            lat, lon,
+                            closest_city['geometry']['location']['lat'],
+                            closest_city['geometry']['location']['lng']
+                        )
+                        
+                        return PlaceResult(
+                            name=closest_city['name'],
+                            distance_miles=round(distance, 1),
+                            lat=closest_city['geometry']['location']['lat'],
+                            lon=closest_city['geometry']['location']['lng'],
+                            place_type='major_city'
+                        )
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error finding major city: {e}")
+            return None
+    
+    def find_other_nearby_places(self, lat: float, lon: float, radius_miles: float = 15) -> List[PlaceResult]:
+        """
+        Phase 3: Find other nearby places within 15 miles
+        """
+        places = []
+        
+        try:
+            radius_meters = int(radius_miles * 1609.34)
+            
+            # Search for various place types
+            search_types = ['locality', 'sublocality', 'natural_feature', 'park', 'point_of_interest']
+            
+            for place_type in search_types:
+                url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+                params = {
+                    'location': f"{lat},{lon}",
+                    'radius': radius_meters,
+                    'type': place_type,
+                    'key': self.api_key
+                }
+                
+                response = requests.get(url, params=params, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+                
+                for result in data.get('results', [])[:5]:  # Limit results per type
+                    distance = self._calculate_distance(
+                        lat, lon,
+                        result['geometry']['location']['lat'],
+                        result['geometry']['location']['lng']
+                    )
+                    
+                    if distance <= radius_miles:
+                        places.append(PlaceResult(
+                            name=result['name'],
+                            distance_miles=round(distance, 1),
+                            lat=result['geometry']['location']['lat'],
+                            lon=result['geometry']['location']['lng'],
+                            place_type=place_type
+                        ))
+            
+            # Remove duplicates and sort by distance
+            unique_places = {}
+            for place in places:
+                if place.name not in unique_places or place.distance_miles < unique_places[place.name].distance_miles:
+                    unique_places[place.name] = place
+            
+            return sorted(unique_places.values(), key=lambda p: p.distance_miles)[:6]
+            
+        except Exception as e:
+            logger.error(f"Error finding nearby places: {e}")
+            return []
+    
+    def enrich_location(self, lat: float, lon: float, spc_reference_city: str = None) -> Dict[str, Any]:
+        """
+        Complete location enrichment using 3-tier Google Places architecture
+        """
+        enrichment = {
+            'nearby_places': []
+        }
+        
+        logger.info(f"Starting Google Places enrichment for {lat:.4f}, {lon:.4f}")
+        
+        # Phase 1: Event Location (within 5 miles)
+        event_location = self.find_event_location(lat, lon)
+        if not event_location:
+            # Fallback to reverse geocoding for town/city name
+            event_location = self.find_nearest_place_by_geocoding(lat, lon)
+        
+        if event_location:
+            enrichment['nearby_places'].append({
+                'name': event_location.name,
+                'distance_miles': event_location.distance_miles,
+                'approx_lat': event_location.lat,
+                'approx_lon': event_location.lon,
+                'type': 'primary_location'
+            })
+            logger.info(f"Event Location: {event_location.name} at {event_location.distance_miles} miles")
+        
+        # Phase 2: Nearest Major City (no distance limit)
+        major_city = self.find_nearest_major_city(lat, lon)
+        if major_city:
+            enrichment['nearby_places'].append({
+                'name': major_city.name,
+                'distance_miles': major_city.distance_miles,
+                'approx_lat': major_city.lat,
+                'approx_lon': major_city.lon,
+                'type': 'nearest_city'
+            })
+            logger.info(f"Nearest Major City: {major_city.name} at {major_city.distance_miles} miles")
+        
+        # Phase 3: Other Nearby Places (within 15 miles)
+        other_places = self.find_other_nearby_places(lat, lon)
+        for place in other_places:
+            # Skip if already added as primary location or major city
+            existing_names = [p['name'] for p in enrichment['nearby_places']]
+            if place.name not in existing_names:
+                enrichment['nearby_places'].append({
+                    'name': place.name,
+                    'distance_miles': place.distance_miles,
+                    'approx_lat': place.lat,
+                    'approx_lon': place.lon,
+                    'type': 'nearby_place'
+                })
+                logger.info(f"Nearby Place: {place.name} at {place.distance_miles} miles")
+        
+        return enrichment

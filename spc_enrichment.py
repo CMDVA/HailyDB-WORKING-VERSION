@@ -15,6 +15,7 @@ from sqlalchemy import text
 from app import db
 from models import SPCReport, RadarAlert
 from config import Config
+from google_places_service import GooglePlacesService
 
 # OpenAI integration
 from openai import OpenAI
@@ -31,6 +32,7 @@ class SPCEnrichmentService:
     
     def __init__(self):
         self.openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        self.google_places = GooglePlacesService()
     
     def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """
@@ -77,15 +79,17 @@ class SPCEnrichmentService:
             )
             enrichment.update(radar_match)
             
-            # Generate nearby places (pass SPC location for reference city extraction)
-            nearby_places = self._generate_nearby_places(
+            # Generate nearby places using Google Places API
+            spc_reference_city = self._extract_spc_reference_city(
+                spc_report.location if hasattr(spc_report, 'location') else None
+            ) if hasattr(spc_report, 'location') else None
+            
+            google_places_data = self.google_places.enrich_location(
                 spc_report.latitude,
                 spc_report.longitude,
-                spc_report.county,
-                spc_report.state,
-                spc_report.location if hasattr(spc_report, 'location') else None
+                spc_reference_city
             )
-            enrichment['nearby_places'] = nearby_places
+            enrichment.update(google_places_data)
             
             # Generate enriched summary
             enriched_summary = self._generate_enriched_summary(
@@ -202,220 +206,7 @@ class SPCEnrichmentService:
                     
         return None
 
-    def _generate_nearby_places(self, lat: float, lon: float, county: str, state: str, spc_location: str = None) -> List[Dict[str, Any]]:
-        """
-        Generate location identification using ONLY SPC lat/lon coordinates.
-        Returns publicly identifiable, Google Maps-searchable places in priority order.
-        
-        Args:
-            lat: Latitude of SPC report
-            lon: Longitude of SPC report  
-            county: County name
-            state: State abbreviation
-            
-        Returns:
-            List with Event Location first, then Nearest Major City for context
-        """
-        try:
-            # Extract SPC reference city first
-            spc_reference_city = self._extract_spc_reference_city(spc_location) if spc_location else None
-            logger.info(f"SPC reference city extracted: {spc_reference_city}")
-            
-            # Three-phase search with proper distance limits and structured results
-            
-            # Phase 1: Event Location (within 5 miles, prioritize SPC reference city)
-            event_location_prompt = f"""
-            You are a location specialist finding the closest publicly identifiable, Google Maps-searchable place to coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
 
-            SPC REFERENCE PRIORITY: {f"The SPC report references '{spc_reference_city}' - PRIORITIZE this city if it exists within 5 miles" if spc_reference_city else "No SPC city reference provided"}
-
-            PRIORITY ORDER for Event Location (WITHIN 5 MILES ONLY):
-            
-            1️⃣ IF SPC REFERENCE CITY EXISTS: "{spc_reference_city if spc_reference_city else 'N/A'}"
-            - If {spc_reference_city} is within 5 miles, use it as Event Location
-            
-            2️⃣ CLOSEST PUBLIC PLACE with known name and address:
-            - Schools (K-12, colleges, universities)
-            - Hospitals, medical centers
-            - Fire stations, police stations
-            - Parks or public recreation areas
-            - Libraries, civic centers
-            - Named public buildings (city hall, post office)
-            
-            3️⃣ IF no public place within 5 miles → CLOSEST NAMED COMMUNITY:
-            - Small communities, CDP (Census Designated Places)
-            - Villages, unincorporated places, townships
-            - Named neighborhoods or districts
-            
-            4️⃣ IF no named place within 5 miles → USE SPC REFERENCE:
-            - Use "{spc_reference_city}" even if slightly beyond 5 miles (up to 10 miles)
-            
-            Return JSON format:
-            {{
-                "event_location": {{
-                    "name": "Recluse",
-                    "distance_miles": 6.2,
-                    "approx_lat": 44.900,
-                    "approx_lon": -105.750,
-                    "type": "community"
-                }}
-            }}
-            """
-            
-            # Phase 2: Nearest Major City (NO distance limit)
-            major_city_prompt = f"""
-            You are a regional context specialist. Find the closest major city to coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
-
-            REQUIREMENTS:
-            - Find the closest major city (population > 10,000) for regional anchor context
-            - NO DISTANCE LIMIT - find the closest major city regardless of distance
-            - Provide exact distance in miles from {lat:.4f}, {lon:.4f}
-            - Include approximate coordinates of the major city
-            
-            Return JSON format:
-            {{
-                "nearest_major_city": {{
-                    "name": "Gillette",
-                    "distance_miles": 40.5,
-                    "approx_lat": 44.291,
-                    "approx_lon": -105.502,
-                    "type": "major_city"
-                }}
-            }}
-            """
-            
-            # Phase 3: Other Nearby Places (within 15 miles)
-            nearby_places_prompt = f"""
-            You are a proximity specialist finding nearby places within 15 miles of coordinates {lat:.4f}, {lon:.4f} in {county} County, {state}.
-
-            SEARCH CRITERIA (WITHIN 15 MILES ONLY):
-            - Named communities, towns, villages
-            - Historic places and settlements
-            - Parks, landmarks, geographic features
-            - Other recognizable places
-            
-            REQUIREMENTS:
-            - Find 2-4 closest places within 15 miles
-            - Exclude major cities (handled separately)
-            - Provide exact coordinates and distances
-            
-            Return JSON format:
-            {{
-                "nearby_places": [
-                    {{"name": "Weston", "distance_miles": 2.0, "approx_lat": 44.850, "approx_lon": -105.600, "type": "community"}},
-                    {{"name": "Moorcroft", "distance_miles": 12.3, "approx_lat": 44.263, "approx_lon": -104.948, "type": "town"}}
-                ]
-            }}
-            """
-            
-            # Execute all three searches
-            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
-            # do not change this unless explicitly requested by the user
-            event_location_response = self.openai_client.chat.completions.create(
-                model="gpt-4o", 
-                messages=[
-                    {"role": "system", "content": "You are a location specialist finding publicly identifiable places within strict distance limits."},
-                    {"role": "user", "content": event_location_prompt}
-                ],
-                response_format={"type": "json_object"},
-                max_tokens=300,
-                temperature=0.1
-            )
-            
-            major_city_response = self.openai_client.chat.completions.create(
-                model="gpt-4o", 
-                messages=[
-                    {"role": "system", "content": "You are a regional context specialist with no distance limits for major cities."},
-                    {"role": "user", "content": major_city_prompt}
-                ],
-                response_format={"type": "json_object"},
-                max_tokens=200,
-                temperature=0.1
-            )
-            
-            nearby_places_response = self.openai_client.chat.completions.create(
-                model="gpt-4o", 
-                messages=[
-                    {"role": "system", "content": "You are a proximity specialist finding places within 15 miles."},
-                    {"role": "user", "content": nearby_places_prompt}
-                ],
-                response_format={"type": "json_object"},
-                max_tokens=400,
-                temperature=0.1
-            )
-            
-            # Parse results
-            event_location_result = json.loads(event_location_response.choices[0].message.content)
-            major_city_result = json.loads(major_city_response.choices[0].message.content)
-            nearby_places_result = json.loads(nearby_places_response.choices[0].message.content)
-            
-            logger.info(f"Event location search result: {event_location_result}")
-            logger.info(f"Major city search result: {major_city_result}")
-            logger.info(f"Nearby places search result: {nearby_places_result}")
-            
-            # Build structured results list
-            places_list = []
-            
-            # Add Event Location (if found within 5 miles)
-            if 'event_location' in event_location_result and event_location_result['event_location']:
-                event_loc = event_location_result['event_location']
-                
-                if 'approx_lat' in event_loc and 'approx_lon' in event_loc:
-                    actual_distance = self._calculate_distance(
-                        lat, lon, event_loc['approx_lat'], event_loc['approx_lon']
-                    )
-                    
-                    if actual_distance <= 5.0:  # Double-check 5 mile limit
-                        places_list.append({
-                            'name': event_loc['name'],
-                            'distance_miles': round(actual_distance, 1),
-                            'approx_lat': event_loc['approx_lat'],
-                            'approx_lon': event_loc['approx_lon'],
-                            'type': 'primary_location'
-                        })
-                        logger.info(f"Event Location: {event_loc['name']} at {actual_distance:.1f} miles")
-            
-            # Add Nearest Major City (no distance limit)
-            if 'nearest_major_city' in major_city_result and major_city_result['nearest_major_city']:
-                city_data = major_city_result['nearest_major_city']
-                
-                if 'approx_lat' in city_data and 'approx_lon' in city_data:
-                    actual_distance = self._calculate_distance(
-                        lat, lon, city_data['approx_lat'], city_data['approx_lon']
-                    )
-                    
-                    places_list.append({
-                        'name': city_data['name'],
-                        'distance_miles': round(actual_distance, 1),
-                        'approx_lat': city_data['approx_lat'],
-                        'approx_lon': city_data['approx_lon'],
-                        'type': 'nearest_city'
-                    })
-                    logger.info(f"Nearest Major City: {city_data['name']} at {actual_distance:.1f} miles")
-            
-            # Add Other Nearby Places (within 15 miles)
-            if 'nearby_places' in nearby_places_result and nearby_places_result['nearby_places']:
-                for place in nearby_places_result['nearby_places']:
-                    if 'approx_lat' in place and 'approx_lon' in place:
-                        actual_distance = self._calculate_distance(
-                            lat, lon, place['approx_lat'], place['approx_lon']
-                        )
-                        
-                        if actual_distance <= 15.0:  # Enforce 15 mile limit
-                            places_list.append({
-                                'name': place['name'],
-                                'distance_miles': round(actual_distance, 1),
-                                'approx_lat': place['approx_lat'],
-                                'approx_lon': place['approx_lon'],
-                                'type': 'nearby_place'
-                            })
-                            logger.info(f"Nearby Place: {place['name']} at {actual_distance:.1f} miles")
-            
-            return places_list
-                
-        except Exception as e:
-            logger.error(f"Error generating nearby places for {lat}, {lon}: {e}")
-            return []
     
     def _generate_enriched_summary(self, spc_report: SPCReport, enrichment: Dict[str, Any]) -> str:
         """
