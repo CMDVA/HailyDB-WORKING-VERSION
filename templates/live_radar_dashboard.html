@@ -535,12 +535,6 @@ function proceedWithDisplay(tbody, alerts) {
     
     console.log('Building table rows for', filteredAlerts.length, 'alerts...');
     
-    const tbody = document.getElementById('liveRadarTableBody');
-    if (!tbody) {
-        console.error('Table body element not found!');
-        return;
-    }
-    
     tbody.innerHTML = filteredAlerts.map(alert => {
         // Extract wind and hail data from the correct API response structure
         let hailSize = (alert.radar_data && alert.radar_data.hail_inches) || alert.max_hail_size || 0;
