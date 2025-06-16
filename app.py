@@ -1303,7 +1303,7 @@ def view_spc_report_detail(report_id):
         nearest_major_city = None
         nearby_places = []
         
-        # PRIORITY: Use Enhanced Context v2.0 data first (most accurate with improved city detection)
+        # Use Enhanced Context v2.0 data (single source of truth with improved city detection)
         if enhanced_context_data and 'location_context' in enhanced_context_data:
             location_context = enhanced_context_data['location_context']
             if 'nearby_places' in location_context and location_context['nearby_places']:
@@ -1331,35 +1331,6 @@ def view_spc_report_detail(report_id):
                 
                 # Set all nearby places for display
                 nearby_places = location_context['nearby_places']
-        
-        # Fallback to spc_enrichment (old format) if Enhanced Context unavailable
-        elif hasattr(report, 'spc_enrichment') and report.spc_enrichment:
-            try:
-                if isinstance(report.spc_enrichment, str):
-                    enrichment = json.loads(report.spc_enrichment)
-                else:
-                    enrichment = report.spc_enrichment
-                
-                # Get primary location (smallest nearby place)
-                if 'primary_location' in enrichment and enrichment['primary_location']:
-                    primary_location = {
-                        'name': enrichment['primary_location'].get('name', ''),
-                        'distance_miles': enrichment['primary_location'].get('distance_miles', 0)
-                    }
-                
-                # Get nearest major city
-                if 'nearest_major_city' in enrichment and enrichment['nearest_major_city']:
-                    nearest_major_city = {
-                        'name': enrichment['nearest_major_city'].get('name', ''),
-                        'distance_miles': enrichment['nearest_major_city'].get('distance_miles', 0)
-                    }
-                
-                # Get nearby places
-                if 'nearby_places' in enrichment:
-                    nearby_places = enrichment['nearby_places']
-                    
-            except (json.JSONDecodeError, TypeError):
-                pass
         
         # Final fallback - never show county as primary location for end users
         if not primary_location:
