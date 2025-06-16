@@ -1,0 +1,108 @@
+Strengths:
+Follows Flask best practices for initializing the app and database.
+
+Includes structured comments and docstrings for some filters and utilities.
+
+Uses ProxyFix, useful if deploying behind a reverse proxy.
+
+Live radar service is modularized (init_live_radar_service, etc.).
+
+Logger configured properly at the top.
+
+🛠️ Critical Issues and Recommendations
+1. Redundant or Unused Imports
+json is imported twice — once at the top and again inside determine_enhanced_status. Remove duplicate import.
+
+Several imports (like request, redirect, flash, url_for) are not used in the visible portion and may be unused across the file — audit for dead imports.
+
+2. Overloaded app initialization block
+You’re doing too much inside with app.app_context(). This includes:
+
+Creating DB schema
+
+Instantiating services
+
+Starting services
+
+Better practice: separate DB setup, background task launching, and application logic into separate files (e.g. startup.py or factory pattern with blueprints).
+
+Recommendation:
+Move initialization logic into /services/init.py or startup.py and only call it from here.
+
+3. Tight coupling to SQLAlchemy session
+Using a manual Session via sessionmaker when SQLAlchemy already manages sessions.
+
+If you need fine-grained control, use scoped_session or context-managed sessions.
+
+4. Missing lifecycle handling for background jobs
+You're using apscheduler but I don't see its configuration or startup in this fragment.
+
+Does the scheduler shut down cleanly with the app?
+
+Are job exceptions logged properly?
+
+Is the scheduler configured for Flask context-awareness?
+
+If not, move it to a @app.before_first_request or initialize it in a managed background task class.
+
+5. Hardcoded configuration logic
+python
+Copy
+Edit
+app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
+Use Config class or environment-based Flask.config.from_object() to avoid inline config sprawl.
+
+6. No separation of concerns
+This file mixes DB, UI filters, and background services.
+
+Consider separating into:
+
+/filters/jinja_filters.py
+
+/services/live_radar.py
+
+/routes/ui_routes.py
+
+Modular design allows faster debugging and collaboration, and reduces the chance of merge conflicts.
+
+7. Custom Jinja2 filters should include fallback behavior
+You’re calling Config.get_hail_display_name() and Config.get_hail_severity() in filters, but don’t show where Config is imported.
+
+What happens if Config is None or unavailable at runtime?
+
+Add try/catch and log a warning.
+
+8. Poor error specificity
+python
+Copy
+Edit
+except Exception as e:
+    logger.error(f"Error initializing services: {e}")
+This swallows stack trace context.
+
+Use logger.exception("...") instead of logger.error() to capture traceback.
+
+9. Lack of CORS / API protections
+If this is serving external clients, you should integrate:
+
+CORS middleware (e.g. Flask-CORS)
+
+Rate limiting (e.g. Flask-Limiter)
+
+API key or JWT-based access control for /api/ endpoints
+
+10. HTML rendering logic mixed in with service code
+render_template is imported but not yet used (in preview).
+
+If HTML routes are defined here alongside API and service code, separate them into routes_html.py.
+
+⚠️ Summary of Technical Bloat / Refactor Priorities
+Issue	Severity	Fix Priority
+Service logic bloated in app init	High	🔴 Immediate
+Redundant imports	Medium	🟠 Short-term
+No modular config separation	Medium	🟠 Short-term
+Poor separation of Jinja filters	Medium	🟠 Short-term
+Logger misuse in exception	Medium	🟠 Short-term
+Missing CORS/rate-limit protections	High	🔴 Immediate
+Manual SQLAlchemy session	Medium	🟠 Short-term
+Scheduler not clearly isolated	Medium	🟠 Short-term

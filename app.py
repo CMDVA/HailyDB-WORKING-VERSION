@@ -4880,7 +4880,7 @@ Focus on impact and professional terminology."""
             "success": True,
             "report_id": report_id,
             "enhanced_context": enhanced_context,
-            "message": "Enhanced Context generated successfully"
+            "message": "Enhanced Contexet generated successfully"
         })
         
     except Exception as e:
