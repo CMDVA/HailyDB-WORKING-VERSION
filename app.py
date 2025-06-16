@@ -1377,12 +1377,9 @@ def view_spc_report_detail(report_id):
                 'distance_miles': 0
             }
         
-        # Ensure alert_count is set on the enhanced_context object
-        if hasattr(report, 'enhanced_context') and report.enhanced_context:
-            report.enhanced_context.alert_count = len(matching_alerts)
-            
         return render_template('spc_report_detail.html', 
                              report=report,
+                             enhanced_context=enhanced_context_obj,
                              enhanced_context_data=enhanced_context_data,
                              primary_location=primary_location,
                              nearest_major_city=nearest_major_city,
