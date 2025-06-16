@@ -98,6 +98,14 @@ The system integrates with multiple authoritative weather data sources:
 
 ```
 Changelog:
+- June 16, 2025: TECH DEBT CLEANUP & Enhanced Context System Restoration COMPLETE
+  * REMOVED: 6 conflicting Enhanced Context files that caused system confusion
+  * RESTORED: Working Enhanced Context system using existing app.py functions
+  * FIXED: UNK magnitude handling for both WIND and HAIL report types
+  * ENHANCED: Google Places API restaurant filtering to exclude food establishments
+  * OPERATIONAL: Enhanced Context backfill system generating summaries with proper location hierarchy
+  * AUTONOMOUS: System processing all SPC reports with Google Places location enrichment
+  * PRODUCTION: Enhanced Context v2.0 now stable with proper error handling
 - June 16, 2025: Enhanced Context v2.0 with Complete Location Hierarchy OPERATIONAL
   * FIXED: Enhanced Context generation now uses complete Google Places location hierarchy
   * IMPLEMENTED: Event Location (smallest nearby place), Nearest Major City (with distance), Nearby Places (establishment list)

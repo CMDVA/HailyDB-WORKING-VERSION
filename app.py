@@ -4216,7 +4216,7 @@ def test_enhanced_context_generation(report_id):
         if not report:
             return jsonify({"success": False, "error": f"Report {report_id} not found"}), 404
         
-        # Extract magnitude value from JSON if needed
+        # Extract magnitude value from JSON if needed with UNK handling
         magnitude_value = None
         if report.magnitude:
             if isinstance(report.magnitude, dict):
@@ -4227,13 +4227,29 @@ def test_enhanced_context_generation(report_id):
             else:
                 magnitude_value = report.magnitude
         
-        # Format magnitude display
+        # Filter out UNK values early
+        if magnitude_value and str(magnitude_value).upper() == 'UNK':
+            magnitude_value = None
+        
+        # Format magnitude display with UNK handling
         if report.report_type.upper() == "WIND":
-            magnitude_display = f"{int(magnitude_value)} mph" if magnitude_value else "unknown speed"
+            if magnitude_value and str(magnitude_value).upper() != 'UNK':
+                try:
+                    magnitude_display = f"{int(float(magnitude_value))} mph"
+                except (ValueError, TypeError):
+                    magnitude_display = "unknown speed"
+            else:
+                magnitude_display = "unknown speed"
         elif report.report_type.upper() == "HAIL":
-            magnitude_display = f"{magnitude_value:.2f} inch" if magnitude_value else "unknown size"
+            if magnitude_value and str(magnitude_value).upper() != 'UNK':
+                try:
+                    magnitude_display = f"{float(magnitude_value):.2f} inch"
+                except (ValueError, TypeError):
+                    magnitude_display = "unknown size"
+            else:
+                magnitude_display = "unknown size"
         else:
-            magnitude_display = str(magnitude_value) if magnitude_value else "unknown magnitude"
+            magnitude_display = str(magnitude_value) if magnitude_value and str(magnitude_value).upper() != 'UNK' else "unknown magnitude"
         
         # Create basic Enhanced Context summary
         enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event was reported at {report.location} in {report.county} County, {report.state}. The {report.report_type.lower()} measured {magnitude_display}."
@@ -4363,18 +4379,23 @@ def enhanced_context_backfill():
                         primary_location_name = closest_place.get('name', report.location)
                 
                 # Create professional Enhanced Context summary using Google Places data
-                if report.report_type.upper() == "WIND" and magnitude_value:
-                    if magnitude_value >= 74:
+                try:
+                    numeric_magnitude = float(magnitude_value) if magnitude_value else 0
+                except (ValueError, TypeError):
+                    numeric_magnitude = 0
+                
+                if report.report_type.upper() == "WIND" and numeric_magnitude > 0:
+                    if numeric_magnitude >= 74:
                         damage_desc = "Capable of causing significant structural damage to buildings and vehicles."
-                    elif magnitude_value >= 58:
+                    elif numeric_magnitude >= 58:
                         damage_desc = "Strong enough to damage roofs, break windows, and down large trees."
                     else:
                         damage_desc = "Sufficient to cause minor property damage and tree limb breakage."
                     enhanced_summary = f"On {report.report_date}, damaging winds reached {magnitude_display} at {primary_location_name}. {damage_desc}"
-                elif report.report_type.upper() == "HAIL" and magnitude_value:
-                    if magnitude_value >= 2.0:
+                elif report.report_type.upper() == "HAIL" and numeric_magnitude > 0:
+                    if numeric_magnitude >= 2.0:
                         damage_desc = "Large enough to cause severe vehicle damage and roof penetration."
-                    elif magnitude_value >= 1.0:
+                    elif numeric_magnitude >= 1.0:
                         damage_desc = "Size sufficient to damage vehicles and cause roof impacts."
                     else:
                         damage_desc = "Small hail capable of minor vehicle and property damage."
