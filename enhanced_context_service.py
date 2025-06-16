@@ -246,95 +246,59 @@ class EnhancedContextService:
         return {}
     
     def _assess_hail_damage(self, size_inches: float) -> Dict[str, Any]:
-        """Assess hail damage probability based on NWS damage classification"""
-        # NWS Hail Damage Classification Table
-        if size_inches >= 4.5:  # Grapefruit+
+        """Assess historical hail damage based on our existing damage classification table"""
+        # Use our existing hail damage lookup table for historical events
+        if size_inches >= 4.0:  # Softball+
             return {
-                "assessment": "Damage Potential: Severe structural damage likely to roofs, vehicles, and crops. Major property damage expected.",
-                "category": "Severe",
-                "probability": "High"
+                "assessment": "Giant hail likely caused severe property damage including roof penetration, vehicle destruction, and injury risk.",
+                "category": "Giant Hail",
+                "severity": "Extreme Damage"
             }
-        elif size_inches >= 2.75:  # Baseball+
+        elif size_inches >= 2.0:  # Egg/Tennis Ball+
             return {
-                "assessment": "Damage Potential: Significant damage likely to roofs, vehicles, and agriculture. Extensive property damage probable.",
-                "category": "Significant",
-                "probability": "High"
-            }
-        elif size_inches >= 1.75:  # Golf Ball+
-            return {
-                "assessment": "Damage Potential: Moderate to severe damage expected to vehicles, roofs, and crops. Property damage likely.",
-                "category": "Moderate-Severe",
-                "probability": "Moderate-High"
+                "assessment": "Very large hail likely caused substantial damage to vehicles, roofing, siding, and outdoor equipment.",
+                "category": "Very Large Hail",
+                "severity": "Significant Damage"
             }
         elif size_inches >= 1.0:  # Quarter+
             return {
-                "assessment": "Damage Potential: Minor to moderate damage possible to vehicles and crops. Some property damage expected.",
-                "category": "Minor-Moderate",
-                "probability": "Moderate"
-            }
-        elif size_inches >= 0.75:  # Penny+
-            return {
-                "assessment": "Damage Potential: Minor damage possible to crops and sensitive surfaces. Vehicle dents possible.",
-                "category": "Minor",
-                "probability": "Low-Moderate"
+                "assessment": "Large hail likely caused dents to vehicles, cracked windows, damage to roofing materials, siding, and gutters.",
+                "category": "Large Hail",
+                "severity": "Minor Damage"
             }
         else:  # Smaller hail
             return {
-                "assessment": "Damage Potential: Minimal damage expected. Possible minor crop or garden damage.",
-                "category": "Minimal",
-                "probability": "Low"
+                "assessment": "Small hail typically caused minimal damage but may have affected crops and outdoor equipment.",
+                "category": "Small Hail",
+                "severity": "Minimal Damage"
             }
     
     def _assess_wind_damage(self, speed_mph: float) -> Dict[str, Any]:
-        """Assess wind damage probability based on Enhanced Fujita Scale"""
-        # Enhanced Fujita Scale Wind Damage Classification
-        if speed_mph >= 200:  # EF5
+        """Assess historical wind damage based on our existing damage classification table"""
+        # Use our existing wind damage lookup table for historical events
+        if speed_mph >= 75:  # Violent Wind
             return {
-                "assessment": "Damage Potential: Catastrophic destruction. Well-built structures leveled, automobiles thrown significant distances.",
-                "category": "Catastrophic",
-                "probability": "Extreme"
+                "assessment": "Violent winds likely caused widespread damage to structures, trees, and power lines.",
+                "category": "Violent Wind",
+                "severity": "Extreme Damage"
             }
-        elif speed_mph >= 166:  # EF4
+        elif speed_mph >= 65:  # Very Damaging Wind
             return {
-                "assessment": "Damage Potential: Devastating structural damage. Well-constructed homes severely damaged or destroyed.",
-                "category": "Devastating",
-                "probability": "Extreme"
-            }
-        elif speed_mph >= 136:  # EF3
-            return {
-                "assessment": "Damage Potential: Severe structural damage. Roofs and walls torn from well-constructed buildings.",
-                "category": "Severe",
-                "probability": "High"
-            }
-        elif speed_mph >= 111:  # EF2
-            return {
-                "assessment": "Damage Potential: Considerable structural damage. Mobile homes destroyed, large trees snapped.",
-                "category": "Considerable",
-                "probability": "High"
-            }
-        elif speed_mph >= 86:  # EF1
-            return {
-                "assessment": "Damage Potential: Moderate structural damage. Roof damage, mobile homes overturned, trees uprooted.",
-                "category": "Moderate",
-                "probability": "Moderate-High"
-            }
-        elif speed_mph >= 65:  # EF0
-            return {
-                "assessment": "Damage Potential: Light structural damage. Peeling roof surfaces, broken branches, shallow-rooted trees pushed over.",
-                "category": "Light",
-                "probability": "Moderate"
+                "assessment": "Very damaging winds likely caused structural damage and widespread power outages.",
+                "category": "Very Damaging Wind",
+                "severity": "Significant Damage"
             }
         elif speed_mph >= 58:  # Severe threshold
             return {
-                "assessment": "Damage Potential: Minor structural damage. Tree limbs broken, loose outdoor objects become projectiles.",
-                "category": "Minor",
-                "probability": "Low-Moderate"
+                "assessment": "Severe winds likely caused tree damage and power outages in the area.",
+                "category": "Severe Wind",
+                "severity": "Minor Damage"
             }
         else:
             return {
-                "assessment": "Damage Potential: Minimal damage expected. Possible minor debris movement.",
-                "category": "Minimal",
-                "probability": "Low"
+                "assessment": "Moderate winds may have caused minor tree limb damage and debris movement.",
+                "category": "Moderate Wind", 
+                "severity": "Minimal Damage"
             }
     
     def _check_verified_warnings(self, report, db_session: Session) -> List[Dict[str, Any]]:
