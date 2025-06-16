@@ -3970,8 +3970,6 @@ def api_get_spc_enhanced_context(report_id):
     API endpoint to retrieve enhanced context for a specific SPC report
     """
     try:
-        from spc_enhanced_context import enrich_spc_report_context
-        
         # Get the SPC report
         report = db.session.query(SPCReport).filter_by(id=report_id).first()
         if not report:
@@ -3979,7 +3977,8 @@ def api_get_spc_enhanced_context(report_id):
         
         # Generate enhanced context if not present
         if not report.enhanced_context or report.enhanced_context == {}:
-            enhanced_context = enrich_spc_report_context(report_id)
+            result = enhanced_context_service.generate_enhanced_context(report, db.session)
+            enhanced_context = result.get('enhanced_context', {})
         else:
             enhanced_context = report.enhanced_context
         
@@ -4004,170 +4003,15 @@ def api_generate_enhanced_context():
                 "error": "Missing report_id parameter"
             }), 400
         
-        # Use Enhanced Context v2.0 system with production fixes
-        # Enhanced Context is now handled directly in app.py functions
-        from datetime import datetime
-        
         # Get the report
         report = db.session.get(SPCReport, report_id)
         if not report:
             return jsonify({"success": False, "error": f"Report {report_id} not found"}), 404
         
-        # Use the working Enhanced Context generation logic directly
-        from google_places_service import GooglePlacesService
+        # Use the new Enhanced Context Service for clean separation of concerns
+        result = enhanced_context_service.generate_enhanced_context(report, db.session)
         
-        # Extract magnitude value from JSON if needed with UNK handling
-        magnitude_value = None
-        if report.magnitude:
-            if isinstance(report.magnitude, dict):
-                if report.report_type.upper() == "WIND" and 'speed' in report.magnitude:
-                    magnitude_value = report.magnitude['speed']
-                elif report.report_type.upper() == "HAIL" and 'size_inches' in report.magnitude:
-                    magnitude_value = report.magnitude['size_inches']
-            else:
-                magnitude_value = report.magnitude
-        
-        # Filter out UNK values early
-        if magnitude_value and str(magnitude_value).upper() == 'UNK':
-            magnitude_value = None
-        
-        # Format magnitude display with UNK handling
-        if report.report_type.upper() == "WIND":
-            if magnitude_value and str(magnitude_value).upper() != 'UNK':
-                try:
-                    magnitude_display = f"{int(float(magnitude_value))} mph"
-                except (ValueError, TypeError):
-                    magnitude_display = "unknown speed"
-            else:
-                magnitude_display = "unknown speed"
-        elif report.report_type.upper() == "HAIL":
-            if magnitude_value and str(magnitude_value).upper() != 'UNK':
-                try:
-                    magnitude_display = f"{float(magnitude_value):.2f} inch"
-                except (ValueError, TypeError):
-                    magnitude_display = "unknown size"
-            else:
-                magnitude_display = "unknown size"
-        else:
-            magnitude_display = str(magnitude_value) if magnitude_value and str(magnitude_value).upper() != 'UNK' else "unknown magnitude"
-        
-        # Get Google Places location context
-        places_service = GooglePlacesService()
-        location_context = places_service.enrich_location(
-            lat=float(report.latitude) if report.latitude else 0,
-            lon=float(report.longitude) if report.longitude else 0
-        )
-        
-        # Build comprehensive location context with 6 geo data points
-        event_location = None
-        event_distance = None
-        event_direction = ""
-        nearest_major_city = None
-        major_city_distance = None
-        major_city_direction = ""
-        nearby_places_text = ""
-        
-        if location_context and location_context.get('nearby_places'):
-            nearby_places = location_context['nearby_places']
-            
-            # Extract event location (primary_location)
-            for place in nearby_places:
-                if place.get('type') == 'primary_location':
-                    event_location = place.get('name')
-                    event_distance = place.get('distance_miles')
-                    
-                    # Calculate direction FROM event coordinates TO the location
-                    if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
-                        lat_diff = float(report.latitude) - float(place['approx_lat'])
-                        lon_diff = float(report.longitude) - float(place['approx_lon'])
-                        
-                        if abs(lat_diff) > abs(lon_diff):
-                            event_direction = "north" if lat_diff > 0 else "south"
-                        else:
-                            event_direction = "east" if lon_diff > 0 else "west"
-                    break
-            
-            # Extract nearest major city with direction
-            for place in nearby_places:
-                if place.get('type') == 'nearest_city':
-                    nearest_major_city = place.get('name')
-                    major_city_distance = place.get('distance_miles')
-                    
-                    # Calculate direction FROM event coordinates TO major city
-                    if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
-                        lat_diff = float(report.latitude) - float(place['approx_lat'])
-                        lon_diff = float(report.longitude) - float(place['approx_lon'])
-                        
-                        if abs(lat_diff) > abs(lon_diff):
-                            major_city_direction = "north" if lat_diff > 0 else "south"
-                        else:
-                            major_city_direction = "east" if lon_diff > 0 else "west"
-                    break
-            
-            # Build nearby places text (closest 2-3 places)
-            nearby_place_items = []
-            for place in nearby_places:
-                if place.get('type') == 'nearby_place' and len(nearby_place_items) < 3:
-                    name = place.get('name')
-                    distance = place.get('distance_miles')
-                    if name and distance:
-                        nearby_place_items.append(f"{name} ({distance:.1f} mi)")
-            
-            if nearby_place_items:
-                nearby_places_text = f". Nearby places include {', '.join(nearby_place_items)}"
-        
-        # Generate comprehensive Enhanced Context summary with 6 geo data points
-        enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred"
-        
-        # Add magnitude information
-        if magnitude_value:
-            try:
-                mag_val = float(magnitude_value)
-                if report.report_type.upper() == "HAIL":
-                    enhanced_summary += f" with {mag_val:.2f}\" hail"
-                elif report.report_type.upper() == "WIND":
-                    enhanced_summary += f" with {int(mag_val)} mph winds"
-            except (ValueError, TypeError):
-                pass
-        
-        # Build comprehensive location context using the 6 geo data points
-        location_text = f" at {report.location}"
-        
-        if event_location and event_distance:
-            if event_direction:
-                location_text += f", located {event_direction} {event_distance:.1f} miles from {event_location}"
-            else:
-                location_text += f", located {event_distance:.1f} miles from {event_location}"
-        
-        if nearest_major_city and major_city_distance:
-            if major_city_direction:
-                location_text += f", or {major_city_direction} {major_city_distance:.1f} miles from {nearest_major_city}"
-            else:
-                location_text += f", or {major_city_distance:.1f} miles from {nearest_major_city}"
-        
-        enhanced_summary += location_text + nearby_places_text + "."
-        
-        # Store enhanced context in the database
-        enhanced_context = {
-            "enhanced_summary": enhanced_summary,
-            "location_context": location_context,
-            "generated_at": datetime.utcnow().isoformat(),
-            "version": "v2.0"
-        }
-        
-        # Save to database with proper transaction handling
-        report.enhanced_context = enhanced_context
-        report.enhanced_context_version = "v2.0"
-        report.enhanced_context_generated_at = datetime.utcnow()
-        db.session.commit()
-        
-        return jsonify({
-            "success": True,
-            "report_id": report_id,
-            "enhanced_context": enhanced_context,
-            "message": "Enhanced context generated successfully",
-            "version": "v2.0"
-        })
+        return jsonify(result)
         
     except Exception as e:
         logger.error(f"Error generating enhanced context for report {report_id}: {str(e)}")
