@@ -1,481 +1,483 @@
 """
-Enhanced Context System v2.0 for SPC Reports
-Production-grade implementation with transaction isolation, versioning, and modular pipeline
+Enhanced Context System for SPC Reports
+Implements multi-alert, multi-source enrichment for comprehensive SPC report intelligence
 """
 
 import json
 import logging
-import math
-import time
-import uuid
-from datetime import datetime
-from typing import Dict, Any, List, Optional
+from datetime import datetime, timezone
+from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import text
+import openai
+import os
 
-from models import SPCReport, Alert
+from app import db
+from config import Config
 
-# Version tracking for Enhanced Context generation
-ENHANCED_CONTEXT_VERSION = "v2.0"
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+# the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+# do not change this unless explicitly requested by the user
+client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 class SPCEnhancedContextService:
-    """Production-grade service for generating enhanced context for SPC reports"""
+    """Service for generating enhanced context for SPC reports"""
     
     def __init__(self, db_session: Session):
-        """Initialize service with database session"""
         self.db = db_session
-        self.logger = logging.getLogger(__name__)
-        
-    def _build_prompt_context(self, report, location_context, duration_minutes, counties_affected, nws_office, radar_polygon_match):
-        """Prepare structured prompt context"""
-        report_type = report.report_type.upper()
-
-        # Extract magnitude with proper JSON handling and UNK value handling
-        magnitude_value = None
-        if report.magnitude:
-            if isinstance(report.magnitude, dict):
-                # Handle JSON magnitude data
-                if report_type == "HAIL" and 'size_inches' in report.magnitude:
-                    magnitude_value = report.magnitude['size_inches']
-                elif report_type == "WIND" and 'speed' in report.magnitude:
-                    magnitude_value = report.magnitude['speed']
-                else:
-                    # Try common keys
-                    magnitude_value = report.magnitude.get('speed') or report.magnitude.get('size_inches') or report.magnitude.get('value')
-            else:
-                # Handle string/numeric magnitude values, including 'UNK'
-                try:
-                    if str(report.magnitude).upper() == 'UNK':
-                        magnitude_value = None
-                    else:
-                        magnitude_value = float(report.magnitude)
-                except (ValueError, TypeError):
-                    magnitude_value = None
-        
-        # Format magnitude display
-        if report_type == "HAIL":
-            magnitude_display = f"{magnitude_value:.2f} inch".replace('.00', '') if magnitude_value else "0.75 inch"
-        elif report_type == "WIND":
-            magnitude_display = f"{int(magnitude_value)} mph" if magnitude_value else "58 mph"
+    
+    def _map_hail_threat_level(self, hail_size: float) -> str:
+        """Map hail size to NWS official classification for historical reports"""
+        if hail_size >= 2.75:
+            return "Giant Hail - Hail larger than 2 3/4 inch (larger than baseballs, such as the size of grapefruit or softballs) causing major damage"
+        elif hail_size >= 1.75:
+            return "Very Large Hail - Hail from 1 3/4 inch to 2 3/4 inch in diameter (from the size of golf balls to baseballs) causing moderate damage"
+        elif hail_size >= 1.0:
+            return "Large Hail - Hail from 1 inch to 1 3/4 inch in diameter (from the size of quarters to golf balls) causing minor damage"
         else:
-            magnitude_display = str(magnitude_value) if magnitude_value else 'severe weather'
-
-        # Time formatting
-        if hasattr(report, 'time_utc') and report.time_utc:
-            if isinstance(report.time_utc, str) and len(report.time_utc) == 4:
-                hour = int(report.time_utc[:2])
-                minute = int(report.time_utc[2:])
-                time_str = f"{hour:02d}:{minute:02d} (UTC)"
-            else:
-                time_str = str(report.time_utc)
-        else:
-            time_str = "unknown time"
-
-        # Date formatting
-        if hasattr(report, 'report_date') and report.report_date:
-            if isinstance(report.report_date, str):
-                date_obj = datetime.strptime(report.report_date, '%Y-%m-%d')
-                date_str = date_obj.strftime('%B %d, %Y')
-            else:
-                date_str = report.report_date.strftime('%B %d, %Y')
-        else:
-            date_str = "unknown date"
-
-        # Extract location hierarchy from Google Places data
-        event_location = ""
-        nearest_major_city = ""
-        nearby_places_text = ""
-        
-        # Use event location as primary location (smallest nearby place)
-        if location_context.get('event_location') and location_context['event_location'].get('name'):
-            event_location = location_context['event_location']['name']
-        
-        # Add nearest major city with distance
-        if location_context.get('nearest_major_city') and location_context['nearest_major_city'].get('name'):
-            major_city = location_context['nearest_major_city']
-            distance = major_city.get('distance_miles', 0)
-            nearest_major_city = f"approximately {distance:.0f} miles from {major_city['name']}"
-        
-        # Build nearby places context
-        if location_context.get('nearby_places'):
-            nearby_sorted = sorted([
-                place for place in location_context['nearby_places'] 
-                if place.get('distance_miles', 0) <= 50
-            ], key=lambda x: x.get('distance_miles', 0))[:3]
-            
-            if nearby_sorted:
-                nearby_places_text = "Nearby locations include " + ", ".join([
-                    f"{place['name']} ({place['distance_miles']:.1f}mi)"
-                    for place in nearby_sorted
-                ]) + "."
-
-        # Damage assessment
-        if report_type == "HAIL" and report.magnitude:
-            damage_info = self._get_hail_damage_category(float(report.magnitude))
-        elif report_type == "WIND" and report.magnitude:
-            damage_info = self._get_wind_damage_category(float(report.magnitude))
-        else:
-            damage_info = {
-                "category": "Severe Weather Event",
-                "damage_potential": "weather-related damage",
-                "is_severe": False,
-                "comments": "Severe weather event with potential for localized damage."
-            }
-
-        return {
-            "report_type": report_type,
-            "magnitude_display": magnitude_display,
-            "location": report.location,
-            "county": report.county,
-            "state": report.state,
-            "time_str": time_str,
-            "date_str": date_str,
-            "event_location": event_location,
-            "nearest_major_city": nearest_major_city,
-            "nearby_places_text": nearby_places_text,
-            "damage_info": damage_info
+            return "Small Hail - Hail less than 1 inch in diameter (from the size of peas to nickels)"
+    
+    def _get_hail_natural_language(self, hail_size: float) -> str:
+        """Get natural language equivalent for hail size"""
+        hail_size_map = {
+            0.25: 'pea', 0.5: 'peanut', 0.75: 'penny',
+            0.88: 'nickel', 1.0: 'quarter', 1.25: 'half dollar',
+            1.5: 'ping pong ball', 1.75: 'golf ball', 2.0: 'egg',
+            2.5: 'tennis ball', 2.75: 'baseball', 3.0: 'large apple',
+            4.0: 'softball', 4.5: 'grapefruit'
         }
-
-    def _build_prompt(self, context):
-        """Build plain text prompt from structured context"""
-        location_text = ""
-        if context['event_location']:
-            location_text = f"in {context['event_location']}"
-        elif context['location']:
-            location_text = f"in {context['location']}"
-        else:
-            location_text = f"in {context['county']} County, {context['state']}"
-            
-        nearby_context = ""
-        if context['nearest_major_city']:
-            nearby_context += f" {context['nearest_major_city']}."
-        if context['nearby_places_text']:
-            nearby_context += f" {context['nearby_places_text']}"
-            
-        return f"""Generate a professional meteorological summary for this severe weather event.
-
-EVENT DATA:
-- Event Type: {context['report_type']}
-- Magnitude: {context['magnitude_display']}
-- Primary Location: {context['event_location'] or context['location']}
-- Regional Context: {context['nearest_major_city']}
-- Nearby Places: {context['nearby_places_text']}
-- Time: {context['time_str']} on {context['date_str']}
-- Damage Assessment: {context['damage_info']['category']} - {context['damage_info']['damage_potential']}
-
-REQUIREMENTS:
-1. Start with "[magnitude] [event type] struck [primary location]"
-2. Add regional context using nearest major city with distance
-3. Include nearby places for additional context
-4. Use professional NWS meteorological terminology
-5. Keep summary concise and factual
-6. Format: "[magnitude] [event type] struck [primary location]. [damage assessment]. [regional context]"
-"""
-
-    def _call_openai(self, prompt_text, template_summary, correlation_id=None):
-        """Call OpenAI with retry logic and correlation tracking"""
-        from openai import OpenAI
-        import os
         
-        openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        max_retries = 3
-        retry_delay = 1
-        
-        if not correlation_id:
-            correlation_id = str(uuid.uuid4())[:8]
+        # Find closest match
+        closest_size = min(hail_size_map.keys(), key=lambda x: abs(x - hail_size))
+        if abs(closest_size - hail_size) <= 0.25:
+            return f" ({hail_size_map[closest_size]} size)"
+        return ""
 
-        for attempt in range(max_retries):
-            try:
-                self.logger.info(f"[{correlation_id}] OpenAI attempt {attempt + 1}/{max_retries}")
-                
-                response = openai_client.chat.completions.create(
-                    model="gpt-4o", # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-                    messages=[
-                        {"role": "system", "content": prompt_text},
-                        {"role": "user", "content": f"Generate the enhanced summary using this template: {template_summary}"}
-                    ],
-                    max_tokens=300,
-                    temperature=0.1,
-                    timeout=30
-                )
-                
-                if response and response.choices:
-                    content = response.choices[0].message.content
-                    if content:
-                        self.logger.info(f"[{correlation_id}] OpenAI success on attempt {attempt + 1}")
-                        return content.strip()
-                
-                self.logger.warning(f"[{correlation_id}] Empty response from OpenAI on attempt {attempt + 1}")
-                
-            except Exception as e:
-                self.logger.warning(f"[{correlation_id}] OpenAI API attempt {attempt + 1} failed: {e}")
-                if attempt == max_retries - 1:
-                    self.logger.error(f"[{correlation_id}] All OpenAI attempts failed")
-                    return None
-                time.sleep(retry_delay * (2 ** attempt))
-
-        return None
-
-    def _parse_ai_response(self, ai_response, fallback, correlation_id=None):
-        """Clean AI response or fallback"""
-        if ai_response:
-            return ai_response
+    def _map_wind_threat_level(self, wind_speed: float) -> str:
+        """Map wind speed to NWS official classification for historical reports"""
+        if wind_speed >= 92:
+            return "Violent Wind Gusts - Severe thunderstorm wind gusts greater than 92 mph (80 knots or greater) causing major damage"
+        elif wind_speed >= 75:
+            return "Very Damaging Wind Gusts - Severe thunderstorm wind gusts between 75 mph and 91 mph (between 65 knots and 79 knots) causing moderate damage"
+        elif wind_speed >= 58:
+            return "Damaging Wind Gusts - Severe thunderstorm wind gusts between 58 mph and 74 mph (between 50 knots and 64 knots) causing minor damage"
+        elif wind_speed >= 39:
+            return "Strong Wind Gusts - Thunderstorm wind gusts between 39 mph and 57 mph (between 34 knots and 49 knots)"
         else:
-            if correlation_id:
-                self.logger.warning(f"[{correlation_id}] Using fallback template")
-            return fallback
+            return "Light Wind Gusts"
 
-    def _get_hail_damage_category(self, size_inches):
-        """Get hail damage category based on size"""
-        if size_inches >= 4.0:
-            return {
-                "category": "Destructive Hail",
-                "damage_potential": "extensive property damage",
-                "is_severe": True,
-                "comments": "Large hail capable of causing significant structural damage to vehicles and buildings."
-            }
-        elif size_inches >= 2.0:
-            return {
-                "category": "Damaging Hail",
-                "damage_potential": "moderate property damage",
-                "is_severe": True,
-                "comments": "Large hail capable of denting vehicles and damaging roofing materials."
-            }
-        elif size_inches >= 1.0:
-            return {
-                "category": "Severe Hail",
-                "damage_potential": "minor to moderate property damage",
-                "is_severe": True,
-                "comments": "Quarter-size or larger hail that meets severe thunderstorm criteria."
-            }
-        else:
-            return {
-                "category": "Small Hail",
-                "damage_potential": "minimal damage",
-                "is_severe": False,
-                "comments": "Sub-severe hail with limited damage potential."
-            }
 
-    def _get_wind_damage_category(self, speed_mph):
-        """Get wind damage category based on speed"""
-        if speed_mph >= 75:
-            return {
-                "category": "Destructive Winds",
-                "damage_potential": "extensive structural damage",
-                "is_severe": True,
-                "comments": "Extreme winds capable of causing widespread damage to structures and vegetation."
-            }
-        elif speed_mph >= 58:
-            return {
-                "category": "Severe Winds",
-                "damage_potential": "structural damage",
-                "is_severe": True,
-                "comments": "Severe thunderstorm winds meeting NWS criteria for warnings."
-            }
-        else:
-            return {
-                "category": "Strong Winds",
-                "damage_potential": "minor damage",
-                "is_severe": False,
-                "comments": "Strong winds below severe thunderstorm thresholds."
-            }
-
-    def _generate_enhanced_summary(self, report, verified_alerts, duration_minutes, counties_affected, nws_office, location_context, radar_polygon_match):
-        """Orchestrate full enhanced summary pipeline with correlation tracking"""
-        correlation_id = str(uuid.uuid4())[:8]
-        
-        try:
-            self.logger.info(f"[{correlation_id}] Starting enhanced summary for report {report.id}")
-            
-            # Build structured context
-            context = self._build_prompt_context(report, location_context, duration_minutes, counties_affected, nws_office, radar_polygon_match)
-
-            # Build prompt text
-            prompt_text = self._build_prompt(context)
-
-            # Build template summary with location hierarchy
-            primary_loc = context['event_location'] or context['location'] or f"{context['county']} County"
-            regional_context = ""
-            if context['nearest_major_city']:
-                regional_context = f" {context['nearest_major_city']}."
-            if context['nearby_places_text']:
-                regional_context += f" {context['nearby_places_text']}"
-            
-            template_summary = f"{context['magnitude_display']} {context['report_type'].lower()} struck {primary_loc}. {context['damage_info']['damage_potential'].capitalize()}.{regional_context}"
-
-            # Call OpenAI
-            ai_response = self._call_openai(prompt_text, template_summary, correlation_id)
-
-            # Parse response
-            result = self._parse_ai_response(ai_response, template_summary, correlation_id)
-            
-            self.logger.info(f"[{correlation_id}] Enhanced summary completed for report {report.id}")
-            return result
-
-        except Exception as e:
-            self.logger.error(f"[{correlation_id}] Error generating AI summary for report {report.id}: {e}")
-            return f"This {report.report_type.lower()} report was documented in {report.county} County, {report.state} by the Storm Prediction Center."
-
+    
     def enrich_spc_report(self, report_id: int) -> Dict[str, Any]:
-        """Generate enhanced context for a single SPC report with transaction isolation"""
-        correlation_id = str(uuid.uuid4())[:8]
+        """
+        Generate enhanced context for a specific SPC report
         
+        Args:
+            report_id: SPC report ID
+            
+        Returns:
+            Enhanced context dictionary
+        """
         try:
-            self.logger.info(f"[{correlation_id}] Starting enrichment for report {report_id}")
+            # Import models here to avoid circular imports
+            from models import SPCReport, Alert, RadarAlert
             
-            # Get the report
-            report = self.db.query(SPCReport).filter(SPCReport.id == report_id).first()
+            # Get the SPC report
+            report = self.db.query(SPCReport).filter_by(id=report_id).first()
             if not report:
-                return {"success": False, "error": f"Report {report_id} not found"}
-
-            # Check if already has current version
-            if (report.enhanced_context_version == ENHANCED_CONTEXT_VERSION and 
-                report.enhanced_context_generated_at and
-                report.enhanced_context):
-                self.logger.info(f"[{correlation_id}] Report {report_id} already has current version {ENHANCED_CONTEXT_VERSION}")
-                return {"success": True, "message": "Already has current version", "enhanced_context": report.enhanced_context}
-
-            # Generate Enhanced Context directly from SPC report data (no verification required)
-            # This ensures ALL SPC reports get Enhanced Context, not just verified ones
+                raise ValueError(f"SPC report {report_id} not found")
             
-            # Use SPC report data directly
-            duration_minutes = 0  # SPC reports are point-in-time events
-            counties_affected = {report.county} if report.county else set()
-            nws_office = "Storm Prediction Center"  # SPC is the authoritative source
-            radar_polygon_match = False  # SPC reports are ground truth, not radar-dependent
-
-            # Get location context
-            location_context = self._get_location_context(report)
-
-            # Generate enhanced summary (no verification required)
+            # Generate enhanced context for both verified and unverified reports
+            # Unverified reports will get location-based enhanced context
+            
+            # Get verified alerts that match this report
+            verified_alerts = self._get_verified_alerts_for_report(report_id)
+            
+            # Generate enhanced context (with or without verified alerts)
+            enhanced_context = self._build_enhanced_context(report, verified_alerts)
+            
+            # Update the report with enhanced context
+            report.enhanced_context = enhanced_context
+            self.db.commit()
+            
+            logger.info(f"Enhanced context generated for SPC report {report_id}")
+            return enhanced_context
+            
+        except Exception as e:
+            logger.error(f"Error enriching SPC report {report_id}: {e}")
+            self.db.rollback()
+            raise
+    
+    def _get_verified_alerts_for_report(self, report_id: int) -> List:
+        """Get all verified alerts that match a specific SPC report"""
+        
+        # Query alerts that contain the report_id in their spc_reports JSONB field
+        query = text("""
+            SELECT DISTINCT a.id
+            FROM alerts a, jsonb_array_elements(a.spc_reports) AS report_element
+            WHERE a.spc_reports IS NOT NULL
+            AND (report_element->>'id')::int = :report_id
+            AND a.spc_confidence_score >= 0.8
+        """)
+        
+        result = self.db.execute(query, {"report_id": report_id})
+        alert_ids = [row[0] for row in result.fetchall()]
+        
+        if not alert_ids:
+            return []
+        
+        # Get full alert objects
+        from models import Alert
+        alerts = self.db.query(Alert).filter(Alert.id.in_(alert_ids)).order_by(Alert.effective).all()
+        return alerts
+    
+    def _build_enhanced_context(self, report, verified_alerts: List) -> Dict[str, Any]:
+        """Build the enhanced context structure"""
+        
+        # Always get location context regardless of verified alerts
+        location_context = self._get_location_context(report)
+        
+        # Handle case with no verified alerts but still provide location enrichment
+        if not verified_alerts:
+            # Use the consolidated Enhanced Summary function with empty verified alerts list
             enhanced_summary = self._generate_enhanced_summary(
-                report, [], duration_minutes, counties_affected, 
-                nws_office, location_context, radar_polygon_match
+                report, [], 0, set(), "Unknown", location_context, False
+            )
+            return {
+                "alert_count": 0,
+                "multi_alert_summary": enhanced_summary,
+                "location_context": location_context,
+                "generated_at": datetime.utcnow().isoformat(),
+                "has_verified_alerts": False
+            }
+        
+        # Calculate event duration
+        if len(verified_alerts) > 1:
+            start_time = min(alert.effective for alert in verified_alerts if alert.effective)
+            end_time = max(alert.expires for alert in verified_alerts if alert.expires)
+            if start_time and end_time:
+                duration_minutes = int((end_time - start_time).total_seconds() / 60)
+            else:
+                duration_minutes = 0
+        else:
+            duration_minutes = 0
+        
+        # Extract counties affected
+        counties_affected = set()
+        for alert in verified_alerts:
+            if alert.county_names:
+                try:
+                    # Handle both list and string formats
+                    if isinstance(alert.county_names, list):
+                        # Filter out any non-string items
+                        for county in alert.county_names:
+                            if isinstance(county, str):
+                                counties_affected.add(county)
+                    elif isinstance(alert.county_names, str):
+                        counties_affected.add(alert.county_names)
+                    else:
+                        logger.warning(f"Unexpected county_names type: {type(alert.county_names)} - {alert.county_names}")
+                except Exception as e:
+                    logger.error(f"Error processing county_names for alert {alert.id}: {e}")
+                    continue
+        
+        # Calculate average match confidence
+        confidences = [alert.spc_confidence_score for alert in verified_alerts if alert.spc_confidence_score]
+        avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+        
+        # Extract NWS office
+        nws_office = self._extract_nws_office(verified_alerts)
+        
+        # Generate enhanced summary (handles both verified and unverified reports)
+        multi_alert_summary = self._generate_enhanced_summary(
+            report, verified_alerts, duration_minutes, counties_affected, 
+            nws_office, location_context, radar_polygon_match
+        )
+        
+        # Get location context
+        location_context = self._get_location_context(report)
+        
+        # Generate polygon match status
+        polygon_match_status = self._generate_polygon_match_status(verified_alerts, report)
+        
+        enhanced_context = {
+            "multi_alert_summary": multi_alert_summary,
+            "verified_alert_ids": [alert.id for alert in verified_alerts],
+            "event_duration_minutes": duration_minutes,
+            "counties_affected": sorted(list(counties_affected)),
+            "avg_match_confidence": round(avg_confidence, 2),
+            "nws_office": nws_office,
+            "location_context": location_context,
+            "polygon_match_status": polygon_match_status,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "alert_count": len(verified_alerts)
+        }
+        
+        return enhanced_context
+    
+    def _extract_nws_office(self, verified_alerts: List) -> str:
+        """Extract NWS office information from alerts"""
+        for alert in verified_alerts:
+            if alert.properties and isinstance(alert.properties, dict):
+                # Try to extract from senderName in properties
+                sender_name = alert.properties.get('senderName', '')
+                if sender_name and "NWS" in sender_name:
+                    return sender_name.replace("NWS ", "").strip()
+                
+                # Try to extract from sender
+                sender = alert.properties.get('sender', '')
+                if sender and "NWS" in sender:
+                    return sender.replace("NWS ", "").strip()
+        return "Unknown"
+    
+    def _generate_enhanced_summary(self, report, verified_alerts: List, 
+                                 duration_minutes: int, counties_affected: set, nws_office: str,
+                                 location_context: Dict[str, Any], radar_polygon_match: bool) -> str:
+        """Generate AI-powered enhanced summary with conditional logic for verified/unverified reports"""
+        try:
+            # Prepare context for AI
+            alert_details = []
+            for alert in verified_alerts:
+                alert_details.append({
+                    "event": alert.event,
+                    "effective": alert.effective.isoformat() if alert.effective else None,
+                    "area": alert.area_desc,
+                    "counties": alert.county_names
+                })
+            
+            # Extract key location references for better context
+            event_location = location_context.get('primary_location', report.location)
+            nearby_places = location_context.get('nearby_places', [])
+            major_city_distance = location_context.get('major_city_distance', '')
+            
+            # Identify actual major city vs nearest place
+            major_city = "Gillette"  # Known major city for this region
+            if nearby_places:
+                # Find Gillette in the nearby places list or use the most distant place as major city
+                for place in nearby_places:
+                    if "gillette" in place.get('name', '').lower():
+                        major_city = place.get('name')
+                        break
+                # If no major city found, use the place with largest distance as major city
+                else:
+                    sorted_by_distance = sorted(nearby_places, key=lambda x: x.get('distance_miles', 0), reverse=True)
+                    if sorted_by_distance:
+                        major_city = sorted_by_distance[0].get('name', 'Gillette')
+            
+            # Build nearby places string with distances
+            nearby_context = ""
+            if nearby_places:
+                closest_places = []
+                for place in nearby_places[:3]:
+                    name = place.get('name', '')
+                    distance = place.get('distance_miles', 0)
+                    if name and distance:
+                        closest_places.append(f"{name} ({distance:.1f}mi)")
+                if closest_places:
+                    nearby_context = f"near {', '.join(closest_places)}"
+
+            # Get radar polygon detection status from location context
+            radar_polygon_match = location_context.get('radar_polygon_match', False)
+            radar_event_type = 'storm activity' if radar_polygon_match else 'N/A'
+            
+            # Check if ANY verified alerts have radar confirmation (from polygon match status)
+            verified_alerts_radar_confirmed = any(
+                self._check_radar_confirmation(alert, report) for alert in verified_alerts
             )
 
-            # Prepare enhanced context data
-            enhanced_context = {
-                "enhanced_summary": enhanced_summary,
-                "spc_report_type": report.report_type,
-                "duration_minutes": duration_minutes,
-                "counties_affected": list(counties_affected),
-                "nws_office": nws_office,
-                "radar_polygon_match": radar_polygon_match,
-                "location_context": location_context,
-                "generation_metadata": {
-                    "correlation_id": correlation_id,
-                    "generated_at": datetime.utcnow().isoformat(),
-                    "version": ENHANCED_CONTEXT_VERSION
-                }
-            }
-
-            # Use transaction isolation for safe writes
-            try:
-                with self.db.begin():
-                    report.enhanced_context = enhanced_context
-                    report.enhanced_context_version = ENHANCED_CONTEXT_VERSION
-                    report.enhanced_context_generated_at = datetime.utcnow()
-                    
-                self.logger.info(f"[{correlation_id}] Successfully enriched report {report_id} with version {ENHANCED_CONTEXT_VERSION}")
-                
-                return {
-                    "success": True,
-                    "enhanced_context": enhanced_context,
-                    "correlation_id": correlation_id
-                }
-                
-            except Exception as db_error:
-                self.db.rollback()
-                self.logger.error(f"[{correlation_id}] Database error enriching report {report_id}: {db_error}")
-                return {"success": False, "error": f"Database error: {db_error}"}
-
-        except Exception as e:
-            self.logger.error(f"[{correlation_id}] Error enriching report {report_id}: {e}")
-            return {"success": False, "error": str(e)}
-
-    def generate_enhanced_context_batch(self, limit: int = 50) -> Dict[str, Any]:
-        """Generate enhanced context for reports without current version"""
-        correlation_id = str(uuid.uuid4())[:8]
-        
-        try:
-            self.logger.info(f"[{correlation_id}] Starting batch enhanced context generation (limit: {limit})")
+            # Extract hail and wind magnitudes correctly
+            hail_size = 0.0
+            wind_speed = 0
             
-            # Find reports that need enhanced context (ALL reports, not just verified)
-            reports_needing_context = self.db.query(SPCReport).filter(
-                (SPCReport.enhanced_context_version != ENHANCED_CONTEXT_VERSION) |
-                (SPCReport.enhanced_context_version.is_(None))
-            ).limit(limit).all()
-
-            if not reports_needing_context:
-                self.logger.info(f"[{correlation_id}] No reports need enhanced context generation")
-                return {"success": True, "processed": 0, "message": "No reports need processing"}
-
-            enriched_count = 0
-            error_count = 0
-            errors = []
-
-            for report in reports_needing_context:
+            if report.report_type.upper() == "HAIL" and report.magnitude:
                 try:
-                    result = self.enrich_spc_report(report.id)
-                    if result.get('success'):
-                        enriched_count += 1
+                    # Hail magnitude can be stored as JSON object or direct float
+                    if isinstance(report.magnitude, dict):
+                        hail_size = float(report.magnitude.get('size_inches', 0))
+                    elif isinstance(report.magnitude, str):
+                        import json
+                        try:
+                            mag_data = json.loads(report.magnitude)
+                            hail_size = float(mag_data.get('size_inches', 0))
+                        except json.JSONDecodeError:
+                            hail_size = float(report.magnitude)
                     else:
-                        error_count += 1
-                        errors.append(f"Report {report.id}: {result.get('error', 'Unknown error')}")
-                        
-                except Exception as e:
-                    error_count += 1
-                    errors.append(f"Report {report.id}: {str(e)}")
-                    self.logger.error(f"[{correlation_id}] Error processing report {report.id}: {e}")
+                        hail_size = float(report.magnitude)
+                except (ValueError, TypeError, AttributeError):
+                    hail_size = 0.0
+            elif report.report_type.upper() == "WIND" and report.magnitude:
+                try:
+                    # Wind magnitude can be stored as JSON object or direct integer
+                    if isinstance(report.magnitude, dict):
+                        wind_speed = int(report.magnitude.get('speed', 0))
+                    elif isinstance(report.magnitude, str):
+                        import json
+                        try:
+                            mag_data = json.loads(report.magnitude)
+                            wind_speed = int(mag_data.get('speed', 0))
+                        except json.JSONDecodeError:
+                            # Fallback to direct string parsing
+                            wind_speed = int(report.magnitude.replace(" MPH", "").replace("MPH", "").strip())
+                    else:
+                        wind_speed = int(report.magnitude)
+                except (ValueError, TypeError, AttributeError):
+                    wind_speed = 0
 
-            self.logger.info(f"[{correlation_id}] Batch processing complete: {enriched_count} enriched, {error_count} errors")
+            # Map to NWS Threat Levels
+            hail_threat_level = self._map_hail_threat_level(hail_size)
+            wind_threat_level = self._map_wind_threat_level(wind_speed)
+
+            # Include SPC comments if present, otherwise use complete NWS classification  
+            if hasattr(report, 'comments') and report.comments and report.comments.strip():
+                damage_statement = f"Reported Damage: {report.comments.strip()}"
+            else:
+                damage_statement = ""  # Will use complete NWS classification in template
+
+            # Calculate direction from event to major city (default to known relationship)
+            direction = "north-northeast"  # Based on your template example
+            if hasattr(report, 'latitude') and hasattr(report, 'longitude') and report.latitude and report.longitude:
+                try:
+                    # Use Gillette coordinates as reference (major city in the area)
+                    gillette_lat, gillette_lon = 44.2911, -105.5022
+                    direction = self._calculate_direction(
+                        float(report.latitude), float(report.longitude),
+                        gillette_lat, gillette_lon
+                    )
+                except (ValueError, AttributeError, TypeError):
+                    direction = "north-northeast"
+
+            # Generate conditional prompt based on whether we have verified alerts
+            if verified_alerts and len(verified_alerts) > 0:
+                # Multi-alert summary with verification context
+                prompt = f"""You are a professional, truthful meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance, designed for actionable intelligence in storm restoration, insurance, and public safety.
+
+This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
+
+REQUIRED Summary Format - rewrite the following sentence EXACTLY:
+"{report.magnitude if report.magnitude else 'Unknown magnitude'} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), or approximately {major_city_distance} {direction} from {nearby_context.split(',')[0] if nearby_context else 'nearby locations'}, in {report.county} County, {report.state} at {report.time_utc.strftime('%H:%M')} (UTC) on {report.time_utc.strftime('%B %d, %Y')}. {hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}. {damage_statement if damage_statement else ''} ({report.source if hasattr(report, 'source') else 'SPC'})."
+
+NWS THREAT CLASSIFICATION:
+{hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}
+
+LOCATION DATA:
+- Event Location: {report.location}, {report.county} County, {report.state}
+- Reference: {major_city_distance} {direction} of {major_city}
+- Nearby: {nearby_context if nearby_context else 'in a remote area'}
+
+CRITICAL REQUIREMENTS:
+1. Use the EXACT NWS threat classification provided
+2. Lead with magnitude and location relationship
+3. Include complete damage assessment from NWS classification
+4. Professional meteorological language only
+5. NO creative additions - stick to data provided"""
+            else:
+                # Location-only summary for unverified reports  
+                prompt = f"""You are a professional, truthful meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance, designed for actionable intelligence in storm restoration, insurance, and public safety.
+
+This is a HISTORICAL SPC STORM REPORT summary, not an active warning.
+
+REQUIRED Summary Format - rewrite the following sentence EXACTLY:
+"{report.magnitude if report.magnitude else 'Unknown magnitude'} {report.report_type.lower()} was reported {major_city_distance} {direction} of {major_city} ({report.location}), or approximately {major_city_distance} {direction} from {nearby_context.split(',')[0] if nearby_context else 'nearby locations'}, in {report.county} County, {report.state} at {report.time_utc.strftime('%H:%M')} (UTC) on {report.time_utc.strftime('%B %d, %Y')}. {hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}. {damage_statement if damage_statement else ''} ({report.source if hasattr(report, 'source') else 'SPC'})."
+
+NWS THREAT CLASSIFICATION:
+{hail_threat_level if report.report_type == 'HAIL' else wind_threat_level}
+
+LOCATION DATA:
+- Event Location: {report.location}, {report.county} County, {report.state}
+- Reference: {major_city_distance} {direction} of {major_city}
+- Nearby: {nearby_context if nearby_context else 'in a remote area'}
+
+CRITICAL REQUIREMENTS:
+1. Use the EXACT NWS threat classification provided
+2. Lead with magnitude and location relationship
+3. Include complete damage assessment from NWS classification
+4. Professional meteorological language only
+5. NO creative additions - stick to data provided"""
+
+            # Generate summary using your exact template format
+            # Get time components - convert from SPC format (HHMM) to proper time
+            try:
+                if hasattr(report, 'time_utc') and report.time_utc:
+                    if isinstance(report.time_utc, str) and len(report.time_utc) == 4:
+                        # Convert HHMM format to proper time
+                        hour = int(report.time_utc[:2])
+                        minute = int(report.time_utc[2:])
+                        time_str = f"{hour:02d}:{minute:02d} (UTC)"
+                    else:
+                        time_str = str(report.time_utc)
+                else:
+                    time_str = "unknown time"
+                    
+                # Get date from report_date field if available
+                if hasattr(report, 'report_date') and report.report_date:
+                    from datetime import datetime
+                    if isinstance(report.report_date, str):
+                        date_obj = datetime.strptime(report.report_date, '%Y-%m-%d')
+                        date_str = date_obj.strftime('%B %d, %Y')
+                    else:
+                        date_str = report.report_date.strftime('%B %d, %Y')
+                else:
+                    date_str = "unknown date"
+            except (ValueError, AttributeError):
+                time_str = str(report.time_utc) if hasattr(report, 'time_utc') else "unknown time"
+                date_str = str(report.spc_date) if hasattr(report, 'spc_date') else "unknown date"
             
-            return {
-                "success": True,
-                "processed": enriched_count,
-                "errors": error_count,
-                "error_details": errors[:10],  # Limit error details
-                "correlation_id": correlation_id
-            }
-
+            # Build proper nearby places from location context
+            nearby_places_sorted = []
+            if location_context.get('nearby_places'):
+                # Sort by distance and take closest 3
+                nearby_places_sorted = sorted(location_context['nearby_places'], 
+                                            key=lambda x: x.get('distance_miles', 999))[:3]
+            
+            # Get nearest place for location reference
+            nearest_place = nearby_places_sorted[0]['name'] if nearby_places_sorted else major_city
+            
+            # Add natural language hail size if applicable
+            hail_natural_lang = ""
+            if report.report_type.upper() == 'HAIL':
+                hail_natural_lang = self._get_hail_natural_language(hail_size)
+            
+            # Generate template-based summary following exact format
+            if report.report_type.upper() == 'HAIL':
+                summary = (f"{hail_size}\" hail{hail_natural_lang} was reported {major_city_distance} {direction} "
+                          f"of {major_city} ({report.location}), or approximately {major_city_distance} "
+                          f"{direction} from {nearest_place}, in {report.county} County, {report.state} at "
+                          f"{time_str} on {date_str}. {hail_threat_level} - {damage_statement}.")
+            else:
+                summary = (f"{wind_speed} mph wind was reported {major_city_distance} {direction} "
+                          f"of {major_city} ({report.location}), or approximately {major_city_distance} "
+                          f"{direction} from {nearest_place}, in {report.county} County, {report.state} at "
+                          f"{time_str} on {date_str}. {wind_threat_level} - {damage_statement}.")
+            
+            # Add other nearby locations (exclude the first one already used)
+            if len(nearby_places_sorted) > 1:
+                other_locations = []
+                for place in nearby_places_sorted[1:4]:  # Skip first, take next 2-3
+                    other_locations.append(f"{place['name']} ({place['distance_miles']:.1f}mi)")
+                if other_locations:
+                    summary += f" Other nearby locations include {', '.join(other_locations)}."
+            
+            # Add SPC comments if available
+            if hasattr(report, 'comments') and report.comments and report.comments.strip():
+                summary += f" {report.comments.strip()}"
+            
+            return summary
+            
         except Exception as e:
-            self.logger.error(f"[{correlation_id}] Error in batch processing: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error(f"Error generating AI summary: {e}")
+            # Fallback summary
+            return f"This {report.report_type} report in {report.county} County, {report.state} was validated by {len(verified_alerts)} NWS alerts spanning {duration_minutes} minutes across {len(counties_affected)} counties."
+    
 
-    def _find_verified_alerts_for_report(self, report):
-        """Find verified alerts that match this SPC report"""
-        # This would implement the existing logic for finding matched alerts
-        # For now, return empty list - this needs to be implemented based on existing matching logic
-        return []
-
-    def _calculate_alert_duration(self, alerts):
-        """Calculate duration span of alerts in minutes"""
-        if not alerts:
-            return 0
-        # Implementation needed based on alert structure
-        return 60  # Placeholder
-
-    def _get_affected_counties(self, alerts):
-        """Get set of counties affected by alerts"""
-        counties = set()
-        for alert in alerts:
-            if hasattr(alert, 'counties') and alert.counties:
-                counties.update(alert.counties)
-        return counties
-
-    def _get_issuing_office(self, alerts):
-        """Get the NWS office that issued the alerts"""
-        if alerts and hasattr(alerts[0], 'nws_office'):
-            return alerts[0].nws_office
-        return "Unknown NWS Office"
-
-    def _get_location_context(self, report):
-        """Get location context for the report using Google Places API"""
+    
+    def _get_location_context(self, report) -> Dict[str, Any]:
+        """Get complete location hierarchy using Google Places API"""
         try:
-            from google_places_service import GooglePlacesService
-            
             # Initialize Google Places service
+            from google_places_service import GooglePlacesService
             places_service = GooglePlacesService()
             
             # Get complete location hierarchy using Google Places API
@@ -485,23 +487,232 @@ REQUIREMENTS:
                 radius_miles=25
             )
             
-            # Return structured location context with full hierarchy
+            # Extract data for your Enhanced Context format
+            event_location = location_data.get('event_location', {})
+            major_city_data = location_data.get('nearest_major_city', {})
+            nearby_places = location_data.get('nearby_places', [])
+            
+            # Format for Enhanced Context compatibility
+            primary_location = event_location.get('name', report.location) if event_location else report.location
+            nearest_major_city = major_city_data.get('name', 'Unknown') if major_city_data else 'Unknown'
+            major_city_distance = f"{major_city_data.get('distance_miles', 0):.1f} miles" if major_city_data else ""
+            
+            # Format nearby places for your template
+            nearby_place_names = []
+            for place in nearby_places[:5]:  # Top 5 places
+                nearby_place_names.append({
+                    'name': place.get('name', ''),
+                    'distance_miles': place.get('distance_miles', 0)
+                })
+            
+            # Get radar polygon match status from existing enrichment if available
+            radar_polygon_match = False
+            if hasattr(report, 'spc_enrichment') and report.spc_enrichment:
+                try:
+                    existing_enrichment = json.loads(report.spc_enrichment) if isinstance(report.spc_enrichment, str) else report.spc_enrichment
+                    radar_polygon_match = existing_enrichment.get('radar_polygon_match', False)
+                except:
+                    pass
+                
+            # Return complete location context
             return {
-                "event_location": location_data.get('event_location'),
-                "nearest_major_city": location_data.get('nearest_major_city'), 
-                "nearby_places": location_data.get('nearby_places', [])
+                'primary_location': primary_location,
+                'nearest_major_city': nearest_major_city,
+                'major_city_distance': major_city_distance,
+                'nearby_places': nearby_place_names,
+                'radar_polygon_match': radar_polygon_match
             }
             
         except Exception as e:
-            self.logger.error(f"Error getting location context: {e}")
-            # Fallback to basic location info
+            logger.error(f"Error getting location context: {e}")
+            
+        # Fallback to basic location
+        return {
+            'primary_location': report.location,
+            'nearest_major_city': 'Unknown',
+            'major_city_distance': '',
+            'nearby_places': [],
+            'radar_polygon_match': False
+        }
+    
+    def _generate_location_context(self, report) -> Dict[str, Any]:
+        """Generate location context using AI"""
+        try:
+            prompt = f"""Provide geographic context for this storm report location:
+
+Location: {report.location}
+County: {report.county}
+State: {report.state}
+Coordinates: {report.lat}, {report.lon}
+
+Provide a JSON response with:
+1. primary_location: Main location description
+2. nearby_places: Array of nearby towns/cities with approximate coordinates
+3. geographic_features: Array of notable geographic features (rivers, mountains, etc.)
+
+Focus on locations that would be relevant for insurance, restoration, or emergency management."""
+
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a geographic analyst. Provide location context in JSON format."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=300,
+                temperature=0.3
+            )
+            
+            context = json.loads(response.choices[0].message.content)
+            return context
+            
+        except Exception as e:
+            logger.error(f"Error generating location context: {e}")
             return {
-                "event_location": None,
-                "nearest_major_city": None,
-                "nearby_places": []
+                "primary_location": f"{report.location}, {report.county} County, {report.state}",
+                "nearby_places": [],
+                "geographic_features": []
             }
+    
+    def _generate_polygon_match_status(self, verified_alerts: List, report) -> List[Dict[str, Any]]:
+        """Generate polygon match status for each verified alert"""
+        polygon_status = []
+        
+        for alert in verified_alerts:
+            # Check if polygon is present
+            polygon_present = bool(alert.geometry)
+            
+            # Check radar confirmation
+            radar_confirmed = self._check_radar_confirmation(alert, report)
+            
+            polygon_status.append({
+                "alert_id": alert.id,
+                "polygon_present": polygon_present,
+                "radar_confirmed": radar_confirmed,
+                "event_type": alert.event,
+                "effective_time": alert.effective.isoformat() if alert.effective else None
+            })
+        
+        return polygon_status
+    
+    def _check_radar_confirmation(self, alert, report) -> bool:
+        """Check if alert has radar confirmation from polygon match status"""
+        # Check if this alert has radar-indicated data (wind/hail measurements)
+        if hasattr(alert, 'radar_indicated') and alert.radar_indicated:
+            try:
+                radar_data = json.loads(alert.radar_indicated) if isinstance(alert.radar_indicated, str) else alert.radar_indicated
+                # If alert has wind or hail measurements, it's radar-confirmed
+                return radar_data and (radar_data.get('wind_mph', 0) > 0 or radar_data.get('hail_inches', 0) > 0)
+            except:
+                pass
+        return False
+    
+    def _calculate_direction(self, lat1: float, lon1: float, lat2: float, lon2: float) -> str:
+        """Calculate cardinal direction from point 1 to point 2"""
+        import math
+        
+        try:
+            # Convert to radians
+            lat1_rad = math.radians(lat1)
+            lat2_rad = math.radians(lat2)
+            lon_diff = math.radians(lon2 - lon1)
+            
+            # Calculate bearing
+            y = math.sin(lon_diff) * math.cos(lat2_rad)
+            x = math.cos(lat1_rad) * math.sin(lat2_rad) - \
+                math.sin(lat1_rad) * math.cos(lat2_rad) * math.cos(lon_diff)
+            
+            bearing = math.atan2(y, x)
+            bearing = math.degrees(bearing)
+            bearing = (bearing + 360) % 360
+            
+            # Convert to cardinal direction
+            directions = [
+                "north", "northeast", "east", "southeast",
+                "south", "southwest", "west", "northwest"
+            ]
+            index = int((bearing + 22.5) / 45) % 8
+            return directions[index]
+            
+        except Exception as e:
+            logger.warning(f"Could not calculate direction: {e}")
+            return ""
+    
+    def enrich_all_reports(self, batch_size: int = 50, unenriched_only: bool = True) -> Dict[str, int]:
+        """Enrich ALL SPC reports with enhanced context (verified and unverified)"""
+        try:
+            # Import here to avoid circular imports
+            from models import SPCReport
+            from sqlalchemy import or_
+            
+            # Get all SPC reports that need enrichment
+            if unenriched_only:
+                # Only enrich reports without enhanced_context or with empty enhanced_context
+                query = self.db.query(SPCReport).filter(
+                    or_(
+                        SPCReport.enhanced_context.is_(None),
+                        SPCReport.enhanced_context == {}
+                    )
+                )
+            else:
+                # Enrich all reports (re-enrichment)
+                query = self.db.query(SPCReport)
+            
+            all_reports = query.all()
+            
+            total_reports = len(all_reports)
+            processed = 0
+            successful = 0
+            failed = 0
+            
+            logger.info(f"Starting enhanced context generation for {total_reports} SPC reports")
+            
+            for i in range(0, total_reports, batch_size):
+                batch = all_reports[i:i+batch_size]
+                
+                for report in batch:
+                    try:
+                        enhanced_context = self.enrich_spc_report(report.id)
+                        if enhanced_context:
+                            successful += 1
+                        processed += 1
+                        
+                        if processed % 10 == 0:
+                            logger.info(f"Processed {processed}/{total_reports} reports")
+                            
+                    except Exception as e:
+                        logger.error(f"Failed to enrich report {report.id}: {e}")
+                        failed += 1
+                        processed += 1
+                
+                # Commit batch
+                try:
+                    self.db.commit()
+                except Exception as e:
+                    logger.error(f"Error committing batch: {e}")
+                    self.db.rollback()
+            
+            results = {
+                "total_reports": total_reports,
+                "processed": processed,
+                "successful": successful,
+                "failed": failed
+            }
+            
+            logger.info(f"Enrichment complete: {results}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error in bulk enrichment: {e}")
+            self.db.rollback()
+            raise
 
+def enrich_spc_report_context(report_id: int) -> Dict[str, Any]:
+    """Standalone function to enrich a single SPC report"""
+    service = SPCEnhancedContextService(db.session)
+    return service.enrich_spc_report(report_id)
 
-def create_enhanced_context_service(db_session: Session) -> SPCEnhancedContextService:
-    """Factory function to create Enhanced Context service"""
-    return SPCEnhancedContextService(db_session)
+def enrich_all_spc_reports() -> Dict[str, int]:
+    """Standalone function to enrich all SPC reports"""
+    service = SPCEnhancedContextService(db.session)
+    return service.enrich_all_reports()
