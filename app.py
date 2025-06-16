@@ -4110,13 +4110,39 @@ def api_generate_enhanced_context():
                 else:
                     damage_desc = "Sufficient to cause minor property damage and tree limb breakage."
                     
-                # Use Google Places event location as primary with directional context
-                location_text = f"{primary_location_name}{directional_context}"
-                enhanced_summary = f"On {report.report_date}, damaging winds reached {magnitude_display} at {location_text}. {damage_desc}"
+                # Build comprehensive location context using ALL data sources
+                location_text = ""
+                if event_location and nearest_major_city:
+                    # Calculate distance and direction to event location
+                    event_distance = None
+                    event_direction = ""
+                    
+                    if location_context and location_context.get('nearby_places'):
+                        for place in location_context['nearby_places']:
+                            if place.get('type') == 'primary_location' and place.get('distance_miles'):
+                                event_distance = place['distance_miles']
+                                
+                                # Calculate direction from coordinates to event location
+                                if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
+                                    lat_diff = float(place['approx_lat']) - float(report.latitude)
+                                    lon_diff = float(place['approx_lon']) - float(report.longitude)
+                                    
+                                    if abs(lat_diff) > abs(lon_diff):
+                                        event_direction = "north" if lat_diff > 0 else "south"
+                                    else:
+                                        event_direction = "east" if lon_diff > 0 else "west"
+                                break
+                    
+                    if event_distance and event_direction:
+                        location_text = f"located {event_distance} miles {event_direction} of {event_location} ({report.location}){directional_context}"
+                    else:
+                        location_text = f"at {event_location} ({report.location}){directional_context}"
+                elif event_location:
+                    location_text = f"at {event_location} ({report.location}){directional_context}"
+                else:
+                    location_text = f"at {report.location}{directional_context}"
                 
-                # Add SPC location for reference
-                if report.location and report.location != primary_location_name:
-                    enhanced_summary += f" SPC reference: {report.location}, {report.county} County, {report.state}."
+                enhanced_summary = f"On {report.report_date}, damaging winds reached {magnitude_display} {location_text}. {damage_desc}"
                     
             elif report.report_type.upper() == "HAIL" and numeric_magnitude > 0:
                 if numeric_magnitude >= 2.0:
@@ -4126,17 +4152,74 @@ def api_generate_enhanced_context():
                 else:
                     damage_desc = "Small hail capable of minor vehicle and property damage."
                     
-                # Include comprehensive location data
-                location_text = f"{primary_location_name}{directional_context}"
-                enhanced_summary = f"On {report.report_date}, hail measuring {magnitude_display} struck {location_text}. {damage_desc}"
+                # Build comprehensive location context using ALL data sources
+                location_text = ""
+                if event_location and nearest_major_city:
+                    # Calculate distance and direction to event location
+                    event_distance = None
+                    event_direction = ""
+                    
+                    if location_context and location_context.get('nearby_places'):
+                        for place in location_context['nearby_places']:
+                            if place.get('type') == 'primary_location' and place.get('distance_miles'):
+                                event_distance = place['distance_miles']
+                                
+                                # Calculate direction from coordinates to event location
+                                if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
+                                    lat_diff = float(place['approx_lat']) - float(report.latitude)
+                                    lon_diff = float(place['approx_lon']) - float(report.longitude)
+                                    
+                                    if abs(lat_diff) > abs(lon_diff):
+                                        event_direction = "north" if lat_diff > 0 else "south"
+                                    else:
+                                        event_direction = "east" if lon_diff > 0 else "west"
+                                break
+                    
+                    if event_distance and event_direction:
+                        location_text = f"located {event_distance} miles {event_direction} of {event_location} ({report.location}){directional_context}"
+                    else:
+                        location_text = f"at {event_location} ({report.location}){directional_context}"
+                elif event_location:
+                    location_text = f"at {event_location} ({report.location}){directional_context}"
+                else:
+                    location_text = f"at {report.location}{directional_context}"
                 
-                # Add SPC location for reference
-                if report.location and report.location != primary_location_name:
-                    enhanced_summary += f" SPC reference: {report.location}, {report.county} County, {report.state}."
+                enhanced_summary = f"On {report.report_date}, hail measuring {magnitude_display} struck {location_text}. {damage_desc}"
                     
             else:
-                location_text = f"{primary_location_name}{directional_context}"
-                enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred at {location_text}."
+                # Build comprehensive location context using ALL data sources
+                location_text = ""
+                if event_location and nearest_major_city:
+                    # Calculate distance and direction to event location
+                    event_distance = None
+                    event_direction = ""
+                    
+                    if location_context and location_context.get('nearby_places'):
+                        for place in location_context['nearby_places']:
+                            if place.get('type') == 'primary_location' and place.get('distance_miles'):
+                                event_distance = place['distance_miles']
+                                
+                                # Calculate direction from coordinates to event location
+                                if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
+                                    lat_diff = float(place['approx_lat']) - float(report.latitude)
+                                    lon_diff = float(place['approx_lon']) - float(report.longitude)
+                                    
+                                    if abs(lat_diff) > abs(lon_diff):
+                                        event_direction = "north" if lat_diff > 0 else "south"
+                                    else:
+                                        event_direction = "east" if lon_diff > 0 else "west"
+                                break
+                    
+                    if event_distance and event_direction:
+                        location_text = f"located {event_distance} miles {event_direction} of {event_location} ({report.location}){directional_context}"
+                    else:
+                        location_text = f"at {event_location} ({report.location}){directional_context}"
+                elif event_location:
+                    location_text = f"at {event_location} ({report.location}){directional_context}"
+                else:
+                    location_text = f"at {report.location}{directional_context}"
+                
+                enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred {location_text}."
                 
                 # Add SPC location for reference
                 if report.location and report.location != primary_location_name:
