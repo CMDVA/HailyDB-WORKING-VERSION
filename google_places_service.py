@@ -205,84 +205,160 @@ class GooglePlacesService:
             logger.error(f"Error in Google reverse geocoding: {e}")
             return None
     
+    def _find_comprehensive_regional_cities(self, lat: float, lon: float) -> List[Dict]:
+        """
+        Comprehensive regional city database covering all major metropolitan areas
+        Addresses the Pelican Rapids/Fargo issue by including detailed regional coverage
+        """
+        # Comprehensive city database with population-based significance
+        regional_cities = [
+            # Minnesota - Upper Midwest
+            {'name': 'Minneapolis', 'state': 'MN', 'lat': 45.9537, 'lon': -93.0900, 'pop': 429606},
+            {'name': 'Saint Paul', 'state': 'MN', 'lat': 44.9537, 'lon': -93.0900, 'pop': 308096},
+            {'name': 'Duluth', 'state': 'MN', 'lat': 46.7867, 'lon': -92.1005, 'pop': 85884},
+            {'name': 'Rochester', 'state': 'MN', 'lat': 44.0121, 'lon': -92.4802, 'pop': 118935},
+            {'name': 'Moorhead', 'state': 'MN', 'lat': 46.8739, 'lon': -96.7678, 'pop': 44505},
+            {'name': 'Detroit Lakes', 'state': 'MN', 'lat': 46.8172, 'lon': -95.8453, 'pop': 9869},
+            {'name': 'Brainerd', 'state': 'MN', 'lat': 46.3580, 'lon': -94.2008, 'pop': 13590},
+            {'name': 'Fergus Falls', 'state': 'MN', 'lat': 46.2830, 'lon': -96.0777, 'pop': 13471},
+            {'name': 'Alexandria', 'state': 'MN', 'lat': 45.8855, 'lon': -95.3775, 'pop': 13070},
+            {'name': 'Willmar', 'state': 'MN', 'lat': 45.1219, 'lon': -95.0434, 'pop': 21015},
+
+            # North Dakota - Key Regional Centers
+            {'name': 'Fargo', 'state': 'ND', 'lat': 46.8772, 'lon': -96.7898, 'pop': 125990},
+            {'name': 'Bismarck', 'state': 'ND', 'lat': 46.8083, 'lon': -100.7837, 'pop': 73529},
+            {'name': 'Grand Forks', 'state': 'ND', 'lat': 47.9253, 'lon': -97.0329, 'pop': 56588},
+            {'name': 'Minot', 'state': 'ND', 'lat': 48.2330, 'lon': -101.2960, 'pop': 48743},
+            {'name': 'West Fargo', 'state': 'ND', 'lat': 46.8747, 'lon': -96.9003, 'pop': 38626},
+
+            # South Dakota - Regional Cities
+            {'name': 'Sioux Falls', 'state': 'SD', 'lat': 43.5460, 'lon': -96.7313, 'pop': 192517},
+            {'name': 'Rapid City', 'state': 'SD', 'lat': 44.0805, 'lon': -103.2310, 'pop': 74703},
+            {'name': 'Aberdeen', 'state': 'SD', 'lat': 45.4647, 'lon': -98.4865, 'pop': 28495},
+
+            # Wisconsin - Upper Midwest Coverage
+            {'name': 'Milwaukee', 'state': 'WI', 'lat': 43.0389, 'lon': -87.9065, 'pop': 577222},
+            {'name': 'Madison', 'state': 'WI', 'lat': 43.0731, 'lon': -89.4012, 'pop': 269840},
+            {'name': 'Green Bay', 'state': 'WI', 'lat': 44.5133, 'lon': -88.0133, 'pop': 107395},
+            {'name': 'Eau Claire', 'state': 'WI', 'lat': 44.8113, 'lon': -91.4985, 'pop': 69421},
+
+            # Iowa - Regional Coverage
+            {'name': 'Des Moines', 'state': 'IA', 'lat': 41.5868, 'lon': -93.6250, 'pop': 214133},
+            {'name': 'Cedar Rapids', 'state': 'IA', 'lat': 41.9778, 'lon': -91.6656, 'pop': 137710},
+            {'name': 'Davenport', 'state': 'IA', 'lat': 41.5236, 'lon': -90.5776, 'pop': 101724},
+
+            # Wyoming - Original Coverage Area
+            {'name': 'Cheyenne', 'state': 'WY', 'lat': 41.1400, 'lon': -104.8197, 'pop': 65132},
+            {'name': 'Casper', 'state': 'WY', 'lat': 42.8668, 'lon': -106.3131, 'pop': 59038},
+            {'name': 'Laramie', 'state': 'WY', 'lat': 41.3114, 'lon': -105.5911, 'pop': 31407},
+            {'name': 'Gillette', 'state': 'WY', 'lat': 44.2911, 'lon': -105.5022, 'pop': 33403},
+            {'name': 'Rock Springs', 'state': 'WY', 'lat': 41.5875, 'lon': -109.2029, 'pop': 23526},
+            {'name': 'Sheridan', 'state': 'WY', 'lat': 44.7972, 'lon': -106.9561, 'pop': 18737},
+            {'name': 'Buffalo', 'state': 'WY', 'lat': 44.3483, 'lon': -106.6989, 'pop': 4415},
+            {'name': 'Cody', 'state': 'WY', 'lat': 44.5263, 'lon': -109.0565, 'pop': 10028},
+
+            # Montana - Regional Coverage
+            {'name': 'Billings', 'state': 'MT', 'lat': 45.7833, 'lon': -108.5007, 'pop': 117116},
+            {'name': 'Missoula', 'state': 'MT', 'lat': 46.8721, 'lon': -113.9940, 'pop': 75516},
+            {'name': 'Great Falls', 'state': 'MT', 'lat': 47.5053, 'lon': -111.3008, 'pop': 60442},
+            {'name': 'Bozeman', 'state': 'MT', 'lat': 45.6770, 'lon': -111.0429, 'pop': 53293},
+
+            # Colorado - Regional Coverage
+            {'name': 'Denver', 'state': 'CO', 'lat': 39.7392, 'lon': -104.9903, 'pop': 715522},
+            {'name': 'Colorado Springs', 'state': 'CO', 'lat': 38.8339, 'lon': -104.8214, 'pop': 478961},
+            {'name': 'Fort Collins', 'state': 'CO', 'lat': 40.5853, 'lon': -105.0844, 'pop': 169810},
+
+            # Utah - Regional Coverage
+            {'name': 'Salt Lake City', 'state': 'UT', 'lat': 40.7608, 'lon': -111.8910, 'pop': 200567},
+
+            # Nebraska - Regional Coverage
+            {'name': 'Omaha', 'state': 'NE', 'lat': 41.2565, 'lon': -95.9345, 'pop': 486051},
+            {'name': 'Lincoln', 'state': 'NE', 'lat': 40.8136, 'lon': -96.7026, 'pop': 295178},
+        ]
+
+        # Calculate distances and filter
+        cities_with_distance = []
+        for city in regional_cities:
+            distance = self._calculate_distance(lat, lon, city['lat'], city['lon'])
+            cities_with_distance.append({
+                'name': f"{city['name']}, {city['state']}",
+                'distance': distance,
+                'lat': city['lat'],
+                'lon': city['lon'],
+                'population': city['pop']
+            })
+
+        return sorted(cities_with_distance, key=lambda c: c['distance'])
+
     def find_nearest_major_city(self, lat: float, lon: float) -> Optional[PlaceResult]:
         """
-        Find nearest major city for regional context (no distance limit)
-        Uses direct geocoding for known major cities to bypass API radius limitations
+        Find nearest major city using comprehensive regional database
+        Prioritizes cities under 100 miles with population-based significance
         """
         try:
-            # Pre-defined major cities with approximate coordinates for Wyoming region
-            major_cities = [
-                {'name': 'Gillette', 'lat': 44.2911, 'lon': -105.5022},
-                {'name': 'Casper', 'lat': 42.8668, 'lon': -106.3131},
-                {'name': 'Cheyenne', 'lat': 41.1400, 'lon': -104.8197},
-                {'name': 'Laramie', 'lat': 41.3114, 'lon': -105.5911},
-                {'name': 'Rock Springs', 'lat': 41.5875, 'lon': -109.2029},
-                {'name': 'Sheridan', 'lat': 44.7972, 'lon': -106.9561},
-                {'name': 'Buffalo', 'lat': 44.3483, 'lon': -106.6989},
-                {'name': 'Cody', 'lat': 44.5263, 'lon': -109.0565},
-                {'name': 'Rawlins', 'lat': 41.7911, 'lon': -107.2387},
-                {'name': 'Riverton', 'lat': 43.0242, 'lon': -108.3801},
-                # Major regional cities
-                {'name': 'Billings', 'lat': 45.7833, 'lon': -108.5007},
-                {'name': 'Rapid City', 'lat': 44.0805, 'lon': -103.2310},
-                {'name': 'Denver', 'lat': 39.7392, 'lon': -104.9903},
-                {'name': 'Salt Lake City', 'lat': 40.7608, 'lon': -111.8910}
-            ]
+            # Get all cities sorted by distance
+            regional_cities = self._find_comprehensive_regional_cities(lat, lon)
             
-            # Calculate distances to all major cities and find the closest
-            city_distances = []
-            for city in major_cities:
-                distance = self._calculate_distance(lat, lon, city['lat'], city['lon'])
-                city_distances.append({
-                    'name': city['name'],
-                    'distance': distance,
-                    'lat': city['lat'],
-                    'lon': city['lon']
-                })
-            
-            # Return the closest major city
-            if city_distances:
-                closest_city = min(city_distances, key=lambda c: c['distance'])
+            if regional_cities:
+                # Filter for suitable cities within 100 miles (population 5,000+ or under 50 miles)
+                suitable_cities = []
+                for city in regional_cities:
+                    if (city['distance'] <= 100 and 
+                        (city['population'] >= 5000 or city['distance'] <= 50)):
+                        suitable_cities.append(city)
                 
-                # Verify this city exists using Google Places to get exact coordinates
-                try:
-                    url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
-                    params = {
-                        'input': f"{closest_city['name']} city",
-                        'inputtype': 'textquery',
-                        'fields': 'name,geometry',
-                        'key': self.api_key
-                    }
+                # If we found suitable cities, use the closest
+                if suitable_cities:
+                    closest = suitable_cities[0]
                     
-                    response = requests.get(url, params=params, timeout=10)
-                    response.raise_for_status()
-                    data = response.json()
-                    
-                    if data.get('candidates') and len(data['candidates']) > 0:
-                        candidate = data['candidates'][0]
-                        exact_distance = self._calculate_distance(
-                            lat, lon,
-                            candidate['geometry']['location']['lat'],
-                            candidate['geometry']['location']['lng']
-                        )
+                    # Verify coordinates with Google Places for accuracy (optional enhancement)
+                    try:
+                        url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
+                        params = {
+                            'input': closest['name'],
+                            'inputtype': 'textquery',
+                            'fields': 'name,geometry',
+                            'key': self.api_key
+                        }
                         
-                        return PlaceResult(
-                            name=candidate['name'],
-                            distance_miles=round(exact_distance, 1),
-                            lat=candidate['geometry']['location']['lat'],
-                            lon=candidate['geometry']['location']['lng'],
-                            place_type='major_city'
-                        )
-                except Exception as geocode_error:
-                    logger.warning(f"Could not verify coordinates for {closest_city['name']}: {geocode_error}")
+                        response = requests.get(url, params=params, timeout=10)
+                        response.raise_for_status()
+                        data = response.json()
+                        
+                        if data.get('candidates') and len(data['candidates']) > 0:
+                            candidate = data['candidates'][0]
+                            exact_distance = self._calculate_distance(
+                                lat, lon,
+                                candidate['geometry']['location']['lat'],
+                                candidate['geometry']['location']['lng']
+                            )
+                            
+                            return PlaceResult(
+                                name=candidate['name'],
+                                distance_miles=round(exact_distance, 1),
+                                lat=candidate['geometry']['location']['lat'],
+                                lon=candidate['geometry']['location']['lng'],
+                                place_type='major_city'
+                            )
+                    except Exception as geocode_error:
+                        logger.warning(f"Could not verify coordinates with Google Places for {closest['name']}: {geocode_error}")
+                    
+                    # Use regional database coordinates
+                    return PlaceResult(
+                        name=closest['name'],
+                        distance_miles=round(closest['distance'], 1),
+                        lat=closest['lat'],
+                        lon=closest['lon'],
+                        place_type='major_city'
+                    )
                 
-                # Fallback to approximate coordinates if geocoding fails
+                # If no suitable cities under 100 miles, use the closest available
+                closest_any = regional_cities[0]
                 return PlaceResult(
-                    name=closest_city['name'],
-                    distance_miles=round(closest_city['distance'], 1),
-                    lat=closest_city['lat'],
-                    lon=closest_city['lon'],
+                    name=closest_any['name'],
+                    distance_miles=round(closest_any['distance'], 1),
+                    lat=closest_any['lat'],
+                    lon=closest_any['lon'],
                     place_type='major_city'
                 )
             
