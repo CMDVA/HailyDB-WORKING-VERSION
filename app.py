@@ -4050,108 +4050,108 @@ def api_generate_enhanced_context():
                 magnitude_display = "unknown size"
         else:
             magnitude_display = str(magnitude_value) if magnitude_value and str(magnitude_value).upper() != 'UNK' else "unknown magnitude"
+        
+        # Get Google Places location context
+        places_service = GooglePlacesService()
+        location_context = places_service.enrich_location(
+            lat=float(report.latitude) if report.latitude else 0,
+            lon=float(report.longitude) if report.longitude else 0
+        )
+        
+        # Build comprehensive location context with 6 geo data points
+        event_location = None
+        event_distance = None
+        event_direction = ""
+        nearest_major_city = None
+        major_city_distance = None
+        major_city_direction = ""
+        nearby_places_text = ""
+        
+        if location_context and location_context.get('nearby_places'):
+            nearby_places = location_context['nearby_places']
             
-            # Get Google Places location context
-            places_service = GooglePlacesService()
-            location_context = places_service.enrich_location(
-                lat=float(report.latitude) if report.latitude else 0,
-                lon=float(report.longitude) if report.longitude else 0
-            )
-            
-            # Build comprehensive location context with 6 geo data points
-            event_location = None
-            event_distance = None
-            event_direction = ""
-            nearest_major_city = None
-            major_city_distance = None
-            major_city_direction = ""
-            nearby_places_text = ""
-            
-            if location_context and location_context.get('nearby_places'):
-                nearby_places = location_context['nearby_places']
-                
-                # Extract event location (primary_location)
-                for place in nearby_places:
-                    if place.get('type') == 'primary_location':
-                        event_location = place.get('name')
-                        event_distance = place.get('distance_miles')
+            # Extract event location (primary_location)
+            for place in nearby_places:
+                if place.get('type') == 'primary_location':
+                    event_location = place.get('name')
+                    event_distance = place.get('distance_miles')
+                    
+                    # Calculate direction FROM event coordinates TO the location
+                    if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
+                        lat_diff = float(report.latitude) - float(place['approx_lat'])
+                        lon_diff = float(report.longitude) - float(place['approx_lon'])
                         
-                        # Calculate direction FROM event coordinates TO the location
-                        if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
-                            lat_diff = float(report.latitude) - float(place['approx_lat'])
-                            lon_diff = float(report.longitude) - float(place['approx_lon'])
-                            
-                            if abs(lat_diff) > abs(lon_diff):
-                                event_direction = "north" if lat_diff > 0 else "south"
-                            else:
-                                event_direction = "east" if lon_diff > 0 else "west"
-                        break
-                
-                # Extract nearest major city with direction
-                for place in nearby_places:
-                    if place.get('type') == 'nearest_city':
-                        nearest_major_city = place.get('name')
-                        major_city_distance = place.get('distance_miles')
+                        if abs(lat_diff) > abs(lon_diff):
+                            event_direction = "north" if lat_diff > 0 else "south"
+                        else:
+                            event_direction = "east" if lon_diff > 0 else "west"
+                    break
+            
+            # Extract nearest major city with direction
+            for place in nearby_places:
+                if place.get('type') == 'nearest_city':
+                    nearest_major_city = place.get('name')
+                    major_city_distance = place.get('distance_miles')
+                    
+                    # Calculate direction FROM event coordinates TO major city
+                    if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
+                        lat_diff = float(report.latitude) - float(place['approx_lat'])
+                        lon_diff = float(report.longitude) - float(place['approx_lon'])
                         
-                        # Calculate direction FROM event coordinates TO major city
-                        if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
-                            lat_diff = float(report.latitude) - float(place['approx_lat'])
-                            lon_diff = float(report.longitude) - float(place['approx_lon'])
-                            
-                            if abs(lat_diff) > abs(lon_diff):
-                                major_city_direction = "north" if lat_diff > 0 else "south"
-                            else:
-                                major_city_direction = "east" if lon_diff > 0 else "west"
-                        break
-                
-                # Build nearby places text (closest 2-3 places)
-                nearby_place_items = []
-                for place in nearby_places:
-                    if place.get('type') == 'nearby_place' and len(nearby_place_items) < 3:
-                        name = place.get('name')
-                        distance = place.get('distance_miles')
-                        if name and distance:
-                            nearby_place_items.append(f"{name} ({distance:.1f} mi)")
-                
-                if nearby_place_items:
-                    nearby_places_text = f". Nearby places include {', '.join(nearby_place_items)}"
+                        if abs(lat_diff) > abs(lon_diff):
+                            major_city_direction = "north" if lat_diff > 0 else "south"
+                        else:
+                            major_city_direction = "east" if lon_diff > 0 else "west"
+                    break
             
-            # Generate simple Enhanced Context summary
-            enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred at {report.location}"
+            # Build nearby places text (closest 2-3 places)
+            nearby_place_items = []
+            for place in nearby_places:
+                if place.get('type') == 'nearby_place' and len(nearby_place_items) < 3:
+                    name = place.get('name')
+                    distance = place.get('distance_miles')
+                    if name and distance:
+                        nearby_place_items.append(f"{name} ({distance:.1f} mi)")
             
-            if magnitude_value:
-                try:
-                    mag_val = float(magnitude_value)
-                    if report.report_type.upper() == "HAIL":
-                        enhanced_summary += f" with {mag_val:.2f}\" hail"
-                    elif report.report_type.upper() == "WIND":
-                        enhanced_summary += f" with {int(mag_val)} mph winds"
-                except (ValueError, TypeError):
-                    pass
-            
-            enhanced_summary += "."
-            
-            # Store enhanced context in the database
-            enhanced_context = {
-                "enhanced_summary": enhanced_summary,
-                "location_context": location_context,
-                "generated_at": datetime.utcnow().isoformat(),
-                "version": "v2.0"
-            }
-            
-            # Save to database with transaction isolation
-            with db.session.begin():
-                report.enhanced_context = enhanced_context
-                report.enhanced_context_version = "v2.0"
-                report.enhanced_context_generated_at = datetime.utcnow()
-            
-            return jsonify({
-                "success": True,
-                "report_id": report_id,
-                "enhanced_context": enhanced_context,
-                "message": "Enhanced context generated successfully",
-                "version": "v2.0"
-            })
+            if nearby_place_items:
+                nearby_places_text = f". Nearby places include {', '.join(nearby_place_items)}"
+        
+        # Generate simple Enhanced Context summary
+        enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred at {report.location}"
+        
+        if magnitude_value:
+            try:
+                mag_val = float(magnitude_value)
+                if report.report_type.upper() == "HAIL":
+                    enhanced_summary += f" with {mag_val:.2f}\" hail"
+                elif report.report_type.upper() == "WIND":
+                    enhanced_summary += f" with {int(mag_val)} mph winds"
+            except (ValueError, TypeError):
+                pass
+        
+        enhanced_summary += "."
+        
+        # Store enhanced context in the database
+        enhanced_context = {
+            "enhanced_summary": enhanced_summary,
+            "location_context": location_context,
+            "generated_at": datetime.utcnow().isoformat(),
+            "version": "v2.0"
+        }
+        
+        # Save to database with transaction isolation
+        with db.session.begin():
+            report.enhanced_context = enhanced_context
+            report.enhanced_context_version = "v2.0"
+            report.enhanced_context_generated_at = datetime.utcnow()
+        
+        return jsonify({
+            "success": True,
+            "report_id": report_id,
+            "enhanced_context": enhanced_context,
+            "message": "Enhanced context generated successfully",
+            "version": "v2.0"
+        })
         
     except Exception as e:
         logger.error(f"Error generating enhanced context for report {report_id}: {str(e)}")
