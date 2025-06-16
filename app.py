@@ -1288,17 +1288,27 @@ def view_spc_report_detail(report_id):
         
         # Fetch Enhanced Context data from Enhanced Context Service
         import json
+        from types import SimpleNamespace
         enhanced_context_data = None
         try:
             from enhanced_context_service import EnhancedContextService
             context_service = EnhancedContextService()
             enhanced_context_result = context_service.generate_enhanced_context(report, db.session)
             if enhanced_context_result and 'enhanced_summary' in enhanced_context_result:
+                # Convert dictionary to object for template compatibility
+                enhanced_context_obj = SimpleNamespace()
+                enhanced_context_obj.enhanced_summary = enhanced_context_result.get('enhanced_summary', '')
+                enhanced_context_obj.generated_at = enhanced_context_result.get('generated_at', '')
+                enhanced_context_obj.location_context = enhanced_context_result.get('location_context', {})
+                enhanced_context_obj.alert_count = 0  # Default value for template
+                enhanced_context_obj.radar_polygon_match = False  # Default value for template
+                enhanced_context_obj.version = enhanced_context_result.get('version', 'v2.0')
+                
+                # Add the enhanced context object to the report for template access
+                report.enhanced_context = enhanced_context_obj
                 enhanced_context_data = enhanced_context_result
-                # Add the enhanced context to the report object for template access
-                report.enhanced_context = enhanced_context_data
         except Exception as e:
-            logger.warning(f"Failed to fetch enhanced_context for report {report_id}: {e}")
+            logger.error(f"Error viewing SPC report {report_id}: {e}")
             enhanced_context_data = None
         
         # Extract location context for template
