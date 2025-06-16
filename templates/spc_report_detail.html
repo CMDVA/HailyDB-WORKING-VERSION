@@ -118,14 +118,15 @@
                 </div>
             </div>
 
-            {% if report.enhanced_context and report.enhanced_context.enhanced_summary %}
+            <!-- Enhanced Context Summary Section -->
+            {% if enhanced_context_data and enhanced_context_data.enhanced_summary %}
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
                     <h6 class="m-0 font-weight-bold text-success">
                         <i class="fas fa-map-marker-alt me-2"></i>Enhanced Context Summary
                     </h6>
-                    {% if report.enhanced_context.alert_count > 0 %}
-                        <span class="badge bg-success">{{ report.enhanced_context.alert_count }} Verified Alerts</span>
+                    {% if enhanced_context_data.alert_count and enhanced_context_data.alert_count > 0 %}
+                        <span class="badge bg-success">{{ enhanced_context_data.alert_count }} Verified Alerts</span>
                     {% else %}
                         <span class="badge bg-info">Location Enhanced</span>
                     {% endif %}
@@ -134,110 +135,73 @@
                     <div class="row">
                         <div class="col-12 mb-3">
                             <h6 class="text-muted mb-2">Enhanced Summary</h6>
-                            <p class="mb-0">{{ report.enhanced_context.enhanced_summary }}</p>
+                            <p class="mb-0">{{ enhanced_context_data.enhanced_summary }}</p>
                         </div>
                     </div>
                     
-                    {% if report.enhanced_context.alert_count > 0 %}
+                    {% if enhanced_context_data.generated_at %}
                     <div class="row mt-3">
-                        <div class="col-md-6">
-                            <h6 class="text-muted mb-2">Verified Alert Details</h6>
-                            <ul class="list-unstyled">
-                                <li><strong>Verified Alerts:</strong> {{ report.enhanced_context.alert_count }}</li>
-                                <li><strong>Generated:</strong> {{ report.enhanced_context.generated_at[:16].replace('T', ' ') if report.enhanced_context.generated_at else 'N/A' }}</li>
-                                <li><strong>Radar Confirmation:</strong> 
-                                    {% if report.enhanced_context.radar_polygon_match %}
-                                        <span class="badge bg-success">Confirmed</span>
-                                    {% else %}
-                                        <span class="badge bg-warning">Not Confirmed</span>
-                                    {% endif %}
-                                </li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <h6 class="text-muted mb-2">Location Context</h6>
-                            <div class="small">
-                                {% if report.enhanced_context.location_context %}
-                                <div class="mb-2">
-                                    <strong>Nearest City:</strong> {{ report.enhanced_context.location_context.nearest_major_city or 'N/A' }}
-                                    ({{ report.enhanced_context.location_context.major_city_distance or 'N/A' }})
-                                </div>
-                                {% endif %}
-                            </div>
+                        <div class="col-12">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>Generated: {{ enhanced_context_data.generated_at[:16].replace('T', ' ') }} UTC
+                            </small>
                         </div>
                     </div>
                     {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Location Context Section -->
+            {% if primary_location or nearest_major_city or nearby_places %}
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">
+                        <i class="fas fa-map-marked-alt me-2"></i>Location Context
+                    </h6>
+                </div>
+                <div class="card-body">
                     
-                    <div class="row mt-3">
-                        <div class="col-12">
-                            <h6 class="text-muted mb-2">Location Context</h6>
-                            
-                            <!-- Check if we have enrichment data from enhanced_context (NEW) or fallback to spc_enrichment (OLD) -->
-                            {% if report.enhanced_context and report.enhanced_context.location_context and report.enhanced_context.location_context.nearby_places %}
-                                {% set primary_location = report.enhanced_context.location_context.nearby_places|selectattr('type', 'equalto', 'primary_location')|first %}
-                                {% set nearest_city = report.enhanced_context.location_context.nearby_places|selectattr('type', 'equalto', 'nearest_city')|first %}
-                            {% elif report.spc_enrichment and report.spc_enrichment.nearby_places %}
-                                {% set primary_location = report.spc_enrichment.nearby_places|selectattr('type', 'equalto', 'primary_location')|first %}
-                                {% set nearest_city = report.spc_enrichment.nearby_places|selectattr('type', 'equalto', 'nearest_city')|first %}
-                            {% else %}
-                                {% set primary_location = none %}
-                                {% set nearest_city = none %}
-                            {% endif %}
-                            
-                            {% if primary_location or nearest_city %}
-                                
-                                <!-- Event Location -->
-                                {% if primary_location %}
-                                <div class="mb-3 p-3 bg-primary bg-opacity-10 rounded border-start border-primary border-3">
-                                    <div class="d-flex align-items-center">
-                                        <i class="fas fa-map-marker-alt text-primary me-2"></i>
-                                        <span class="fw-bold text-primary">Event Location:</span>
-                                        <span class="ms-2 fw-bold">{{ primary_location.name }}</span>
-                                        {% if primary_location.distance_miles is defined and primary_location.distance_miles is not none %}
-                                            {% if primary_location.distance_miles <= 0.5 %}
-                                        <span class="badge bg-success ms-2">exact location</span>
-                                            {% else %}
-                                        <span class="badge bg-primary ms-2">{{ "%.1f"|format(primary_location.distance_miles) }} miles away</span>
-                                            {% endif %}
-                                        {% endif %}
-                                    </div>
-                                    <small class="text-muted d-block mt-1 ms-3">
-                                        Primary location where the event occurred
-                                    </small>
-                                </div>
-                                {% endif %}
-
-                                <!-- Nearest Major City -->
-                                {% if nearest_city %}
-                                <div class="mb-3 p-3 bg-light rounded">
-                                    <div class="d-flex align-items-center">
-                                        <i class="fas fa-city text-success me-2"></i>
-                                        <span class="fw-bold text-success">Nearest Major City:</span>
-                                        <span class="ms-2">{{ nearest_city.name }}</span>
-                                        {% if nearest_city.distance_miles %}
-                                        <span class="badge bg-success ms-2">{{ "%.1f"|format(nearest_city.distance_miles) }} miles away</span>
-                                        {% endif %}
-                                    </div>
-                                    {% if nearest_city.approx_lat and nearest_city.approx_lon %}
-                                    <small class="text-muted d-block mt-1">
-                                        {{ "%.3f"|format(nearest_city.approx_lat) }}, {{ "%.3f"|format(nearest_city.approx_lon) }}
-                                    </small>
-                                    {% endif %}
-                                </div>
-                                {% endif %}
-
-                                <!-- Other Nearby Places -->
-                                {% if report.enhanced_context and report.enhanced_context.location_context and report.enhanced_context.location_context.nearby_places %}
-                                    {% set other_places = report.enhanced_context.location_context.nearby_places|rejectattr('type', 'in', ['primary_location', 'nearest_city'])|list %}
-                                {% elif report.spc_enrichment and report.spc_enrichment.nearby_places %}
-                                    {% set other_places = report.spc_enrichment.nearby_places|rejectattr('type', 'in', ['primary_location', 'nearest_city'])|list %}
+                    <!-- Event Location -->
+                    {% if primary_location %}
+                    <div class="mb-3 p-3 bg-primary bg-opacity-10 rounded border-start border-primary border-3">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-map-marker-alt text-primary me-2"></i>
+                            <span class="fw-bold text-primary">Event Location:</span>
+                            <span class="ms-2 fw-bold">{{ primary_location.name }}</span>
+                            {% if primary_location.distance_miles is defined and primary_location.distance_miles is not none %}
+                                {% if primary_location.distance_miles <= 0.5 %}
+                            <span class="badge bg-success ms-2">exact location</span>
                                 {% else %}
-                                    {% set other_places = [] %}
+                            <span class="badge bg-primary ms-2">{{ "%.1f"|format(primary_location.distance_miles) }} miles away</span>
                                 {% endif %}
-                                {% if other_places %}
-                                <h6 class="text-muted mb-2 small">Other Nearby Places</h6>
-                                <div class="row">
-                                    {% for place in other_places[:6] %}
+                            {% endif %}
+                        </div>
+                        <small class="text-muted d-block mt-1 ms-3">
+                            Primary location where the event occurred
+                        </small>
+                    </div>
+                    {% endif %}
+
+                    <!-- Nearest Major City -->
+                    {% if nearest_major_city %}
+                    <div class="mb-3 p-3 bg-light rounded">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-city text-success me-2"></i>
+                            <span class="fw-bold text-success">Nearest Major City:</span>
+                            <span class="ms-2">{{ nearest_major_city.name }}</span>
+                            {% if nearest_major_city.distance_miles %}
+                            <span class="badge bg-success ms-2">{{ "%.1f"|format(nearest_major_city.distance_miles) }} miles away</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Other Nearby Places -->
+                    {% if nearby_places %}
+                    <h6 class="text-muted mb-2 small">Other Nearby Places</h6>
+                    <div class="row">
+                        {% for place in nearby_places[:6] %}
                                     <div class="col-6 mb-2">
                                         <div class="d-flex align-items-center">
                                             <i class="fas fa-map-pin text-primary me-2 small"></i>
