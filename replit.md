@@ -98,6 +98,11 @@ The system integrates with multiple authoritative weather data sources:
 
 ```
 Changelog:
+- June 16, 2025: SPC REPORT DETAIL PAGE CONSISTENCY FIXED
+  * TEMPLATE CLEANUP: Eliminated complex conditional logic causing inconsistent page layouts across different report IDs
+  * UNIFIED DATA HANDLING: Route handler now provides consistent variables (primary_location, nearest_major_city, nearby_places) regardless of data source
+  * LAYOUT CONSISTENCY: All SPC report detail pages now render with identical professional structure and formatting
+  * ERROR ELIMINATION: Fixed template errors from accessing undefined properties or mixed data structures
 - June 16, 2025: ENHANCED CONTEXT v3.0 WITH THREE MISSING FEATURES COMPLETE
   * SPC COMMENTS: Enhanced Summary now includes original SPC comments with "SPC Notes:" prefix for meteorological context
   * HISTORICAL DAMAGE ASSESSMENT: Corrected damage classification to use proper historical language describing damage LIKELY CAUSED by reported hail/wind
