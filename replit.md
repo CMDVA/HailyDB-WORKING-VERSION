@@ -98,15 +98,15 @@ The system integrates with multiple authoritative weather data sources:
 
 ```
 Changelog:
-- June 16, 2025: ENHANCED CONTEXT v3.0 - PERFECT LOCATION INTELLIGENCE OPERATIONAL
-  * OPTIMAL FORMAT: "located X miles [direction] of [Google Places location] ([SPC location]), Y miles from [major city]"
-  * MAXIMUM VALUE: Uses ALL data sources - Google Places + SPC reference + major city context + directional calculations
+- June 16, 2025: ENHANCED CONTEXT v3.0 - 6 GEO DATA POINTS FORMAT OPERATIONAL
+  * PERFECT FORMAT: "located [direction] [distance] miles from [event location] ([SPC location]), or [direction] [distance] from [major city]. Nearby places [closest (mi), second (mi), third (mi)]"
+  * 6 GEO DATA POINTS: Direction+distance to event, SPC preservation, direction+distance to major city, 3 closest nearby places
+  * MAXIMUM VALUE: Google Places API location enrichment + SPC data preservation + complete geographic context
   * VERIFICATION READY: Framework integrated for verified NWS alert matches with timing and storm track confirmation
-  * LOCATION HIERARCHY: Event location (Google Places) + distance/direction + SPC preservation + geographic reference
-  * DAMAGE CONTEXT: Professional NWS damage classifications based on magnitude thresholds
-  * COMPREHENSIVE OUTPUT: Enhanced summaries deliver complete weather intelligence beyond raw SPC coordinates
-  * AUTONOMOUS: System processing all SPC reports with optimal location context structure
-  * PRODUCTION: Enhanced Context v3.0 delivering top-notch context using ALL available data sources
+  * AUTHENTIC LOCATION NAMES: Event location from Google Places instead of raw coordinates
+  * COMPREHENSIVE OUTPUT: Enhanced summaries deliver complete weather intelligence with 6 additional geo references
+  * AUTONOMOUS: System processing all SPC reports with this comprehensive location format
+  * PRODUCTION: Enhanced Context v3.0 delivering exactly the specified location enhancement structure
 - June 16, 2025: TECH DEBT CLEANUP & Enhanced Context System Restoration COMPLETE
   * REMOVED: 6 conflicting Enhanced Context files that caused system confusion
   * RESTORED: Working Enhanced Context system using existing app.py functions

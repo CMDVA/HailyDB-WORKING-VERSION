@@ -4126,7 +4126,7 @@ def api_generate_enhanced_context():
             except (ValueError, TypeError):
                 numeric_magnitude = 0
             
-            # Build comprehensive enhanced summary
+            # Build Enhanced Context with 6 geo data points format
             if report.report_type.upper() == "WIND" and numeric_magnitude > 0:
                 if numeric_magnitude >= 74:
                     damage_desc = "Capable of causing significant structural damage to buildings and vehicles."
@@ -4158,14 +4158,13 @@ def api_generate_enhanced_context():
                                         event_direction = "east" if lon_diff > 0 else "west"
                                 break
                     
-                    if event_distance and event_direction:
-                        location_text = f"located {event_distance} miles {event_direction} of {event_location} ({report.location}){directional_context}"
-                    else:
-                        location_text = f"at {event_location} ({report.location}){directional_context}"
+                # Generate location text with 6 geo data points format
+                if event_location and event_distance and event_direction and nearest_major_city and major_city_distance and major_city_direction:
+                    location_text = f"located {event_direction} {event_distance} miles from {event_location} ({report.location}), or {major_city_direction} {major_city_distance:.1f} miles from {nearest_major_city}{nearby_places_text}"
                 elif event_location:
-                    location_text = f"at {event_location} ({report.location}){directional_context}"
+                    location_text = f"at {event_location} ({report.location}){nearby_places_text}"
                 else:
-                    location_text = f"at {report.location}{directional_context}"
+                    location_text = f"at {report.location}{nearby_places_text}"
                 
                 enhanced_summary = f"On {report.report_date}, damaging winds reached {magnitude_display} {location_text}. {damage_desc}"
                     
