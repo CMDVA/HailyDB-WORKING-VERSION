@@ -98,6 +98,13 @@ The system integrates with multiple authoritative weather data sources:
 
 ```
 Changelog:
+- June 16, 2025: Enhanced Context generation now working with Google Places API integration
+  * Fixed Google Places API response parsing errors
+  * Implemented proper location enrichment using smallest nearby place as event location
+  * Eliminated hardcoded "at coordinates" text in Enhanced Context summaries
+  * Added professional NWS damage classifications for wind and hail events
+  * System autonomously processing 33,433 remaining SPC reports for 100% coverage
+  * Enhanced Context now includes distance context to major cities
 - June 16, 2025. Initial setup
 ```
 

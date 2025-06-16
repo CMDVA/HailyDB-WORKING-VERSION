@@ -4336,8 +4336,15 @@ def enhanced_context_backfill():
                 
                 # Extract primary location (smallest nearby place from Google Places)
                 primary_location_name = report.location  # fallback
-                if location_context and location_context.get('event_location'):
-                    primary_location_name = location_context['event_location']['name']
+                if location_context:
+                    if location_context.get('event_location') and location_context['event_location'].get('name'):
+                        primary_location_name = location_context['event_location']['name']
+                    elif location_context.get('nearest_major_city') and location_context['nearest_major_city'].get('name'):
+                        primary_location_name = location_context['nearest_major_city']['name']
+                    elif location_context.get('nearby_places') and len(location_context['nearby_places']) > 0:
+                        # Use closest place from nearby_places list
+                        closest_place = min(location_context['nearby_places'], key=lambda x: x.get('distance_miles', 999))
+                        primary_location_name = closest_place.get('name', report.location)
                 
                 # Create professional Enhanced Context summary using Google Places data
                 if report.report_type.upper() == "WIND" and magnitude_value:
