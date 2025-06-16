@@ -98,6 +98,13 @@ The system integrates with multiple authoritative weather data sources:
 
 ```
 Changelog:
+- June 16, 2025: COMPREHENSIVE CITY DETECTION SYSTEM IMPLEMENTED
+  * GEOGRAPHIC ACCURACY ACHIEVED: Replaced hardcoded city list with comprehensive regional database covering 40+ cities
+  * PELICAN RAPIDS ISSUE RESOLVED: Now correctly identifies Detroit Lakes, MN (17.5 miles) instead of Rapid City, SD (391 miles)
+  * REGIONAL COVERAGE: Added detailed Minnesota, North Dakota, South Dakota, Wisconsin, Iowa cities for complete Upper Midwest coverage
+  * INTELLIGENT FILTERING: Population-based significance (5,000+ people) with distance-based exceptions (under 50 miles)
+  * GOOGLE PLACES VERIFICATION: Optional coordinate verification maintains accuracy while using comprehensive regional data
+  * PRODUCTION READY: Enhanced Context system now uses accurate nearest major city detection for all storm reports
 - June 16, 2025: ENHANCED CONTEXT SYSTEM FULLY RESTORED AND OPERATIONAL
   * CORRUPTION RESOLVED: Systematically fixed severe syntax errors and indentation issues in app.py
   * APPLICATION RESTORED: System now running successfully with live radar service operational

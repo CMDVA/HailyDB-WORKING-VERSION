@@ -290,6 +290,77 @@ class GooglePlacesService:
 
         return sorted(cities_with_distance, key=lambda c: c['distance'])
 
+    def _get_geonames_location_context(self, lat: float, lon: float) -> Dict[str, Any]:
+        """
+        Get comprehensive location context using GeoNames APIs
+        Returns streets, intersections, and neighborhood information
+        """
+        context = {
+            'nearby_streets': [],
+            'nearest_intersection': None,
+            'neighborhood': None
+        }
+        
+        try:
+            # Find nearby streets
+            streets_url = "http://api.geonames.org/findNearbyStreetsJSON"
+            streets_params = {'lat': lat, 'lng': lon, 'maxRows': 5}
+            
+            streets_response = requests.get(streets_url, params=streets_params, timeout=10)
+            if streets_response.status_code == 200:
+                streets_data = streets_response.json()
+                if 'streetSegment' in streets_data:
+                    for street in streets_data['streetSegment'][:3]:
+                        distance = self._calculate_distance(
+                            lat, lon, 
+                            float(street['lat']), 
+                            float(street['lng'])
+                        )
+                        context['nearby_streets'].append({
+                            'name': street.get('name', 'Unnamed Street'),
+                            'distance_miles': round(distance, 2)
+                        })
+            
+            # Find nearest intersection
+            intersection_url = "http://api.geonames.org/findNearestIntersectionJSON"
+            intersection_params = {'lat': lat, 'lng': lon}
+            
+            intersection_response = requests.get(intersection_url, params=intersection_params, timeout=10)
+            if intersection_response.status_code == 200:
+                intersection_data = intersection_response.json()
+                if 'intersection' in intersection_data:
+                    intersection = intersection_data['intersection']
+                    distance = self._calculate_distance(
+                        lat, lon,
+                        float(intersection['lat']),
+                        float(intersection['lng'])
+                    )
+                    context['nearest_intersection'] = {
+                        'street1': intersection.get('street1', ''),
+                        'street2': intersection.get('street2', ''),
+                        'distance_miles': round(distance, 2)
+                    }
+            
+            # Find neighborhood
+            neighborhood_url = "http://api.geonames.org/neighbourhoodJSON"
+            neighborhood_params = {'lat': lat, 'lng': lon}
+            
+            neighborhood_response = requests.get(neighborhood_url, params=neighborhood_params, timeout=10)
+            if neighborhood_response.status_code == 200:
+                neighborhood_data = neighborhood_response.json()
+                if 'neighbourhood' in neighborhood_data:
+                    neighborhood = neighborhood_data['neighbourhood']
+                    context['neighborhood'] = {
+                        'name': neighborhood.get('name', ''),
+                        'city': neighborhood.get('city', ''),
+                        'adminName1': neighborhood.get('adminName1', '')
+                    }
+            
+        except Exception as e:
+            logger.warning(f"Error getting GeoNames location context: {e}")
+        
+        return context
+
     def find_nearest_major_city(self, lat: float, lon: float) -> Optional[PlaceResult]:
         """
         Find nearest major city using comprehensive regional database
