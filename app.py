@@ -4005,10 +4005,123 @@ def api_generate_enhanced_context():
             }), 400
         
         # Use Enhanced Context v2.0 system with production fixes
-        from spc_enhanced_context_v2 import SPCEnhancedContextService
-        service = SPCEnhancedContextService(db.session)
+        # Enhanced Context is now handled directly in app.py functions
+        from datetime import datetime
         
-        result = service.enrich_spc_report(report_id)
+        # Get the report
+        report = db.session.get(SPCReport, report_id)
+        if not report:
+            return jsonify({"success": False, "error": f"Report {report_id} not found"}), 404
+        
+        try:
+            # Use the working Enhanced Context generation logic directly
+            from google_places_service import GooglePlacesService
+            
+            # Extract magnitude value from JSON if needed with UNK handling
+            magnitude_value = None
+            if report.magnitude:
+                if isinstance(report.magnitude, dict):
+                    if report.report_type.upper() == "WIND" and 'speed' in report.magnitude:
+                        magnitude_value = report.magnitude['speed']
+                    elif report.report_type.upper() == "HAIL" and 'size_inches' in report.magnitude:
+                        magnitude_value = report.magnitude['size_inches']
+                else:
+                    magnitude_value = report.magnitude
+            
+            # Filter out UNK values early
+            if magnitude_value and str(magnitude_value).upper() == 'UNK':
+                magnitude_value = None
+            
+            # Format magnitude display with UNK handling
+            if report.report_type.upper() == "WIND":
+                if magnitude_value and str(magnitude_value).upper() != 'UNK':
+                    try:
+                        magnitude_display = f"{int(float(magnitude_value))} mph"
+                    except (ValueError, TypeError):
+                        magnitude_display = "unknown speed"
+                else:
+                    magnitude_display = "unknown speed"
+            elif report.report_type.upper() == "HAIL":
+                if magnitude_value and str(magnitude_value).upper() != 'UNK':
+                    try:
+                        magnitude_display = f"{float(magnitude_value):.2f} inch"
+                    except (ValueError, TypeError):
+                        magnitude_display = "unknown size"
+                else:
+                    magnitude_display = "unknown size"
+            else:
+                magnitude_display = str(magnitude_value) if magnitude_value and str(magnitude_value).upper() != 'UNK' else "unknown magnitude"
+            
+            # Get Google Places location context
+            places_service = GooglePlacesService()
+            location_context = places_service.enrich_location(
+                lat=float(report.latitude) if report.latitude else 0,
+                lon=float(report.longitude) if report.longitude else 0
+            )
+            
+            # Extract primary location (smallest nearby place from Google Places)
+            primary_location_name = report.location  # fallback
+            if location_context:
+                if location_context.get('event_location') and location_context['event_location'].get('name'):
+                    primary_location_name = location_context['event_location']['name']
+                elif location_context.get('nearest_major_city') and location_context['nearest_major_city'].get('name'):
+                    primary_location_name = location_context['nearest_major_city']['name']
+            
+            # Create professional Enhanced Context summary using Google Places data
+            try:
+                numeric_magnitude = float(magnitude_value) if magnitude_value else 0
+            except (ValueError, TypeError):
+                numeric_magnitude = 0
+            
+            if report.report_type.upper() == "WIND" and numeric_magnitude > 0:
+                if numeric_magnitude >= 74:
+                    damage_desc = "Capable of causing significant structural damage to buildings and vehicles."
+                elif numeric_magnitude >= 58:
+                    damage_desc = "Strong enough to damage roofs, break windows, and down large trees."
+                else:
+                    damage_desc = "Sufficient to cause minor property damage and tree limb breakage."
+                enhanced_summary = f"On {report.report_date}, damaging winds reached {magnitude_display} at {primary_location_name}. {damage_desc}"
+            elif report.report_type.upper() == "HAIL" and numeric_magnitude > 0:
+                if numeric_magnitude >= 2.0:
+                    damage_desc = "Large enough to cause severe vehicle damage and roof penetration."
+                elif numeric_magnitude >= 1.0:
+                    damage_desc = "Size sufficient to damage vehicles and cause roof impacts."
+                else:
+                    damage_desc = "Small hail capable of minor vehicle and property damage."
+                enhanced_summary = f"On {report.report_date}, hail measuring {magnitude_display} struck {primary_location_name}. {damage_desc}"
+            else:
+                enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred at {primary_location_name}."
+            
+            # Add NWS comments for additional context
+            if report.comments:
+                enhanced_summary += f" {report.comments}"
+            
+            # Create Enhanced Context data structure
+            enhanced_context = {
+                "enhanced_summary": enhanced_summary,
+                "version": "v2.0",
+                "generated_at": datetime.utcnow().isoformat(),
+                "location_context": location_context
+            }
+            
+            # Save to database
+            report.enhanced_context = enhanced_context
+            report.enhanced_context_version = "v2.0"
+            report.enhanced_context_generated_at = datetime.utcnow()
+            db.session.commit()
+            
+            result = {
+                "success": True,
+                "message": "Enhanced Context generated successfully",
+                "report_id": report_id,
+                "enhanced_context": enhanced_context
+            }
+            
+        except Exception as e:
+            result = {
+                "success": False,
+                "error": str(e)
+            }
         
         if result.get('success'):
             return jsonify({
