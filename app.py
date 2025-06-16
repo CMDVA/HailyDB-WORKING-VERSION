@@ -4059,38 +4059,63 @@ def api_generate_enhanced_context():
                 lon=float(report.longitude) if report.longitude else 0
             )
             
-            # Build comprehensive location hierarchy from Google Places data
+            # Build comprehensive location context with 6 geo data points
             event_location = None
+            event_distance = None
+            event_direction = ""
             nearest_major_city = None
-            directional_context = ""
+            major_city_distance = None
+            major_city_direction = ""
+            nearby_places_text = ""
             
             if location_context and location_context.get('nearby_places'):
                 nearby_places = location_context['nearby_places']
                 
-                # Extract event location (first entry marked as primary_location)
+                # Extract event location (primary_location)
                 for place in nearby_places:
                     if place.get('type') == 'primary_location':
                         event_location = place.get('name')
-                        break
-                
-                # Extract nearest major city with directional context
-                for place in nearby_places:
-                    if place.get('type') == 'nearest_city':
-                        nearest_major_city = place.get('name')
-                        distance = place.get('distance_miles')
+                        event_distance = place.get('distance_miles')
                         
-                        # Calculate directional context
+                        # Calculate direction FROM event coordinates TO the location
                         if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
                             lat_diff = float(report.latitude) - float(place['approx_lat'])
                             lon_diff = float(report.longitude) - float(place['approx_lon'])
                             
                             if abs(lat_diff) > abs(lon_diff):
-                                direction = "north" if lat_diff > 0 else "south"
+                                event_direction = "north" if lat_diff > 0 else "south"
                             else:
-                                direction = "east" if lon_diff > 0 else "west"
-                            
-                            directional_context = f", {distance:.1f} miles {direction} of {nearest_major_city}"
+                                event_direction = "east" if lon_diff > 0 else "west"
                         break
+                
+                # Extract nearest major city with direction
+                for place in nearby_places:
+                    if place.get('type') == 'nearest_city':
+                        nearest_major_city = place.get('name')
+                        major_city_distance = place.get('distance_miles')
+                        
+                        # Calculate direction FROM event coordinates TO major city
+                        if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
+                            lat_diff = float(report.latitude) - float(place['approx_lat'])
+                            lon_diff = float(report.longitude) - float(place['approx_lon'])
+                            
+                            if abs(lat_diff) > abs(lon_diff):
+                                major_city_direction = "north" if lat_diff > 0 else "south"
+                            else:
+                                major_city_direction = "east" if lon_diff > 0 else "west"
+                        break
+                
+                # Build nearby places text (closest 2-3 places)
+                nearby_place_items = []
+                for place in nearby_places:
+                    if place.get('type') == 'nearby_place' and len(nearby_place_items) < 3:
+                        name = place.get('name')
+                        distance = place.get('distance_miles')
+                        if name and distance:
+                            nearby_place_items.append(f"{name} ({distance:.1f} mi)")
+                
+                if nearby_place_items:
+                    nearby_places_text = f". Nearby places include {', '.join(nearby_place_items)}"
             
             # Use comprehensive location hierarchy - prioritize Google Places event location
             primary_location_name = event_location if event_location else report.location
