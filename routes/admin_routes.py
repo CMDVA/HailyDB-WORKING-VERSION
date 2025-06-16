@@ -5,6 +5,7 @@ Internal management and monitoring endpoints
 from flask import Blueprint, request, jsonify, render_template
 import logging
 from datetime import datetime, timedelta
+from sqlalchemy import text
 
 from models import db, Alert, SPCReport, IngestionLog, WebhookRule
 from services.enhanced_context_service import EnhancedContextService
@@ -22,7 +23,7 @@ def internal_status():
     """Health status endpoint - comprehensive system diagnostics"""
     try:
         # Database connectivity check
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         db_status = "healthy"
         
         # Recent alert counts
@@ -44,18 +45,18 @@ def internal_status():
         
         # Recent ingestion logs
         recent_logs = IngestionLog.query.filter(
-            IngestionLog.start_time >= datetime.utcnow() - timedelta(hours=6)
-        ).order_by(IngestionLog.start_time.desc()).limit(10).all()
+            IngestionLog.started_at >= datetime.utcnow() - timedelta(hours=6)
+        ).order_by(IngestionLog.started_at.desc()).limit(10).all()
         
         log_data = []
         for log in recent_logs:
             log_data.append({
-                'operation_type': log.operation_type,
-                'status': log.status,
-                'start_time': log.start_time.isoformat() if log.start_time else None,
-                'end_time': log.end_time.isoformat() if log.end_time else None,
-                'records_processed': log.records_processed,
-                'errors_count': log.errors_count
+                'success': log.success,
+                'alerts_processed': log.alerts_processed,
+                'started_at': log.started_at.isoformat() if log.started_at else None,
+                'completed_at': log.completed_at.isoformat() if log.completed_at else None,
+                'new_alerts': log.new_alerts,
+                'error_message': log.error_message
             })
         
         status_data = {
