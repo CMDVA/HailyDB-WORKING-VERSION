@@ -1309,9 +1309,6 @@ def view_spc_report_detail(report_id):
             enhanced_context_obj.alert_count = len(matching_alerts)
             enhanced_context_obj.radar_polygon_match = False  # Default value for template  
             enhanced_context_obj.version = enhanced_context_data.get('version', 'v2.0')
-            
-            # Add the enhanced context object to the report for template access
-            report.enhanced_context = enhanced_context_obj
         else:
             # Create minimal enhanced_context object to prevent template errors
             enhanced_context_obj = SimpleNamespace()
@@ -1321,7 +1318,6 @@ def view_spc_report_detail(report_id):
             enhanced_context_obj.alert_count = len(matching_alerts)
             enhanced_context_obj.radar_polygon_match = False
             enhanced_context_obj.version = 'v2.0'
-            report.enhanced_context = enhanced_context_obj
         
         # Extract location context for template
         primary_location = None
