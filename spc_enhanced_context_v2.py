@@ -31,7 +31,7 @@ class SPCEnhancedContextService:
         """Prepare structured prompt context"""
         report_type = report.report_type.upper()
 
-        # Extract magnitude with proper JSON handling
+        # Extract magnitude with proper JSON handling and UNK value handling
         magnitude_value = None
         if report.magnitude:
             if isinstance(report.magnitude, dict):
@@ -44,7 +44,14 @@ class SPCEnhancedContextService:
                     # Try common keys
                     magnitude_value = report.magnitude.get('speed') or report.magnitude.get('size_inches') or report.magnitude.get('value')
             else:
-                magnitude_value = float(report.magnitude) if report.magnitude else None
+                # Handle string/numeric magnitude values, including 'UNK'
+                try:
+                    if str(report.magnitude).upper() == 'UNK':
+                        magnitude_value = None
+                    else:
+                        magnitude_value = float(report.magnitude)
+                except (ValueError, TypeError):
+                    magnitude_value = None
         
         # Format magnitude display
         if report_type == "HAIL":
@@ -473,8 +480,8 @@ REQUIREMENTS:
             
             # Get complete location hierarchy using Google Places API
             location_data = places_service.get_nearby_places(
-                lat=float(report.lat), 
-                lon=float(report.lon), 
+                lat=float(report.latitude), 
+                lon=float(report.longitude), 
                 radius_miles=25
             )
             

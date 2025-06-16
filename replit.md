@@ -98,6 +98,13 @@ The system integrates with multiple authoritative weather data sources:
 
 ```
 Changelog:
+- June 16, 2025: Enhanced Context v2.0 with Complete Location Hierarchy OPERATIONAL
+  * FIXED: Enhanced Context generation now uses complete Google Places location hierarchy
+  * IMPLEMENTED: Event Location (smallest nearby place), Nearest Major City (with distance), Nearby Places (establishment list)
+  * FIXED: Database attribute mapping (latitude/longitude vs lat/lon) and UNK magnitude handling
+  * ELIMINATED: All hardcoded "at coordinates" text - professional location names only
+  * AUTONOMOUS: System processing 33,236 remaining SPC reports with complete location context
+  * PRODUCTION: Enhanced Context summaries now include full location hierarchy as specified
 - June 16, 2025: Enhanced Context generation now working with Google Places API integration
   * Fixed Google Places API response parsing errors
   * Implemented proper location enrichment using smallest nearby place as event location
