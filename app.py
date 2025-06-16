@@ -4064,22 +4064,25 @@ def api_generate_enhanced_context():
             nearest_major_city = None
             directional_context = ""
             
-            if location_context:
-                # Extract event location (smallest nearby place from Google Places)
-                if location_context.get('event_location') and location_context['event_location'].get('name'):
-                    event_location = location_context['event_location']['name']
+            if location_context and location_context.get('nearby_places'):
+                nearby_places = location_context['nearby_places']
+                
+                # Extract event location (first entry marked as primary_location)
+                for place in nearby_places:
+                    if place.get('type') == 'primary_location':
+                        event_location = place.get('name')
+                        break
                 
                 # Extract nearest major city with directional context
-                if location_context.get('nearest_major_city'):
-                    city_data = location_context['nearest_major_city']
-                    if city_data.get('name') and city_data.get('distance_miles'):
-                        nearest_major_city = city_data['name']
-                        distance = city_data['distance_miles']
+                for place in nearby_places:
+                    if place.get('type') == 'nearest_city':
+                        nearest_major_city = place.get('name')
+                        distance = place.get('distance_miles')
                         
                         # Calculate directional context
-                        if report.latitude and report.longitude and city_data.get('approx_lat') and city_data.get('approx_lon'):
-                            lat_diff = float(report.latitude) - float(city_data['approx_lat'])
-                            lon_diff = float(report.longitude) - float(city_data['approx_lon'])
+                        if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
+                            lat_diff = float(report.latitude) - float(place['approx_lat'])
+                            lon_diff = float(report.longitude) - float(place['approx_lon'])
                             
                             if abs(lat_diff) > abs(lon_diff):
                                 direction = "north" if lat_diff > 0 else "south"
@@ -4087,9 +4090,10 @@ def api_generate_enhanced_context():
                                 direction = "east" if lon_diff > 0 else "west"
                             
                             directional_context = f", {distance:.1f} miles {direction} of {nearest_major_city}"
+                        break
             
-            # Use comprehensive location hierarchy
-            primary_location_name = event_location or report.location
+            # Use comprehensive location hierarchy - prioritize Google Places event location
+            primary_location_name = event_location if event_location else report.location
             
             # Create professional Enhanced Context summary with ALL available data
             try:
