@@ -4059,20 +4059,45 @@ def api_generate_enhanced_context():
                 lon=float(report.longitude) if report.longitude else 0
             )
             
-            # Extract primary location (smallest nearby place from Google Places)
-            primary_location_name = report.location  # fallback
-            if location_context:
-                if location_context.get('event_location') and location_context['event_location'].get('name'):
-                    primary_location_name = location_context['event_location']['name']
-                elif location_context.get('nearest_major_city') and location_context['nearest_major_city'].get('name'):
-                    primary_location_name = location_context['nearest_major_city']['name']
+            # Build comprehensive location hierarchy from Google Places data
+            event_location = None
+            nearest_major_city = None
+            directional_context = ""
             
-            # Create professional Enhanced Context summary using Google Places data
+            if location_context:
+                # Extract event location (smallest nearby place from Google Places)
+                if location_context.get('event_location') and location_context['event_location'].get('name'):
+                    event_location = location_context['event_location']['name']
+                
+                # Extract nearest major city with directional context
+                if location_context.get('nearest_major_city'):
+                    city_data = location_context['nearest_major_city']
+                    if city_data.get('name') and city_data.get('distance_miles'):
+                        nearest_major_city = city_data['name']
+                        distance = city_data['distance_miles']
+                        
+                        # Calculate directional context
+                        if report.latitude and report.longitude and city_data.get('approx_lat') and city_data.get('approx_lon'):
+                            lat_diff = float(report.latitude) - float(city_data['approx_lat'])
+                            lon_diff = float(report.longitude) - float(city_data['approx_lon'])
+                            
+                            if abs(lat_diff) > abs(lon_diff):
+                                direction = "north" if lat_diff > 0 else "south"
+                            else:
+                                direction = "east" if lon_diff > 0 else "west"
+                            
+                            directional_context = f", {distance:.1f} miles {direction} of {nearest_major_city}"
+            
+            # Use comprehensive location hierarchy
+            primary_location_name = event_location or report.location
+            
+            # Create professional Enhanced Context summary with ALL available data
             try:
                 numeric_magnitude = float(magnitude_value) if magnitude_value else 0
             except (ValueError, TypeError):
                 numeric_magnitude = 0
             
+            # Build comprehensive enhanced summary
             if report.report_type.upper() == "WIND" and numeric_magnitude > 0:
                 if numeric_magnitude >= 74:
                     damage_desc = "Capable of causing significant structural damage to buildings and vehicles."
@@ -4080,7 +4105,15 @@ def api_generate_enhanced_context():
                     damage_desc = "Strong enough to damage roofs, break windows, and down large trees."
                 else:
                     damage_desc = "Sufficient to cause minor property damage and tree limb breakage."
-                enhanced_summary = f"On {report.report_date}, damaging winds reached {magnitude_display} at {primary_location_name}. {damage_desc}"
+                    
+                # Use Google Places event location as primary with directional context
+                location_text = f"{primary_location_name}{directional_context}"
+                enhanced_summary = f"On {report.report_date}, damaging winds reached {magnitude_display} at {location_text}. {damage_desc}"
+                
+                # Add SPC location for reference
+                if report.location and report.location != primary_location_name:
+                    enhanced_summary += f" SPC reference: {report.location}, {report.county} County, {report.state}."
+                    
             elif report.report_type.upper() == "HAIL" and numeric_magnitude > 0:
                 if numeric_magnitude >= 2.0:
                     damage_desc = "Large enough to cause severe vehicle damage and roof penetration."
@@ -4088,13 +4121,57 @@ def api_generate_enhanced_context():
                     damage_desc = "Size sufficient to damage vehicles and cause roof impacts."
                 else:
                     damage_desc = "Small hail capable of minor vehicle and property damage."
-                enhanced_summary = f"On {report.report_date}, hail measuring {magnitude_display} struck {primary_location_name}. {damage_desc}"
+                    
+                # Include comprehensive location data
+                location_text = f"{primary_location_name}{directional_context}"
+                enhanced_summary = f"On {report.report_date}, hail measuring {magnitude_display} struck {location_text}. {damage_desc}"
+                
+                # Add SPC location for reference
+                if report.location and report.location != primary_location_name:
+                    enhanced_summary += f" SPC reference: {report.location}, {report.county} County, {report.state}."
+                    
             else:
-                enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred at {primary_location_name}."
+                location_text = f"{primary_location_name}{directional_context}"
+                enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred at {location_text}."
+                
+                # Add SPC location for reference
+                if report.location and report.location != primary_location_name:
+                    enhanced_summary += f" SPC reference: {report.location}, {report.county} County, {report.state}."
             
             # Add NWS comments for additional context
             if report.comments:
                 enhanced_summary += f" {report.comments}"
+            
+            # Add verified alert context if this SPC report has verified NWS matches
+            verified_alerts = db.session.query(Alert).filter(
+                Alert.spc_verified == True,
+                Alert.spc_reports.op('?')(str(report_id))
+            ).all()
+            
+            if verified_alerts:
+                alert_count = len(verified_alerts)
+                # Get alert timing and details
+                alert_times = []
+                alert_types = set()
+                for alert in verified_alerts:
+                    if alert.effective:
+                        alert_times.append(alert.effective.strftime('%H:%M UTC'))
+                    alert_types.add(alert.event)
+                
+                if alert_times:
+                    time_context = f" at {', '.join(alert_times[:2])}" if len(alert_times) <= 2 else f" starting at {alert_times[0]}"
+                else:
+                    time_context = ""
+                
+                alert_type_text = ', '.join(sorted(alert_types))
+                enhanced_summary += f" This event was preceded by {alert_count} verified NWS {alert_type_text}{time_context}, confirming the storm track and timing."
+            
+            # Add nearby places context for complete location intelligence
+            if location_context and location_context.get('nearby_places'):
+                nearby_places = location_context['nearby_places']
+                if len(nearby_places) > 2:  # Skip primary location and major city
+                    nearby_names = [place['name'] for place in nearby_places[2:5]]  # Top 3 additional places
+                    enhanced_summary += f" Nearby places include {', '.join(nearby_names)}."
             
             # Create Enhanced Context data structure
             enhanced_context = {
