@@ -4116,9 +4116,10 @@ def api_generate_enhanced_context():
             if nearby_place_items:
                 nearby_places_text = f". Nearby places include {', '.join(nearby_place_items)}"
         
-        # Generate simple Enhanced Context summary
-        enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred at {report.location}"
+        # Generate comprehensive Enhanced Context summary with 6 geo data points
+        enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred"
         
+        # Add magnitude information
         if magnitude_value:
             try:
                 mag_val = float(magnitude_value)
@@ -4129,7 +4130,22 @@ def api_generate_enhanced_context():
             except (ValueError, TypeError):
                 pass
         
-        enhanced_summary += "."
+        # Build comprehensive location context using the 6 geo data points
+        location_text = f" at {report.location}"
+        
+        if event_location and event_distance:
+            if event_direction:
+                location_text += f", located {event_direction} {event_distance:.1f} miles from {event_location}"
+            else:
+                location_text += f", located {event_distance:.1f} miles from {event_location}"
+        
+        if nearest_major_city and major_city_distance:
+            if major_city_direction:
+                location_text += f", or {major_city_direction} {major_city_distance:.1f} miles from {nearest_major_city}"
+            else:
+                location_text += f", or {major_city_distance:.1f} miles from {nearest_major_city}"
+        
+        enhanced_summary += location_text + nearby_places_text + "."
         
         # Store enhanced context in the database
         enhanced_context = {
