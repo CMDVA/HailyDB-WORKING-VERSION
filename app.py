@@ -1295,21 +1295,33 @@ def view_spc_report_detail(report_id):
             context_service = EnhancedContextService()
             enhanced_context_result = context_service.generate_enhanced_context(report, db.session)
             if enhanced_context_result and 'enhanced_summary' in enhanced_context_result:
-                # Convert dictionary to object for template compatibility
-                enhanced_context_obj = SimpleNamespace()
-                enhanced_context_obj.enhanced_summary = enhanced_context_result.get('enhanced_summary', '')
-                enhanced_context_obj.generated_at = enhanced_context_result.get('generated_at', '')
-                enhanced_context_obj.location_context = enhanced_context_result.get('location_context', {})
-                enhanced_context_obj.alert_count = 0  # Default value for template
-                enhanced_context_obj.radar_polygon_match = False  # Default value for template
-                enhanced_context_obj.version = enhanced_context_result.get('version', 'v2.0')
-                
-                # Add the enhanced context object to the report for template access
-                report.enhanced_context = enhanced_context_obj
                 enhanced_context_data = enhanced_context_result
         except Exception as e:
-            logger.error(f"Error viewing SPC report {report_id}: {e}")
+            logger.warning(f"Failed to fetch enhanced_context for report {report_id}: {e}")
             enhanced_context_data = None
+        
+        # Convert Enhanced Context dictionary to object for template compatibility
+        if enhanced_context_data:
+            enhanced_context_obj = SimpleNamespace()
+            enhanced_context_obj.enhanced_summary = enhanced_context_data.get('enhanced_summary', '')
+            enhanced_context_obj.generated_at = enhanced_context_data.get('generated_at', '')
+            enhanced_context_obj.location_context = enhanced_context_data.get('location_context', {})
+            enhanced_context_obj.alert_count = len(matching_alerts)
+            enhanced_context_obj.radar_polygon_match = False  # Default value for template  
+            enhanced_context_obj.version = enhanced_context_data.get('version', 'v2.0')
+            
+            # Add the enhanced context object to the report for template access
+            report.enhanced_context = enhanced_context_obj
+        else:
+            # Create minimal enhanced_context object to prevent template errors
+            enhanced_context_obj = SimpleNamespace()
+            enhanced_context_obj.enhanced_summary = ''
+            enhanced_context_obj.generated_at = ''
+            enhanced_context_obj.location_context = {}
+            enhanced_context_obj.alert_count = len(matching_alerts)
+            enhanced_context_obj.radar_polygon_match = False
+            enhanced_context_obj.version = 'v2.0'
+            report.enhanced_context = enhanced_context_obj
         
         # Extract location context for template
         primary_location = None
@@ -1346,16 +1358,20 @@ def view_spc_report_detail(report_id):
                 pass
         
         # Fallback to enhanced_context location data if spc_enrichment unavailable
-        if not primary_location and enhanced_context_data and 'location_context' in enhanced_context_data:
-            location_context = enhanced_context_data['location_context']
-            if 'nearby_places' in location_context and location_context['nearby_places']:
-                # Use smallest/closest place as primary location
-                closest_place = min(location_context['nearby_places'], key=lambda x: x.get('distance_miles', 999))
-                primary_location = {
-                    'name': closest_place.get('name', ''),
-                    'distance_miles': closest_place.get('distance_miles', 0)
-                }
-                nearby_places = location_context['nearby_places']
+        if not primary_location and enhanced_context_data:
+            try:
+                if isinstance(enhanced_context_data, dict) and 'location_context' in enhanced_context_data:
+                    location_context = enhanced_context_data['location_context']
+                    if 'nearby_places' in location_context and location_context['nearby_places']:
+                        # Use smallest/closest place as primary location
+                        closest_place = min(location_context['nearby_places'], key=lambda x: x.get('distance_miles', 999))
+                        primary_location = {
+                            'name': closest_place.get('name', ''),
+                            'distance_miles': closest_place.get('distance_miles', 0)
+                        }
+                        nearby_places = location_context['nearby_places']
+            except Exception as e:
+                logger.debug(f"Error extracting location from enhanced_context_data: {e}")
         
         # Final fallback - never show county as primary location for end users
         if not primary_location:
@@ -1365,11 +1381,9 @@ def view_spc_report_detail(report_id):
                 'distance_miles': 0
             }
         
-        # Add alert_count to enhanced_context_data to fix template error
-        if enhanced_context_data:
-            enhanced_context_data['alert_count'] = len(matching_alerts)
-        else:
-            enhanced_context_data = {'alert_count': len(matching_alerts)}
+        # Ensure alert_count is set on the enhanced_context object
+        if hasattr(report, 'enhanced_context') and report.enhanced_context:
+            report.enhanced_context.alert_count = len(matching_alerts)
             
         return render_template('spc_report_detail.html', 
                              report=report,
