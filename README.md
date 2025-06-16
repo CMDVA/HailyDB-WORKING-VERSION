@@ -218,6 +218,44 @@ GET https://api.hailyai.com/api/spc/enrichment/{report_id}
 
 Returns detailed location intelligence and contextual enrichment for a specific SPC report.
 
+#### Enhanced Context v2.0
+```http
+GET https://api.hailyai.com/api/spc-reports/{report_id}/enhanced-context
+```
+
+**New Feature:** AI-powered Enhanced Context generates comprehensive meteorological summaries using:
+- **Multi-source Intelligence:** Cross-references SPC reports with NWS alerts and radar data
+- **Location Intelligence:** Uses Google Places API to find exact nearby places instead of generic coordinates  
+- **Damage Assessment:** Official NWS hail and wind damage classifications
+- **Event Context:** Multi-alert correlation for comprehensive storm analysis
+
+**Response Format:**
+```json
+{
+  "enhanced_context": {
+    "enhanced_summary": "On June 10, 2025, a severe thunderstorm produced quarter-sized hail near Downtown Dallas. The 1.25-inch hail was reported at Central Business District at 6:30 PM UTC, with radar confirmation showing embedded supercell activity. Other nearby locations include Deep Ellum (1.2mi) and Fair Park (2.1mi).",
+    "version": "v2.0",
+    "generated_at": "2025-06-16T02:35:14Z",
+    "location_context": {
+      "event_location": "Downtown Dallas",
+      "nearest_major_city": "Dallas at 0.0 miles",
+      "nearby_places": [
+        {
+          "name": "Deep Ellum",
+          "distance_miles": 1.2,
+          "type": "nearby_place"
+        }
+      ]
+    },
+    "damage_assessment": {
+      "category": "Large Hail",
+      "damage_potential": "moderate damage to vehicles and property", 
+      "is_severe": true
+    }
+  }
+}
+```
+
 ### Live Radar Alerts
 
 #### Real-Time Radar Events
@@ -488,14 +526,25 @@ HailyDB automatically cross-references NWS alerts with official Storm Prediction
 - **Confidence Score:** `spc_confidence_score` (0.0-1.0) indicates match quality
 - **Match Method:** `spc_match_method` shows verification methodology
 
-### AI Enhancement
+### AI Enhancement and Auto-Enrichment
 
-All alerts include AI-generated contextual intelligence:
+**Autonomous Processing Pipeline:**
+1. **Real-time Ingestion:** SPC reports imported every 30 minutes automatically
+2. **Auto-Enrichment:** Location intelligence added immediately on import using Google Places API
+3. **Enhanced Context:** AI-powered summaries generated every 10 minutes for new reports
+4. **Radar Correlation:** Cross-referenced with NWS radar-detected events for verification
 
-- **Location Intelligence:** Nearby places and geographic context
-- **Impact Assessment:** Potential damage and affected areas
-- **Event Summary:** Human-readable event descriptions
-- **Radar Context:** Correlation with radar-detected phenomena
+**Enhanced Context v2.0 Features:**
+- **Multi-source Intelligence:** Correlates SPC reports, NWS alerts, and radar data
+- **Location Precision:** Uses smallest nearby place names instead of coordinates
+- **Damage Classifications:** Official NWS hail and wind damage categories
+- **Production-Ready:** Transaction isolation and error handling for weeks-unattended operation
+
+**AI Enhancement Components:**
+- **Location Intelligence:** Nearby places and geographic context from Google Places API
+- **Impact Assessment:** NWS-official damage potential classifications
+- **Event Summary:** Human-readable meteorological descriptions optimized for end users
+- **Radar Context:** Correlation with radar-detected phenomena for verification
 
 ## Error Handling
 
@@ -625,18 +674,93 @@ curl -H "Authorization: Bearer YOUR_API_KEY" \
 4. **Webhooks:** Use webhooks instead of polling for real-time updates
 5. **Error Handling:** Implement exponential backoff for retry logic
 
+## Production Deployment and Architecture
+
+### Autonomous Operation Design
+HailyDB is designed for **weeks-unattended operation** with comprehensive error handling:
+
+**Background Services:**
+- **Autonomous Scheduler:** Self-monitoring background processes without APScheduler dependency
+- **Auto-Recovery:** Failed operations automatically retry with exponential backoff
+- **Transaction Isolation:** Database operations use proper isolation to prevent corruption
+- **Overlap Prevention:** Threading locks prevent duplicate processing during high-load periods
+
+**Monitoring and Health Checks:**
+```http
+GET /api/autonomous-scheduler/status
+```
+
+Returns real-time status of all background operations with countdown timers.
+
+### Required Environment Variables
+```bash
+# Core Database
+DATABASE_URL=postgresql://user:pass@host:port/dbname
+
+# AI Enhancement (Required)
+OPENAI_API_KEY=sk-xxx  # For Enhanced Context generation
+
+# Location Intelligence (Required for auto-enrichment)
+GOOGLE_PLACES_API_KEY=AIzaSyxxx  # For nearby place identification
+
+# Security
+SESSION_SECRET=your-random-secret-key
+
+# Performance Tuning (Optional)
+DB_WRITE_BATCH_SIZE=500
+ENRICH_BATCH_SIZE=25
+SPC_MATCH_BATCH_SIZE=200
+```
+
+### Deployment Checklist
+1. **Database Setup:** PostgreSQL 12+ with JSONB support
+2. **API Keys:** Obtain OpenAI and Google Places API credentials
+3. **Environment:** Configure all required environment variables
+4. **Health Check:** Verify `/health` endpoint returns 200 OK
+5. **Auto-Scheduler:** Start autonomous scheduler via `/api/autonomous-scheduler/start`
+6. **Data Verification:** Monitor `/api/status` for data freshness indicators
+
+### Troubleshooting Common Issues
+
+**Enhanced Context Generation Failures:**
+- **Symptom:** `NoneType comparison error` in logs
+- **Cause:** Magnitude fields contain null values
+- **Solution:** Fixed in v2.0 with null-safe magnitude extraction
+
+**Auto-Enrichment Not Working:**
+- **Symptom:** New SPC reports missing enrichment data
+- **Cause:** Auto-enrichment triggered only after successful database commits
+- **Verification:** Check logs for "Auto-enriched SPC report" messages
+
+**Webhook Delivery Failures:**
+- **Symptom:** External systems not receiving notifications
+- **Solution:** Verify webhook URLs are publicly accessible and return 200 status codes
+- **Debug:** Use `/api/webhook-test` endpoint to validate webhook configuration
+
+### Performance Optimization
+
+**Database Indexing:**
+- Geographic queries: Ensure PostGIS indexes on geometry columns
+- Temporal filtering: Index on `effective`, `expires`, `report_date` columns
+- Cross-reference: Composite indexes on state/county combinations
+
+**Caching Strategy:**
+- **Live Radar API:** 5-minute TTL cache for real-time endpoints
+- **SPC Reports:** 1-hour cache for historical data queries
+- **Enhanced Context:** Cache until regeneration (permanent until updated)
+
 ## Support and Documentation
 
 ### Technical Support
-- **Documentation:** Complete API reference at documentation URL
-- **Status Page:** System status and uptime monitoring
-- **Developer Forum:** Community support and integration examples
+- **Documentation:** Complete API reference and deployment guides
+- **Status Page:** Real-time system status and uptime monitoring
+- **Health Endpoints:** Built-in diagnostic tools for troubleshooting
 
 ### Service Level Agreement
-- **Uptime:** 99.9% availability guarantee
+- **Uptime:** 99.9% availability guarantee with autonomous recovery
 - **Response Time:** < 200ms average for API endpoints
-- **Data Freshness:** NWS alerts updated every 5 minutes
-- **Support Response:** 24-hour response time for technical issues
+- **Data Freshness:** NWS alerts updated every 5 minutes, SPC reports every 30 minutes
+- **Auto-Recovery:** Failed operations retry automatically without manual intervention
 
 ## System Status and Monitoring
 
@@ -656,9 +780,10 @@ Returns last update timestamps for all data sources.
 
 ---
 
-**Version:** v2.0 Production  
-**Last Updated:** June 12, 2025  
-**Contact:** Technical Support Team  
+**Version:** v2.0 Production with Enhanced Context  
+**Last Updated:** June 16, 2025  
+**Auto-Enrichment:** Fully autonomous with weeks-unattended operation  
+**Enhanced Context:** v2.0 with location intelligence and damage classifications  
 **Status:** https://api.hailyai.com/health
 
 *HailyDB is a production-grade weather intelligence platform designed for enterprise applications requiring reliable, real-time weather data with comprehensive verification and AI enhancement.*

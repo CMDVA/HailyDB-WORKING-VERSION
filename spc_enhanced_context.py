@@ -280,38 +280,34 @@ class SPCEnhancedContextService:
                                 pass
                         break
             
-            # Extract magnitude based on report type
+            # Extract magnitude based on report type - ensure numeric values to prevent NoneType comparison errors
+            hail_size = 0.0
+            wind_speed = 0
+            
             if report.report_type.upper() == "HAIL" and report.magnitude:
                 try:
                     if isinstance(report.magnitude, str):
                         mag_data = json.loads(report.magnitude)
-                        hail_size = mag_data.get('size_inches', 0)
+                        hail_size = float(mag_data.get('size_inches', 0) or 0)
                     elif isinstance(report.magnitude, dict):
                         # Database returns parsed JSON as dict
-                        hail_size = report.magnitude.get('size_inches', 0)
+                        hail_size = float(report.magnitude.get('size_inches', 0) or 0)
                     else:
-                        hail_size = float(report.magnitude)
-                    wind_speed = 0
+                        hail_size = float(report.magnitude or 0)
                 except (json.JSONDecodeError, ValueError, TypeError):
-                    hail_size = 0
-                    wind_speed = 0
+                    hail_size = 0.0
             elif report.report_type.upper() == "WIND" and report.magnitude:
                 try:
                     if isinstance(report.magnitude, str):
                         mag_data = json.loads(report.magnitude)
-                        wind_speed = mag_data.get('speed', 0)
+                        wind_speed = int(mag_data.get('speed', 0) or 0)
                     elif isinstance(report.magnitude, dict):
                         # Database returns parsed JSON as dict
-                        wind_speed = report.magnitude.get('speed', 0)
+                        wind_speed = int(report.magnitude.get('speed', 0) or 0)
                     else:
-                        wind_speed = int(report.magnitude)
-                    hail_size = 0
+                        wind_speed = int(report.magnitude or 0)
                 except (json.JSONDecodeError, ValueError, TypeError):
-                    hail_size = 0
                     wind_speed = 0
-            else:
-                hail_size = 0
-                wind_speed = 0
             
             # Get NWS damage categories from lookup tables
             if report.report_type.upper() == "HAIL" and hail_size > 0:
