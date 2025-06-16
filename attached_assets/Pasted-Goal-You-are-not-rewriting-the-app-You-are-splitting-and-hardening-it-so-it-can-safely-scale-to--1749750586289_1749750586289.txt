@@ -1,0 +1,263 @@
+Goal: You are not rewriting the app. You are splitting and hardening it, so it can safely scale to:
+
+More users
+
+More endpoints
+
+More background jobs
+
+Concurrent requests
+
+👉 This is a "surgical split," not a major refactor.
+
+Step 1 — Blueprint Refactor
+1️⃣1. Add a folder structure like this:
+bash
+Copy
+Edit
+/blueprints
+    __init__.py
+    alerts.py
+    spc_reports.py
+    internal.py
+    radar.py
+1️⃣2. In alerts.py, move:
+/api/alerts
+
+/api/alerts/search
+
+/api/alerts/by-state
+
+/api/alerts/by-county
+
+→ These become alerts_bp.
+
+Example start of alerts.py:
+
+python
+Copy
+Edit
+from flask import Blueprint, request, jsonify
+alerts_bp = Blueprint('alerts', __name__, url_prefix='/api/alerts')
+
+@alerts_bp.route('/', methods=['GET'])
+def get_alerts():
+    # paste original get_alerts() here
+    ...
+
+# Repeat for other endpoints
+1️⃣3. In spc_reports.py, move:
+/spc/reports
+
+/spc/reports/<int:report_id>
+
+/api/spc-reports/enrich
+
+/api/spc-reports/enhanced-context/generate
+
+/internal/spc-enrich-batch
+
+/internal/spc-enrich
+
+→ These become spc_bp.
+
+1️⃣4. In internal.py, move:
+/internal/ingest-spc
+
+/internal/spc-verify
+
+/internal/spc-backfill
+
+/internal/match-alerts-to-reports
+
+/internal/alert-enrich
+
+/internal/alert-reenrich
+
+/internal/alert-batch-enrich
+
+/internal/scheduler-status
+
+/internal/rebuild-radar-alerts
+
+→ These become internal_bp.
+
+1️⃣5. In radar.py, move:
+/api/radar-alerts
+
+/api/radar-alerts/by-county
+
+/api/radar-alerts/by-state
+
+/api/radar-alerts/by-coord
+
+→ These become radar_bp.
+
+1️⃣6. In app.py, now you do:
+python
+Copy
+Edit
+from blueprints.alerts import alerts_bp
+from blueprints.spc_reports import spc_bp
+from blueprints.internal import internal_bp
+from blueprints.radar import radar_bp
+
+app.register_blueprint(alerts_bp)
+app.register_blueprint(spc_bp)
+app.register_blueprint(internal_bp)
+app.register_blueprint(radar_bp)
+Step 2 — ServiceRegistry Pattern
+2️⃣1. Create services.py:
+python
+Copy
+Edit
+from models import db
+from services.enrichment import SPCEnhancedContextService
+from services.ingest import RadarIngestService
+# Import your other services here
+
+class ServiceRegistry:
+    def __init__(self, db_session):
+        self.db_session = db_session
+    
+    @property
+    def enrich_service(self):
+        return SPCEnhancedContextService(self.db_session)
+    
+    @property
+    def radar_ingest_service(self):
+        return RadarIngestService(self.db_session)
+    
+    # Add other services as needed
+2️⃣2. In each Blueprint:
+At the top of each Blueprint, add:
+
+python
+Copy
+Edit
+from flask import current_app
+from services import ServiceRegistry
+Inside each route:
+
+python
+Copy
+Edit
+registry = ServiceRegistry(db.session)
+enrich_service = registry.enrich_service
+→ No more global enrich_service = None.
+→ Now each request gets a clean service object tied to current DB session.
+
+Step 3 — Harden /internal endpoints
+3️⃣1. Add a shared decorator:
+python
+Copy
+Edit
+from functools import wraps
+from flask import request, abort
+
+INTERNAL_API_KEY = 'my-super-secret-internal-key'
+
+def require_internal_api_key(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if request.headers.get('X-Internal-API-Key') != INTERNAL_API_KEY:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+3️⃣2. In each /internal/* route:
+python
+Copy
+Edit
+@internal_bp.route('/spc-verify', methods=['POST'])
+@require_internal_api_key
+def spc_verify():
+    ...
+Change from GET to POST.
+Force clients to send X-Internal-API-Key header.
+
+→ Now only your admin tools or cron can call these expensive endpoints.
+
+Step 4 — DRY AlertQueryBuilder
+4️⃣1. Create query_builders/alert_query_builder.py:
+python
+Copy
+Edit
+class AlertQueryBuilder:
+    def __init__(self, base_query):
+        self.query = base_query
+    
+    def filter_severity(self, severity):
+        if severity:
+            self.query = self.query.filter(Alert.severity == severity)
+        return self
+    
+    def filter_radar_detected(self, radar_detected):
+        if radar_detected:
+            self.query = self.query.filter(Alert.radar_indicated.isnot(None))
+        return self
+    
+    def filter_county(self, county):
+        if county:
+            self.query = self.query.filter(Alert.area_desc.ilike(f"%{county}%"))
+        return self
+    
+    def filter_state(self, state):
+        if state:
+            self.query = self.query.filter(Alert.area_desc.ilike(f"%{state}%"))
+        return self
+    
+    def order_paginate(self, offset, limit):
+        self.query = self.query.order_by(Alert.effective.desc()).offset(offset).limit(limit)
+        return self
+    
+    def all(self):
+        return self.query.all()
+4️⃣2. In /api/alerts and /api/alerts/search, replace 70% of current code:
+python
+Copy
+Edit
+from query_builders.alert_query_builder import AlertQueryBuilder
+
+base_query = db.session.query(Alert).filter(Alert.active == True)
+query_builder = AlertQueryBuilder(base_query)
+
+alerts = (query_builder
+    .filter_severity(request.args.get('severity'))
+    .filter_radar_detected(request.args.get('radar_detected') == 'true')
+    .filter_county(request.args.get('county'))
+    .filter_state(request.args.get('state'))
+    .order_paginate(offset, limit)
+    .all())
+→ Now you don’t duplicate filter code between endpoints.
+
+Step 5 — Add Correlation IDs to Logs
+5️⃣1. In each batch/internal route:
+At start of function:
+
+python
+Copy
+Edit
+import uuid
+correlation_id = str(uuid.uuid4())
+logger.info(f"[{correlation_id}] Starting SPC backfill batch...")
+
+# In each subsequent logger.info/error line:
+logger.info(f"[{correlation_id}] X happened")
+logger.error(f"[{correlation_id}] Error Y happened")
+→ This lets you trace all log lines across a batch run.
+
+Summary of Steps
+Step	Action
+1	Blueprint split → /blueprints with 4 Blueprints
+2	ServiceRegistry → per-session safe services
+3	Harden /internal/* → POST only + API key required
+4	DRY AlertQueryBuilder → reusable alert filter logic
+5	Add correlation IDs → batch logs become traceable
+
+Final Notes
+This is the exact path I’d drive if I were your CTO:
+✅ It keeps your app running
+✅ It splits "admin" from "public" cleanly
+✅ It eliminates global service risk
+✅ It DRYs out your most duplicated filters
+✅ It makes batch runs debuggable

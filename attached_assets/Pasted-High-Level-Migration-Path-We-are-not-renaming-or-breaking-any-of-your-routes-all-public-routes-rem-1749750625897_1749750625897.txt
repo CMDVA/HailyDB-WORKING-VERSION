@@ -1,0 +1,240 @@
+High Level Migration Path
+We are not renaming or breaking any of your routes — all public routes remain exactly the same.
+
+/internal/* routes will become POST only and require an API key header.
+
+No existing /api/alerts or /api/radar-alerts changes except moving them to Blueprints and DRYing filters.
+
+No change to your models.
+
+No change to your template rendering.
+
+We are not touching your SPCEnhancedContextService — it stays perfect as is.
+
+ServiceRegistry will replace your existing global service objects → 100% compatible with your existing service methods.
+
+1️⃣ Project Layout After Refactor
+bash
+Copy
+Edit
+/app.py               (only registers Blueprints + base config)
+/blueprints
+    __init__.py
+    alerts.py
+    spc_reports.py
+    internal.py
+    radar.py
+/services
+    __init__.py
+    service_registry.py   (new - ServiceRegistry class)
+    enrichment.py         (your existing code)
+    ingest.py             (your existing code)
+/query_builders
+    __init__.py
+    alert_query_builder.py (new - DRY AlertQueryBuilder)
+/templates/...
+/static/...
+/models.py              (unchanged)
+/scheduler/...
+2️⃣ app.py after refactor
+python
+Copy
+Edit
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+from models import db
+from scheduler import scheduler  # your existing scheduler
+import logging
+import os
+
+# Blueprints
+from blueprints.alerts import alerts_bp
+from blueprints.spc_reports import spc_bp
+from blueprints.internal import internal_bp
+from blueprints.radar import radar_bp
+
+# Create Flask app
+app = Flask(__name__)
+app.config.from_object(os.environ.get('APP_SETTINGS', 'config.DevelopmentConfig'))
+CORS(app)
+
+# SQLAlchemy + Migrate
+db.init_app(app)
+migrate = Migrate(app, db)
+
+# Proxy fix (keep your existing config)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# Register Blueprints
+app.register_blueprint(alerts_bp)
+app.register_blueprint(spc_bp)
+app.register_blueprint(internal_bp)
+app.register_blueprint(radar_bp)
+
+# Setup Scheduler
+with app.app_context():
+    scheduler.init_app(app)
+    scheduler.start()
+
+# Basic Health Check Route (keep this here, simple root route)
+@app.route("/health")
+def health_check():
+    return {"status": "ok"}
+
+# Run if needed
+if __name__ == "__main__":
+    app.run()
+3️⃣ ServiceRegistry (services/service_registry.py)
+python
+Copy
+Edit
+from models import db
+from services.enrichment import SPCEnhancedContextService
+from services.ingest import RadarIngestService
+from services.scheduler_service import SchedulerService
+from services.ingest_service import AlertIngestService
+
+class ServiceRegistry:
+    def __init__(self, db_session):
+        self.db_session = db_session
+    
+    @property
+    def enrich_service(self):
+        return SPCEnhancedContextService(self.db_session)
+    
+    @property
+    def radar_ingest_service(self):
+        return RadarIngestService(self.db_session)
+    
+    @property
+    def scheduler_service(self):
+        return SchedulerService(self.db_session)
+    
+    @property
+    def alert_ingest_service(self):
+        return AlertIngestService(self.db_session)
+4️⃣ Harden Internal Routes (blueprints/internal.py)
+python
+Copy
+Edit
+from flask import Blueprint, request, jsonify, abort
+from services.service_registry import ServiceRegistry
+from models import db
+import logging
+import uuid
+
+internal_bp = Blueprint('internal', __name__, url_prefix='/internal')
+
+# Shared API key requirement
+INTERNAL_API_KEY = 'your-strong-internal-key'
+
+def require_internal_api_key(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if request.headers.get('X-Internal-API-Key') != INTERNAL_API_KEY:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+# Example refactored internal route with correlation_id
+@internal_bp.route('/spc-backfill', methods=['POST'])
+@require_internal_api_key
+def spc_backfill():
+    correlation_id = str(uuid.uuid4())
+    logger = logging.getLogger(__name__)
+    logger.info(f"[{correlation_id}] Starting SPC backfill...")
+
+    registry = ServiceRegistry(db.session)
+    ingest_service = registry.radar_ingest_service
+
+    try:
+        count = ingest_service.backfill_missing_reports()
+        logger.info(f"[{correlation_id}] SPC backfill completed: {count} reports backfilled.")
+        return jsonify({"success": True, "reports_backfilled": count, "correlation_id": correlation_id})
+    except Exception as e:
+        logger.error(f"[{correlation_id}] Error during SPC backfill: {e}")
+        return jsonify({"success": False, "error": str(e), "correlation_id": correlation_id}), 500
+You will use this exact pattern for all other /internal/* routes.
+
+5️⃣ DRY AlertQueryBuilder
+(query_builders/alert_query_builder.py)
+
+python
+Copy
+Edit
+class AlertQueryBuilder:
+    def __init__(self, base_query):
+        self.query = base_query
+    
+    def filter_severity(self, severity):
+        if severity:
+            self.query = self.query.filter(Alert.severity == severity)
+        return self
+    
+    def filter_radar_detected(self, radar_detected):
+        if radar_detected:
+            self.query = self.query.filter(Alert.radar_indicated.isnot(None))
+        return self
+    
+    def filter_county(self, county):
+        if county:
+            self.query = self.query.filter(Alert.area_desc.ilike(f"%{county}%"))
+        return self
+    
+    def filter_state(self, state):
+        if state:
+            self.query = self.query.filter(Alert.area_desc.ilike(f"%{state}%"))
+        return self
+    
+    def order_paginate(self, offset, limit):
+        self.query = self.query.order_by(Alert.effective.desc()).offset(offset).limit(limit)
+        return self
+    
+    def all(self):
+        return self.query.all()
+6️⃣ Example usage of AlertQueryBuilder (blueprints/alerts.py)
+python
+Copy
+Edit
+from flask import Blueprint, request, jsonify
+from services.service_registry import ServiceRegistry
+from models import db, Alert
+from query_builders.alert_query_builder import AlertQueryBuilder
+
+alerts_bp = Blueprint('alerts', __name__, url_prefix='/api/alerts')
+
+@alerts_bp.route('/', methods=['GET'])
+def get_alerts():
+    registry = ServiceRegistry(db.session)
+    
+    base_query = db.session.query(Alert).filter(Alert.active == True)
+    query_builder = AlertQueryBuilder(base_query)
+    
+    offset = int(request.args.get('offset', 0))
+    limit = int(request.args.get('limit', 50))
+    
+    alerts = (query_builder
+        .filter_severity(request.args.get('severity'))
+        .filter_radar_detected(request.args.get('radar_detected') == 'true')
+        .filter_county(request.args.get('county'))
+        .filter_state(request.args.get('state'))
+        .order_paginate(offset, limit)
+        .all())
+    
+    alerts_json = [alert.to_dict() for alert in alerts]
+    return jsonify({"alerts": alerts_json, "count": len(alerts_json)})
+Final Notes
+✅ This entire plan fits your current system 100%:
+
+I preserved all your current API names and URL patterns.
+
+You will not lose compatibility with your existing frontends or templates.
+
+Your SPCEnhancedContextService remains untouched and 100% compatible.
+
+No database changes are required for this refactor.
