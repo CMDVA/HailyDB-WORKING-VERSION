@@ -1286,18 +1286,20 @@ def view_spc_report_detail(report_id):
         # Add the verified alerts to the report object
         report.verified_alerts = matching_alerts
         
-        # Parse enhanced_context JSON if it exists
+        # Fetch Enhanced Context data from Enhanced Context Service
         import json
         enhanced_context_data = None
-        if report.enhanced_context:
-            try:
-                if isinstance(report.enhanced_context, str):
-                    enhanced_context_data = json.loads(report.enhanced_context)
-                else:
-                    enhanced_context_data = report.enhanced_context
-            except (json.JSONDecodeError, TypeError):
-                logger.warning(f"Failed to parse enhanced_context for report {report_id}")
-                enhanced_context_data = None
+        try:
+            from enhanced_context_service import EnhancedContextService
+            context_service = EnhancedContextService()
+            enhanced_context_result = context_service.generate_enhanced_context(report, db.session)
+            if enhanced_context_result and 'enhanced_summary' in enhanced_context_result:
+                enhanced_context_data = enhanced_context_result
+                # Add the enhanced context to the report object for template access
+                report.enhanced_context = enhanced_context_data
+        except Exception as e:
+            logger.warning(f"Failed to fetch enhanced_context for report {report_id}: {e}")
+            enhanced_context_data = None
         
         # Extract location context for template
         primary_location = None
