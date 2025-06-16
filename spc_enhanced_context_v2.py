@@ -31,13 +31,28 @@ class SPCEnhancedContextService:
         """Prepare structured prompt context"""
         report_type = report.report_type.upper()
 
-        # Extract magnitude with proper display formatting
+        # Extract magnitude with proper JSON handling
+        magnitude_value = None
+        if report.magnitude:
+            if isinstance(report.magnitude, dict):
+                # Handle JSON magnitude data
+                if report_type == "HAIL" and 'size_inches' in report.magnitude:
+                    magnitude_value = report.magnitude['size_inches']
+                elif report_type == "WIND" and 'speed' in report.magnitude:
+                    magnitude_value = report.magnitude['speed']
+                else:
+                    # Try common keys
+                    magnitude_value = report.magnitude.get('speed') or report.magnitude.get('size_inches') or report.magnitude.get('value')
+            else:
+                magnitude_value = float(report.magnitude) if report.magnitude else None
+        
+        # Format magnitude display
         if report_type == "HAIL":
-            magnitude_display = f"{report.magnitude:.2f} inch".replace('.00', '') if report.magnitude else "0.75 inch"
+            magnitude_display = f"{magnitude_value:.2f} inch".replace('.00', '') if magnitude_value else "0.75 inch"
         elif report_type == "WIND":
-            magnitude_display = f"{report.magnitude} mph" if report.magnitude else "58 mph"
+            magnitude_display = f"{int(magnitude_value)} mph" if magnitude_value else "58 mph"
         else:
-            magnitude_display = str(report.magnitude) if report.magnitude else 'severe weather'
+            magnitude_display = str(magnitude_value) if magnitude_value else 'severe weather'
 
         # Time formatting
         if hasattr(report, 'time_utc') and report.time_utc:
@@ -256,7 +271,7 @@ REQUIREMENTS:
 
         except Exception as e:
             self.logger.error(f"[{correlation_id}] Error generating AI summary for report {report.id}: {e}")
-            return f"This {report.report_type.lower()} report in {report.county} County, {report.state} was validated by {len(verified_alerts)} NWS alerts spanning {duration_minutes} minutes across {len(counties_affected)} counties."
+            return f"This {report.report_type.lower()} report was documented in {report.county} County, {report.state} by the Storm Prediction Center."
 
     def enrich_spc_report(self, report_id: int) -> Dict[str, Any]:
         """Generate enhanced context for a single SPC report with transaction isolation"""
@@ -289,16 +304,16 @@ REQUIREMENTS:
             # Get location context
             location_context = self._get_location_context(report)
 
-            # Generate enhanced summary
+            # Generate enhanced summary (no verification required)
             enhanced_summary = self._generate_enhanced_summary(
-                report, verified_alerts, duration_minutes, counties_affected, 
+                report, [], duration_minutes, counties_affected, 
                 nws_office, location_context, radar_polygon_match
             )
 
             # Prepare enhanced context data
             enhanced_context = {
                 "enhanced_summary": enhanced_summary,
-                "verified_alerts_count": len(verified_alerts),
+                "spc_report_type": report.report_type,
                 "duration_minutes": duration_minutes,
                 "counties_affected": list(counties_affected),
                 "nws_office": nws_office,
