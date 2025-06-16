@@ -620,9 +620,13 @@ Generate a professional summary following meteorological standards."""
             query = self.db.query(SPCReport)
             
             if unenriched_only:
-                # Only enrich reports without enhanced context
+                # Only enrich reports without enhanced context (check for NULL or empty JSON {})
                 query = query.filter(
-                    SPCReport.enhanced_context.is_(None)
+                    db.or_(
+                        SPCReport.enhanced_context.is_(None),
+                        SPCReport.enhanced_context == {},
+                        SPCReport.enhanced_context == '{}'
+                    )
                 )
             
             reports = query.limit(batch_size).all()
