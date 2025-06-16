@@ -292,12 +292,21 @@ class GooglePlacesService:
             logger.error(f"Error finding major city: {e}")
             return None
     
-    def get_nearby_places(self, lat: float, lon: float, radius_miles: float = 25) -> List[Dict[str, Any]]:
+    def get_nearby_places(self, lat: float, lon: float, radius_miles: float = 25) -> Dict[str, Any]:
         """
         Get nearby places using Google Places API for Enhanced Context generation
-        Returns list of places in the format expected by Enhanced Context system
+        Returns structured location context expected by Enhanced Context system
         """
         try:
+            # Phase 1: Find event location (smallest nearby place)
+            event_location = self.find_nearest_place_by_geocoding(lat, lon)
+            
+            # Phase 2: Find nearest major city
+            nearest_major_city = self.find_nearest_major_city(lat, lon)
+            
+            # Phase 3: Find other nearby places
+            nearby_places_list = []
+            
             # Convert miles to meters for Google API
             radius_meters = int(radius_miles * 1609.34)
             
@@ -313,35 +322,43 @@ class GooglePlacesService:
             response.raise_for_status()
             data = response.json()
             
-            places = []
-            
             if data.get('results'):
-                for place in data['results'][:20]:  # Limit to top 20 results
+                for place in data['results'][:10]:  # Limit to top 10 results
                     place_lat = place['geometry']['location']['lat']
                     place_lon = place['geometry']['location']['lng']
                     distance = self._calculate_distance(lat, lon, place_lat, place_lon)
                     
-                    # Determine place type
-                    place_types = place.get('types', [])
-                    is_county = any(keyword in place['name'].lower() for keyword in ['county', 'township', 'parish'])
-                    
-                    place_type = 'county' if is_county else 'establishment'
-                    
-                    places.append({
+                    nearby_places_list.append({
                         'name': place['name'],
                         'distance_miles': round(distance, 1),
-                        'type': place_type,
+                        'type': 'establishment',
                         'lat': place_lat,
-                        'lon': place_lon,
-                        'place_id': place.get('place_id', '')
+                        'lon': place_lon
                     })
             
-            # Sort by distance and return
-            return sorted(places, key=lambda x: x['distance_miles'])
+            # Sort by distance
+            nearby_places_list = sorted(nearby_places_list, key=lambda x: x['distance_miles'])
+            
+            # Structure response for Enhanced Context
+            return {
+                'event_location': {
+                    'name': event_location.name if event_location else None,
+                    'distance_miles': event_location.distance_miles if event_location else 0
+                } if event_location else None,
+                'nearest_major_city': {
+                    'name': nearest_major_city.name if nearest_major_city else None,
+                    'distance_miles': nearest_major_city.distance_miles if nearest_major_city else 0
+                } if nearest_major_city else None,
+                'nearby_places': nearby_places_list
+            }
             
         except Exception as e:
             logger.error(f"Error getting nearby places: {e}")
-            return []
+            return {
+                'event_location': None,
+                'nearest_major_city': None,
+                'nearby_places': []
+            }
 
     def find_other_nearby_places(self, lat: float, lon: float, radius_miles: float = 15) -> List[PlaceResult]:
         """
