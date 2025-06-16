@@ -74,27 +74,21 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'get_alerts' %}active{% endif %}" 
-                           href="{{ url_for('api.get_alerts') }}">
-                            <i class="fas fa-exclamation-triangle me-1"></i>NWS Alerts
+                        <a class="nav-link {% if request.endpoint == 'web.view_radar_alerts' %}active{% endif %}" 
+                           href="{{ url_for('web.view_radar_alerts') }}">
+                            <i class="fas fa-exclamation-triangle me-1"></i>Radar Alerts
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'hurricane_tracks' %}active{% endif %}" 
+                        <a class="nav-link {% if request.endpoint == 'web.hurricane_tracks' %}active{% endif %}" 
                            href="{{ url_for('web.hurricane_tracks') }}">
                             <i class="fas fa-hurricane me-1"></i>Hurricanes
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'ingestion_logs' %}active{% endif %}" 
-                           href="{{ url_for('admin.ingestion_logs') }}">
-                            <i class="fas fa-file-alt me-1"></i>Logs
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'webhook_management' %}active{% endif %}" 
-                           href="{{ url_for('webhook_management') }}">
-                            <i class="fas fa-webhook me-1"></i>Webhooks
+                        <a class="nav-link {% if request.endpoint == 'web.live_radar_dashboard' %}active{% endif %}" 
+                           href="{{ url_for('web.live_radar_dashboard') }}">
+                            <i class="fas fa-broadcast-tower me-1"></i>Live Radar
                         </a>
                     </li>
                     <li class="nav-item">
