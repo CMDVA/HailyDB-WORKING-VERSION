@@ -45,9 +45,15 @@ class EnhancedContextService:
             # Build comprehensive location context with 6 geo data points
             location_data = self._build_location_context(report, location_context)
             
+            # Get damage probability assessment
+            damage_probability = self._assess_damage_probability(report, magnitude_value)
+            
+            # Check for verified NWS warnings during report time
+            verified_warnings = self._check_verified_warnings(report, db_session)
+            
             # Generate comprehensive Enhanced Context summary
             enhanced_summary = self._generate_summary(
-                report, magnitude_value, location_data
+                report, magnitude_value, location_data, damage_probability, verified_warnings
             )
             
             # Store enhanced context in the database
@@ -171,7 +177,8 @@ class EnhancedContextService:
             return "east" if lon_diff > 0 else "west"
     
     def _generate_summary(self, report, magnitude_value: Optional[float], 
-                         location_data: Dict[str, Any]) -> str:
+                         location_data: Dict[str, Any], damage_probability: Dict[str, Any],
+                         verified_warnings: List[Dict[str, Any]]) -> str:
         """Generate comprehensive Enhanced Context summary with 6 geo data points"""
         enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred"
         
@@ -203,7 +210,228 @@ class EnhancedContextService:
         
         enhanced_summary += location_text + location_data['nearby_places_text'] + "."
         
+        # Add SPC Comments if available
+        if hasattr(report, 'comments') and report.comments and report.comments.strip():
+            enhanced_summary += f" SPC Notes: {report.comments.strip()}"
+        
+        # Add damage probability assessment
+        if damage_probability and damage_probability.get('assessment'):
+            enhanced_summary += f" {damage_probability['assessment']}"
+        
+        # Add verified warnings information
+        if verified_warnings:
+            warning_text = f" Verified Reports: {len(verified_warnings)} active NWS warning(s) during this event"
+            enhanced_summary += warning_text
+        
         return enhanced_summary
+    
+    def _assess_damage_probability(self, report, magnitude_value: Optional[float]) -> Dict[str, Any]:
+        """
+        Assess damage probability based on NWS damage classification tables
+        Returns professional damage assessment based on magnitude
+        """
+        if not magnitude_value:
+            return {}
+        
+        try:
+            mag_val = float(magnitude_value)
+            
+            if report.report_type.upper() == "HAIL":
+                return self._assess_hail_damage(mag_val)
+            elif report.report_type.upper() == "WIND":
+                return self._assess_wind_damage(mag_val)
+        except (ValueError, TypeError):
+            pass
+        
+        return {}
+    
+    def _assess_hail_damage(self, size_inches: float) -> Dict[str, Any]:
+        """Assess hail damage probability based on NWS damage classification"""
+        # NWS Hail Damage Classification Table
+        if size_inches >= 4.5:  # Grapefruit+
+            return {
+                "assessment": "Damage Potential: Severe structural damage likely to roofs, vehicles, and crops. Major property damage expected.",
+                "category": "Severe",
+                "probability": "High"
+            }
+        elif size_inches >= 2.75:  # Baseball+
+            return {
+                "assessment": "Damage Potential: Significant damage likely to roofs, vehicles, and agriculture. Extensive property damage probable.",
+                "category": "Significant",
+                "probability": "High"
+            }
+        elif size_inches >= 1.75:  # Golf Ball+
+            return {
+                "assessment": "Damage Potential: Moderate to severe damage expected to vehicles, roofs, and crops. Property damage likely.",
+                "category": "Moderate-Severe",
+                "probability": "Moderate-High"
+            }
+        elif size_inches >= 1.0:  # Quarter+
+            return {
+                "assessment": "Damage Potential: Minor to moderate damage possible to vehicles and crops. Some property damage expected.",
+                "category": "Minor-Moderate",
+                "probability": "Moderate"
+            }
+        elif size_inches >= 0.75:  # Penny+
+            return {
+                "assessment": "Damage Potential: Minor damage possible to crops and sensitive surfaces. Vehicle dents possible.",
+                "category": "Minor",
+                "probability": "Low-Moderate"
+            }
+        else:  # Smaller hail
+            return {
+                "assessment": "Damage Potential: Minimal damage expected. Possible minor crop or garden damage.",
+                "category": "Minimal",
+                "probability": "Low"
+            }
+    
+    def _assess_wind_damage(self, speed_mph: float) -> Dict[str, Any]:
+        """Assess wind damage probability based on Enhanced Fujita Scale"""
+        # Enhanced Fujita Scale Wind Damage Classification
+        if speed_mph >= 200:  # EF5
+            return {
+                "assessment": "Damage Potential: Catastrophic destruction. Well-built structures leveled, automobiles thrown significant distances.",
+                "category": "Catastrophic",
+                "probability": "Extreme"
+            }
+        elif speed_mph >= 166:  # EF4
+            return {
+                "assessment": "Damage Potential: Devastating structural damage. Well-constructed homes severely damaged or destroyed.",
+                "category": "Devastating",
+                "probability": "Extreme"
+            }
+        elif speed_mph >= 136:  # EF3
+            return {
+                "assessment": "Damage Potential: Severe structural damage. Roofs and walls torn from well-constructed buildings.",
+                "category": "Severe",
+                "probability": "High"
+            }
+        elif speed_mph >= 111:  # EF2
+            return {
+                "assessment": "Damage Potential: Considerable structural damage. Mobile homes destroyed, large trees snapped.",
+                "category": "Considerable",
+                "probability": "High"
+            }
+        elif speed_mph >= 86:  # EF1
+            return {
+                "assessment": "Damage Potential: Moderate structural damage. Roof damage, mobile homes overturned, trees uprooted.",
+                "category": "Moderate",
+                "probability": "Moderate-High"
+            }
+        elif speed_mph >= 65:  # EF0
+            return {
+                "assessment": "Damage Potential: Light structural damage. Peeling roof surfaces, broken branches, shallow-rooted trees pushed over.",
+                "category": "Light",
+                "probability": "Moderate"
+            }
+        elif speed_mph >= 58:  # Severe threshold
+            return {
+                "assessment": "Damage Potential: Minor structural damage. Tree limbs broken, loose outdoor objects become projectiles.",
+                "category": "Minor",
+                "probability": "Low-Moderate"
+            }
+        else:
+            return {
+                "assessment": "Damage Potential: Minimal damage expected. Possible minor debris movement.",
+                "category": "Minimal",
+                "probability": "Low"
+            }
+    
+    def _check_verified_warnings(self, report, db_session: Session) -> List[Dict[str, Any]]:
+        """
+        Check for active NWS warnings during the report time
+        Returns list of concurrent NWS warnings for verification
+        """
+        try:
+            # Import here to avoid circular import
+            from models import Alert
+            from datetime import datetime, timedelta
+            
+            # Convert report date and time to datetime object
+            report_datetime = self._parse_report_datetime(report)
+            if not report_datetime:
+                return []
+            
+            # Search for alerts within ±30 minutes of the report time
+            time_window_start = report_datetime - timedelta(minutes=30)
+            time_window_end = report_datetime + timedelta(minutes=30)
+            
+            # Query for severe weather warnings in the same area during the time window
+            warnings = db_session.query(Alert).filter(
+                Alert.sent >= time_window_start,
+                Alert.sent <= time_window_end,
+                Alert.event.in_([
+                    'Severe Thunderstorm Warning',
+                    'Tornado Warning',
+                    'Severe Weather Statement'
+                ])
+            ).all()
+            
+            # Filter warnings that overlap with report location
+            verified_warnings = []
+            for warning in warnings:
+                if self._check_location_overlap(report, warning):
+                    verified_warnings.append({
+                        'id': warning.id,
+                        'event': warning.event,
+                        'sent': warning.sent.isoformat(),
+                        'headline': warning.headline or '',
+                        'description': warning.description[:100] + '...' if warning.description and len(warning.description) > 100 else warning.description
+                    })
+            
+            return verified_warnings[:3]  # Limit to 3 most relevant warnings
+            
+        except Exception as e:
+            logger.warning(f"Error checking verified warnings for report {report.id}: {str(e)}")
+            return []
+    
+    def _parse_report_datetime(self, report) -> Optional[datetime]:
+        """Parse SPC report date and time into datetime object"""
+        try:
+            # SPC reports have date and time fields
+            report_date = report.report_date
+            report_time = report.report_time if hasattr(report, 'report_time') and report.report_time else "1200"
+            
+            # Parse date (YYYY-MM-DD format)
+            if isinstance(report_date, str):
+                date_obj = datetime.strptime(report_date, '%Y-%m-%d').date()
+            else:
+                date_obj = report_date
+            
+            # Parse time (HHMM format)
+            if isinstance(report_time, str) and len(report_time) >= 4:
+                hour = int(report_time[:2])
+                minute = int(report_time[2:4])
+            else:
+                hour = 12  # Default to noon if time is missing
+                minute = 0
+            
+            return datetime.combine(date_obj, datetime.min.time().replace(hour=hour, minute=minute))
+            
+        except Exception as e:
+            logger.warning(f"Error parsing report datetime: {str(e)}")
+            return None
+    
+    def _check_location_overlap(self, report, warning) -> bool:
+        """Check if report location overlaps with warning area"""
+        try:
+            # Simple distance-based check for now
+            if not (report.latitude and report.longitude and warning.latitude and warning.longitude):
+                return False
+            
+            # Calculate distance between report and warning center
+            from geopy.distance import geodesic
+            report_point = (float(report.latitude), float(report.longitude))
+            warning_point = (float(warning.latitude), float(warning.longitude))
+            
+            distance_miles = geodesic(report_point, warning_point).miles
+            
+            # Consider overlap if within 25 miles
+            return distance_miles <= 25.0
+            
+        except Exception as e:
+            logger.warning(f"Error checking location overlap: {str(e)}")
+            return False
     
     def bulk_generate_enhanced_context(self, report_ids: List[int], 
                                      db_session: Session) -> Dict[str, Any]:
