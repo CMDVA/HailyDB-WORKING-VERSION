@@ -4305,7 +4305,7 @@ def enhanced_context_backfill():
         
         for report in reports:
             try:
-                # Extract magnitude value from JSON if needed
+                # Extract magnitude value from JSON if needed with UNK handling
                 magnitude_value = None
                 if report.magnitude:
                     if isinstance(report.magnitude, dict):
@@ -4316,13 +4316,29 @@ def enhanced_context_backfill():
                     else:
                         magnitude_value = report.magnitude
                 
-                # Format magnitude display
+                # Filter out UNK values early
+                if magnitude_value and str(magnitude_value).upper() == 'UNK':
+                    magnitude_value = None
+                
+                # Format magnitude display with UNK handling
                 if report.report_type.upper() == "WIND":
-                    magnitude_display = f"{int(magnitude_value)} mph" if magnitude_value else "unknown speed"
+                    if magnitude_value and str(magnitude_value).upper() != 'UNK':
+                        try:
+                            magnitude_display = f"{int(float(magnitude_value))} mph"
+                        except (ValueError, TypeError):
+                            magnitude_display = "unknown speed"
+                    else:
+                        magnitude_display = "unknown speed"
                 elif report.report_type.upper() == "HAIL":
-                    magnitude_display = f"{magnitude_value:.2f} inch" if magnitude_value else "unknown size"
+                    if magnitude_value and str(magnitude_value).upper() != 'UNK':
+                        try:
+                            magnitude_display = f"{float(magnitude_value):.2f} inch"
+                        except (ValueError, TypeError):
+                            magnitude_display = "unknown size"
+                    else:
+                        magnitude_display = "unknown size"
                 else:
-                    magnitude_display = str(magnitude_value) if magnitude_value else "unknown magnitude"
+                    magnitude_display = str(magnitude_value) if magnitude_value and str(magnitude_value).upper() != 'UNK' else "unknown magnitude"
                 
                 # Get Google Places location enrichment first
                 from google_places_service import GooglePlacesService
