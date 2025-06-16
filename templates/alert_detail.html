@@ -12,10 +12,10 @@
                 Alert Details
             </h1>
             <div class="btn-group" role="group">
-                <a href="{{ url_for('api.get_alerts') }}" class="btn btn-outline-secondary">
+                <a href="{{ url_for('get_alerts') }}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-1"></i>Back to Alerts
                 </a>
-                <a href="{{ url_for('api.get_alert', alert_id=alert.id) }}?format=json" class="btn btn-outline-primary" target="_blank">
+                <a href="{{ url_for('get_alert', alert_id=alert.id) }}?format=json" class="btn btn-outline-primary" target="_blank">
                     <i class="fas fa-code me-1"></i>JSON
                 </a>
             </div>
@@ -72,7 +72,7 @@
                                                         <i class="fas fa-file-alt me-1"></i>
                                                         SPC Report #{{ spc_report.id }}
                                                     </h6>
-                                                    <a href="{{ url_for('web.view_spc_report_detail', report_id=spc_report.id) }}" 
+                                                    <a href="{{ url_for('view_spc_report_detail', report_id=spc_report.id) }}" 
                                                        class="btn btn-outline-success btn-sm">
                                                         <i class="fas fa-external-link-alt me-1"></i>View Report
                                                     </a>
@@ -440,7 +440,7 @@
                                 </form>
                                 {% endif %}
                                 
-                                <a href="{{ url_for('api.get_alert', alert_id=alert.id) }}?format=json" class="btn btn-outline-primary w-100" target="_blank">
+                                <a href="{{ url_for('get_alert', alert_id=alert.id) }}?format=json" class="btn btn-outline-primary w-100" target="_blank">
                                     <i class="fas fa-code me-1"></i>View Raw JSON
                                 </a>
                             </div>

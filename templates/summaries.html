@@ -12,7 +12,7 @@
                 AI Alert Summaries
             </h1>
             <div class="btn-group" role="group">
-                <a href="{{ url_for('api.get_alerts_summary') }}?format=json" class="btn btn-outline-secondary" target="_blank">
+                <a href="{{ url_for('get_alerts_summary') }}?format=json" class="btn btn-outline-secondary" target="_blank">
                     <i class="fas fa-code me-1"></i>JSON API
                 </a>
                 <button type="button" class="btn btn-outline-primary" onclick="refreshSummaries()">
@@ -44,7 +44,7 @@
                                 </div>
                                 <div class="flex-grow-1">
                                     <h4 class="card-title mb-1">
-                                        <a href="{{ url_for('api.get_alert', alert_id=summary.id) }}" class="text-decoration-none">
+                                        <a href="{{ url_for('get_alert', alert_id=summary.id) }}" class="text-decoration-none">
                                             {{ summary.event or 'Unknown Event' }}
                                         </a>
                                     </h4>
@@ -88,7 +88,7 @@
                                 {% endif %}
                                 
                                 <div class="d-grid gap-2 mt-3">
-                                    <a href="{{ url_for('api.get_alert', alert_id=summary.id) }}" class="btn btn-outline-primary btn-sm">
+                                    <a href="{{ url_for('get_alert', alert_id=summary.id) }}" class="btn btn-outline-primary btn-sm">
                                         <i class="fas fa-eye me-1"></i>View Details
                                     </a>
                                 </div>
@@ -108,10 +108,10 @@
                         No alerts have been enriched with AI summaries yet. Use the batch enrichment feature to process alerts automatically.
                     </p>
                     <div class="btn-group" role="group">
-                        <a href="{{ url_for('web.index') }}" class="btn btn-primary">
+                        <a href="{{ url_for('internal_dashboard') }}" class="btn btn-primary">
                             <i class="fas fa-tachometer-alt me-1"></i>Go to Dashboard
                         </a>
-                        <a href="{{ url_for('api.get_alerts') }}" class="btn btn-outline-secondary">
+                        <a href="{{ url_for('get_alerts') }}" class="btn btn-outline-secondary">
                             <i class="fas fa-exclamation-triangle me-1"></i>View All Alerts
                         </a>
                     </div>
@@ -127,7 +127,7 @@
     <div class="col-12 text-center">
         <p class="text-muted">
             Showing the 20 most recent AI-enriched alerts. 
-            <a href="{{ url_for('api.get_alerts') }}?ai_summary=true">View all enriched alerts</a>
+            <a href="{{ url_for('get_alerts') }}?ai_summary=true">View all enriched alerts</a>
         </p>
     </div>
 </div>

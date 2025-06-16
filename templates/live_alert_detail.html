@@ -12,10 +12,10 @@
                 Live Radar Alert Details
             </h1>
             <div class="btn-group" role="group">
-                <a href="{{ url_for('web.live_radar_dashboard') }}" class="btn btn-outline-secondary">
+                <a href="{{ url_for('live_radar_dashboard') }}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-1"></i>Back to Live Alerts
                 </a>
-                <a href="{{ url_for('api.get_alert', alert_id=alert.id) }}?format=json" class="btn btn-outline-primary" target="_blank">
+                <a href="{{ url_for('get_alert', alert_id=alert.id) }}?format=json" class="btn btn-outline-primary" target="_blank">
                     <i class="fas fa-code me-1"></i>JSON
                 </a>
             </div>
