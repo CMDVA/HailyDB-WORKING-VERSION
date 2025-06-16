@@ -11,6 +11,7 @@ import requests
 import json
 from sqlalchemy import text
 from live_radar_service import LiveRadarAlertService
+from enhanced_context_service import enhanced_context_service
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
