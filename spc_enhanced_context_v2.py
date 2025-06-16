@@ -75,21 +75,33 @@ class SPCEnhancedContextService:
         else:
             date_str = "unknown date"
 
-        # Enhanced nearby places with distance filtering
-        nearby_places_sorted = []
+        # Extract location hierarchy from Google Places data
+        event_location = ""
+        nearest_major_city = ""
+        nearby_places_text = ""
+        
+        # Use event location as primary location (smallest nearby place)
+        if location_context.get('event_location') and location_context['event_location'].get('name'):
+            event_location = location_context['event_location']['name']
+        
+        # Add nearest major city with distance
+        if location_context.get('nearest_major_city') and location_context['nearest_major_city'].get('name'):
+            major_city = location_context['nearest_major_city']
+            distance = major_city.get('distance_miles', 0)
+            nearest_major_city = f"approximately {distance:.0f} miles from {major_city['name']}"
+        
+        # Build nearby places context
         if location_context.get('nearby_places'):
-            nearby_places_sorted = sorted([
+            nearby_sorted = sorted([
                 place for place in location_context['nearby_places'] 
-                if place.get('distance_miles', 0) <= 100
+                if place.get('distance_miles', 0) <= 50
             ], key=lambda x: x.get('distance_miles', 0))[:3]
-
-        # Build nearby context
-        other_nearby = ""
-        if len(nearby_places_sorted) > 1:
-            other_nearby = "Other nearby locations include " + ", ".join([
-                f"{place['name']} ({place['distance_miles']:.1f}mi)"
-                for place in nearby_places_sorted[1:]
-            ]) + "."
+            
+            if nearby_sorted:
+                nearby_places_text = "Nearby locations include " + ", ".join([
+                    f"{place['name']} ({place['distance_miles']:.1f}mi)"
+                    for place in nearby_sorted
+                ]) + "."
 
         # Damage assessment
         if report_type == "HAIL" and report.magnitude:
@@ -112,28 +124,46 @@ class SPCEnhancedContextService:
             "state": report.state,
             "time_str": time_str,
             "date_str": date_str,
-            "other_nearby": other_nearby,
+            "event_location": event_location,
+            "nearest_major_city": nearest_major_city,
+            "nearby_places_text": nearby_places_text,
             "damage_info": damage_info
         }
 
     def _build_prompt(self, context):
         """Build plain text prompt from structured context"""
+        location_text = ""
+        if context['event_location']:
+            location_text = f"in {context['event_location']}"
+        elif context['location']:
+            location_text = f"in {context['location']}"
+        else:
+            location_text = f"in {context['county']} County, {context['state']}"
+            
+        nearby_context = ""
+        if context['nearest_major_city']:
+            nearby_context += f" {context['nearest_major_city']}."
+        if context['nearby_places_text']:
+            nearby_context += f" {context['nearby_places_text']}"
+            
         return f"""Generate a professional meteorological summary for this severe weather event.
 
 EVENT DATA:
 - Event Type: {context['report_type']}
 - Magnitude: {context['magnitude_display']}
-- Location: {context['location']}, {context['county']} County, {context['state']}
+- Primary Location: {context['event_location'] or context['location']}
+- Regional Context: {context['nearest_major_city']}
+- Nearby Places: {context['nearby_places_text']}
 - Time: {context['time_str']} on {context['date_str']}
-- Damage Info: {context['damage_info']['category']} - {context['damage_info']['damage_potential']} - {context['damage_info']['comments']}
-- Nearby Places: {context['other_nearby']}
+- Damage Assessment: {context['damage_info']['category']} - {context['damage_info']['damage_potential']}
 
 REQUIREMENTS:
-1. Start with magnitude and event type.
-2. Use professional NWS meteorological language.
-3. Include location context without distant city references.
-4. Keep summary concise and factual.
-5. Example format: "[magnitude] [event type] was reported in [location], [county] County, [state] at [time] on [date]. [damage assessment]. [nearby context]"
+1. Start with "[magnitude] [event type] struck [primary location]"
+2. Add regional context using nearest major city with distance
+3. Include nearby places for additional context
+4. Use professional NWS meteorological terminology
+5. Keep summary concise and factual
+6. Format: "[magnitude] [event type] struck [primary location]. [damage assessment]. [regional context]"
 """
 
     def _call_openai(self, prompt_text, template_summary, correlation_id=None):
@@ -257,8 +287,15 @@ REQUIREMENTS:
             # Build prompt text
             prompt_text = self._build_prompt(context)
 
-            # Build template summary (always have fallback)
-            template_summary = f"{context['magnitude_display']} {context['report_type'].lower()} was reported in {context['location']}, {context['county']} County, {context['state']} at {context['time_str']} on {context['date_str']}. {context['other_nearby']}"
+            # Build template summary with location hierarchy
+            primary_loc = context['event_location'] or context['location'] or f"{context['county']} County"
+            regional_context = ""
+            if context['nearest_major_city']:
+                regional_context = f" {context['nearest_major_city']}."
+            if context['nearby_places_text']:
+                regional_context += f" {context['nearby_places_text']}"
+            
+            template_summary = f"{context['magnitude_display']} {context['report_type'].lower()} struck {primary_loc}. {context['damage_info']['damage_potential'].capitalize()}.{regional_context}"
 
             # Call OpenAI
             ai_response = self._call_openai(prompt_text, template_summary, correlation_id)
@@ -427,10 +464,35 @@ REQUIREMENTS:
         return "Unknown NWS Office"
 
     def _get_location_context(self, report):
-        """Get location context for the report"""
-        # This would integrate with the existing Google Places service
-        # For now, return empty context
-        return {"nearby_places": []}
+        """Get location context for the report using Google Places API"""
+        try:
+            from google_places_service import GooglePlacesService
+            
+            # Initialize Google Places service
+            places_service = GooglePlacesService()
+            
+            # Get complete location hierarchy using Google Places API
+            location_data = places_service.get_nearby_places(
+                lat=float(report.lat), 
+                lon=float(report.lon), 
+                radius_miles=25
+            )
+            
+            # Return structured location context with full hierarchy
+            return {
+                "event_location": location_data.get('event_location'),
+                "nearest_major_city": location_data.get('nearest_major_city'), 
+                "nearby_places": location_data.get('nearby_places', [])
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error getting location context: {e}")
+            # Fallback to basic location info
+            return {
+                "event_location": None,
+                "nearest_major_city": None,
+                "nearby_places": []
+            }
 
 
 def create_enhanced_context_service(db_session: Session) -> SPCEnhancedContextService:
