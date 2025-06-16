@@ -4360,7 +4360,8 @@ def enhanced_context_backfill():
             "errors": errors,
             "remaining": total_reports - processed,
             "progress_percentage": round((processed / total_reports * 100), 2),
-            "message": f"Batch complete: {successful}/{processed} successful. {total_reports - processed} remaining."
+            "message": f"Batch complete: {successful}/{processed} successful. {total_reports - processed} remaining.",
+            "estimated_completion": f"{round((total_reports - processed) / 100)} more batches needed"
         })
         
     except Exception as e:
