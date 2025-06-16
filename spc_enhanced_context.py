@@ -621,8 +621,9 @@ Generate a professional summary following meteorological standards."""
             
             if unenriched_only:
                 # Only enrich reports without enhanced context (check for NULL or empty JSON {})
+                from sqlalchemy import or_
                 query = query.filter(
-                    db.or_(
+                    or_(
                         SPCReport.enhanced_context.is_(None),
                         SPCReport.enhanced_context == {},
                         SPCReport.enhanced_context == '{}'

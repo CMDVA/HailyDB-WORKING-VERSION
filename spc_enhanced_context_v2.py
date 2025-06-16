@@ -277,17 +277,14 @@ REQUIREMENTS:
                 self.logger.info(f"[{correlation_id}] Report {report_id} already has current version {ENHANCED_CONTEXT_VERSION}")
                 return {"success": True, "message": "Already has current version", "enhanced_context": report.enhanced_context}
 
-            # Find verified alerts for this report
-            verified_alerts = self._find_verified_alerts_for_report(report)
-            if not verified_alerts:
-                self.logger.warning(f"[{correlation_id}] No verified alerts found for report {report_id}")
-                return {"success": False, "error": "No verified alerts found"}
-
-            # Calculate context data
-            duration_minutes = self._calculate_alert_duration(verified_alerts)
-            counties_affected = self._get_affected_counties(verified_alerts)
-            nws_office = self._get_issuing_office(verified_alerts)
-            radar_polygon_match = any(alert.radar_indicated for alert in verified_alerts)
+            # Generate Enhanced Context directly from SPC report data (no verification required)
+            # This ensures ALL SPC reports get Enhanced Context, not just verified ones
+            
+            # Use SPC report data directly
+            duration_minutes = 0  # SPC reports are point-in-time events
+            counties_affected = {report.county} if report.county else set()
+            nws_office = "Storm Prediction Center"  # SPC is the authoritative source
+            radar_polygon_match = False  # SPC reports are ground truth, not radar-dependent
 
             # Get location context
             location_context = self._get_location_context(report)
@@ -345,13 +342,10 @@ REQUIREMENTS:
         try:
             self.logger.info(f"[{correlation_id}] Starting batch enhanced context generation (limit: {limit})")
             
-            # Find reports that need enhanced context
+            # Find reports that need enhanced context (ALL reports, not just verified)
             reports_needing_context = self.db.query(SPCReport).filter(
-                and_(
-                    SPCReport.spc_verified == True,
-                    (SPCReport.enhanced_context_version != ENHANCED_CONTEXT_VERSION) |
-                    (SPCReport.enhanced_context_version.is_(None))
-                )
+                (SPCReport.enhanced_context_version != ENHANCED_CONTEXT_VERSION) |
+                (SPCReport.enhanced_context_version.is_(None))
             ).limit(limit).all()
 
             if not reports_needing_context:
