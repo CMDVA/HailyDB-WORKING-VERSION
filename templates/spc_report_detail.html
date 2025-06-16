@@ -172,10 +172,19 @@
                         <div class="col-12">
                             <h6 class="text-muted mb-2">Location Context</h6>
                             
-                            <!-- Check if we have enrichment data from spc_enrichment -->
-                            {% if report.spc_enrichment and report.spc_enrichment.nearby_places %}
+                            <!-- Check if we have enrichment data from enhanced_context (NEW) or fallback to spc_enrichment (OLD) -->
+                            {% if report.enhanced_context and report.enhanced_context.location_context and report.enhanced_context.location_context.nearby_places %}
+                                {% set primary_location = report.enhanced_context.location_context.nearby_places|selectattr('type', 'equalto', 'primary_location')|first %}
+                                {% set nearest_city = report.enhanced_context.location_context.nearby_places|selectattr('type', 'equalto', 'nearest_city')|first %}
+                            {% elif report.spc_enrichment and report.spc_enrichment.nearby_places %}
                                 {% set primary_location = report.spc_enrichment.nearby_places|selectattr('type', 'equalto', 'primary_location')|first %}
                                 {% set nearest_city = report.spc_enrichment.nearby_places|selectattr('type', 'equalto', 'nearest_city')|first %}
+                            {% else %}
+                                {% set primary_location = none %}
+                                {% set nearest_city = none %}
+                            {% endif %}
+                            
+                            {% if primary_location or nearest_city %}
                                 
                                 <!-- Event Location -->
                                 {% if primary_location %}
@@ -218,7 +227,13 @@
                                 {% endif %}
 
                                 <!-- Other Nearby Places -->
-                                {% set other_places = report.spc_enrichment.nearby_places|rejectattr('type', 'in', ['primary_location', 'nearest_city'])|list %}
+                                {% if report.enhanced_context and report.enhanced_context.location_context and report.enhanced_context.location_context.nearby_places %}
+                                    {% set other_places = report.enhanced_context.location_context.nearby_places|rejectattr('type', 'in', ['primary_location', 'nearest_city'])|list %}
+                                {% elif report.spc_enrichment and report.spc_enrichment.nearby_places %}
+                                    {% set other_places = report.spc_enrichment.nearby_places|rejectattr('type', 'in', ['primary_location', 'nearest_city'])|list %}
+                                {% else %}
+                                    {% set other_places = [] %}
+                                {% endif %}
                                 {% if other_places %}
                                 <h6 class="text-muted mb-2 small">Other Nearby Places</h6>
                                 <div class="row">
