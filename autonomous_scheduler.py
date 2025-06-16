@@ -305,23 +305,30 @@ class AutonomousScheduler:
         return time_since_last.total_seconds() >= 600  # 10 minutes
     
     def _run_enhanced_context_generation(self):
-        """Generate Enhanced Context for verified SPC reports without context"""
+        """Generate Enhanced Context for ALL SPC reports using backfill API"""
         try:
-            from spc_enhanced_context import SPCEnhancedContextService
+            import requests
             
-            # Get verified SPC reports without Enhanced Context
-            from app import db
-            service = SPCEnhancedContextService(db.session)
-            result = service.enrich_all_reports(batch_size=50, unenriched_only=True)
+            # Use the new backfill API for continuous processing
+            result = requests.post(
+                f"http://localhost:5000/api/enhanced-context-backfill",
+                json={"batch_size": 100},
+                timeout=120
+            )
             
-            processed = result.get('total_processed', 0)
-            successful = result.get('successful_enrichments', 0)
+            if result.status_code == 200:
+                data = result.json()
+                if data.get("remaining", 0) > 0:
+                    logger.info(f"Enhanced Context backfill: {data['successful']}/{data['batch_processed']} successful. {data['remaining']} remaining ({data['progress_percentage']}% complete)")
+                else:
+                    logger.info("Enhanced Context backfill: 100% COMPLETE! All SPC reports have Enhanced Context v2.0")
+            else:
+                logger.warning(f"Enhanced Context backfill failed: {result.status_code}")
             
             self.last_enhanced_context = datetime.utcnow()
-            logger.info(f"Enhanced Context generation completed: {successful}/{processed} reports enriched")
                 
         except Exception as e:
-            logger.error(f"Enhanced Context generation failed: {e}")
+            logger.error(f"Enhanced Context backfill failed: {e}")
     
     def _run_webhook_evaluation(self):
         """Evaluate and dispatch webhooks for recent alerts"""
