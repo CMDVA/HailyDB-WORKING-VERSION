@@ -323,18 +323,52 @@ class GooglePlacesService:
             data = response.json()
             
             if data.get('results'):
-                for place in data['results'][:10]:  # Limit to top 10 results
+                for place in data['results'][:20]:  # Get more results to filter
+                    place_types = place.get('types', [])
+                    place_name = place['name']
+                    
+                    # Filter out restaurants, food establishments, and chain stores
+                    excluded_types = [
+                        'restaurant', 'food', 'meal_takeaway', 'meal_delivery',
+                        'bakery', 'cafe', 'bar', 'liquor_store', 'convenience_store',
+                        'gas_station', 'atm', 'store', 'supermarket', 'grocery_or_supermarket'
+                    ]
+                    
+                    # Filter out common chain names
+                    excluded_names = [
+                        'subway', 'mcdonalds', 'burger king', 'pizza', 'kfc', 'taco bell',
+                        'walmart', 'target', 'cvs', 'walgreens', 'shell', 'exxon', 'bp'
+                    ]
+                    
+                    # Skip if it's a restaurant or excluded establishment
+                    if any(ptype in excluded_types for ptype in place_types):
+                        continue
+                    
+                    if any(name.lower() in place_name.lower() for name in excluded_names):
+                        continue
+                    
                     place_lat = place['geometry']['location']['lat']
                     place_lon = place['geometry']['location']['lng']
                     distance = self._calculate_distance(lat, lon, place_lat, place_lon)
                     
-                    nearby_places_list.append({
-                        'name': place['name'],
-                        'distance_miles': round(distance, 1),
-                        'type': 'establishment',
-                        'lat': place_lat,
-                        'lon': place_lon
-                    })
+                    # Only include establishments that are meaningful for location context
+                    preferred_types = [
+                        'school', 'hospital', 'library', 'park', 'church', 'cemetery',
+                        'fire_station', 'police', 'post_office', 'city_hall', 'courthouse',
+                        'university', 'museum', 'point_of_interest', 'establishment'
+                    ]
+                    
+                    if any(ptype in preferred_types for ptype in place_types) or len(place_types) == 0:
+                        nearby_places_list.append({
+                            'name': place['name'],
+                            'distance_miles': round(distance, 1),
+                            'type': 'establishment',
+                            'lat': place_lat,
+                            'lon': place_lon
+                        })
+                
+                # Limit to top 10 after filtering
+                nearby_places_list = nearby_places_list[:10]
             
             # Sort by distance
             nearby_places_list = sorted(nearby_places_list, key=lambda x: x['distance_miles'])
