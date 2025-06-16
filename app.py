@@ -4117,58 +4117,57 @@ def api_generate_enhanced_context():
                 if nearby_place_items:
                     nearby_places_text = f". Nearby places include {', '.join(nearby_place_items)}"
             
-            # Use comprehensive location hierarchy - prioritize Google Places event location
-            primary_location_name = event_location if event_location else report.location
+            # Generate simple Enhanced Context summary
+            enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred at {report.location}"
             
-            # Create professional Enhanced Context summary with ALL available data
-            try:
-                numeric_magnitude = float(magnitude_value) if magnitude_value else 0
-            except (ValueError, TypeError):
-                numeric_magnitude = 0
+            if magnitude_value:
+                try:
+                    mag_val = float(magnitude_value)
+                    if report.report_type.upper() == "HAIL":
+                        enhanced_summary += f" with {mag_val:.2f}\" hail"
+                    elif report.report_type.upper() == "WIND":
+                        enhanced_summary += f" with {int(mag_val)} mph winds"
+                except (ValueError, TypeError):
+                    pass
             
-            # Build Enhanced Context with 6 geo data points format
-            if report.report_type.upper() == "WIND" and numeric_magnitude > 0:
-                if numeric_magnitude >= 74:
-                    damage_desc = "Capable of causing significant structural damage to buildings and vehicles."
-                elif numeric_magnitude >= 58:
-                    damage_desc = "Strong enough to damage roofs, break windows, and down large trees."
-                else:
-                    damage_desc = "Sufficient to cause minor property damage and tree limb breakage."
-                    
-                # Build comprehensive location context using ALL data sources
-                location_text = ""
-                if event_location and nearest_major_city:
-                    # Calculate distance and direction to event location
-                    event_distance = None
-                    event_direction = ""
-                    
-                    if location_context and location_context.get('nearby_places'):
-                        for place in location_context['nearby_places']:
-                            if place.get('type') == 'primary_location' and place.get('distance_miles'):
-                                event_distance = place['distance_miles']
-                                
-                                # Calculate direction from coordinates to event location
-                                if report.latitude and report.longitude and place.get('approx_lat') and place.get('approx_lon'):
-                                    lat_diff = float(place['approx_lat']) - float(report.latitude)
-                                    lon_diff = float(place['approx_lon']) - float(report.longitude)
-                                    
-                                    if abs(lat_diff) > abs(lon_diff):
-                                        event_direction = "north" if lat_diff > 0 else "south"
-                                    else:
-                                        event_direction = "east" if lon_diff > 0 else "west"
-                                break
-                    
-                # Generate location text with 6 geo data points format
-                if event_location and event_distance and event_direction and nearest_major_city and major_city_distance and major_city_direction:
-                    location_text = f"located {event_direction} {event_distance} miles from {event_location} ({report.location}), or {major_city_direction} {major_city_distance:.1f} miles from {nearest_major_city}{nearby_places_text}"
-                elif event_location:
-                    location_text = f"at {event_location} ({report.location}){nearby_places_text}"
-                else:
-                    location_text = f"at {report.location}{nearby_places_text}"
-                
-                enhanced_summary = f"On {report.report_date}, damaging winds reached {magnitude_display} {location_text}. {damage_desc}"
-                    
-            elif report.report_type.upper() == "HAIL" and numeric_magnitude > 0:
+            enhanced_summary += "."
+        
+        # Store enhanced context in the database
+        enhanced_context = {
+            "enhanced_summary": enhanced_summary,
+            "location_context": location_context,
+            "generated_at": datetime.utcnow().isoformat(),
+            "version": "v2.0"
+        }
+        
+        # Save to database with transaction isolation
+        try:
+            with db.session.begin():
+                report.enhanced_context = enhanced_context
+                report.enhanced_context_version = "v2.0"
+                report.enhanced_context_generated_at = datetime.utcnow()
+        except Exception as db_error:
+            db.session.rollback()
+            raise db_error
+        
+        return jsonify({
+            "success": True,
+            "report_id": report_id,
+            "enhanced_context": enhanced_context,
+            "message": "Enhanced context generated successfully",
+            "version": "v2.0"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating enhanced context for report {report_id}: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "correlation_id": None
+        }), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
                 if numeric_magnitude >= 2.0:
                     damage_desc = "Large enough to cause severe vehicle damage and roof penetration."
                 elif numeric_magnitude >= 1.0:
