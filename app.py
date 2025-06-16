@@ -4139,11 +4139,11 @@ def api_generate_enhanced_context():
             "version": "v2.0"
         }
         
-        # Save to database with transaction isolation
-        with db.session.begin():
-            report.enhanced_context = enhanced_context
-            report.enhanced_context_version = "v2.0"
-            report.enhanced_context_generated_at = datetime.utcnow()
+        # Save to database with proper transaction handling
+        report.enhanced_context = enhanced_context
+        report.enhanced_context_version = "v2.0"
+        report.enhanced_context_generated_at = datetime.utcnow()
+        db.session.commit()
         
         return jsonify({
             "success": True,
