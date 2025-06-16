@@ -98,6 +98,12 @@ The system integrates with multiple authoritative weather data sources:
 
 ```
 Changelog:
+- June 16, 2025: ENHANCED CONTEXT v3.0 WITH THREE MISSING FEATURES COMPLETE
+  * SPC COMMENTS: Enhanced Summary now includes original SPC comments with "SPC Notes:" prefix for meteorological context
+  * DAMAGE PROBABILITY: Professional NWS damage classification system integrated using Enhanced Fujita Scale for winds and hail damage tables
+  * VERIFIED REPORTS: System checks for active NWS warnings during report time to validate storm reports with concurrent alerts
+  * PRODUCTION READY: All three features working perfectly - SPC Comments, damage assessments, and verified warnings detection
+  * COMPREHENSIVE OUTPUT: Enhanced summaries now deliver complete weather intelligence with location, damage potential, and verification data
 - June 16, 2025: ENHANCED CONTEXT SERVICE ARCHITECTURE COMPLETE
   * CLEAN SEPARATION: Migrated all Enhanced Context generation code from app.py to dedicated enhanced_context_service.py
   * TEMPLATE DATA CONSISTENCY: Fixed template to use unified enhanced_context data source instead of mixed old/new data
