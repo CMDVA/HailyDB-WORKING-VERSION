@@ -1,0 +1,406 @@
+# Parse enhanced context if available
+        enhanced_context = None
+        if report.enhanced_context:
+            try:
+                if isinstance(report.enhanced_context, str):
+                    enhanced_context = json.loads(report.enhanced_context)
+                else:
+                    enhanced_context = report.enhanced_context
+            except (json.JSONDecodeError, TypeError):
+                enhanced_context = None
+        
+        # Extract magnitude data properly
+        magnitude_data = {"raw": None, "display": None, "value": None, "unit": None}
+        if report.magnitude:
+            try:
+                if isinstance(report.magnitude, dict):
+                    mag_dict = report.magnitude
+                elif isinstance(report.magnitude, str):
+                    mag_dict = json.loads(report.magnitude)
+                else:
+                    mag_dict = {"value": float(report.magnitude)}
+                
+                if report.report_type.upper() == "HAIL" and "size_inches" in mag_dict:
+                    size = mag_dict["size_inches"]
+                    magnitude_data = {
+                        "raw": mag_dict,
+                        "display": f"{size:.2f} inch".replace('.00', ''),
+                        "value": float(size),
+                        "unit": "inches"
+                    }
+                elif report.report_type.upper() == "WIND" and "speed" in mag_dict:
+                    speed = mag_dict["speed"]
+                    magnitude_data = {
+                        "raw": mag_dict,
+                        "display": f"{speed} mph",
+                        "value": int(speed),
+                        "unit": "mph"
+                    }
+            except (json.JSONDecodeError, ValueError, TypeError):
+                pass
+        
+        # Get damage assessment from hail size lookup
+        damage_assessment = {"category": "Severe Weather", "severity": "Weather Event", "description": "Severe weather event with potential for damage."}
+        if report.report_type.upper() == "HAIL" and magnitude_data["value"]:
+            hail_size = magnitude_data["value"]
+            if hail_size >= 4.0:
+                damage_assessment = {
+                    "category": "Giant Hail",
+                    "severity": "Extreme Damage",
+                    "description": "Giant hail causes severe property damage including roof penetration, vehicle destruction, and injury risk."
+                }
+            elif hail_size >= 2.0:
+                damage_assessment = {
+                    "category": "Very Large Hail", 
+                    "severity": "Significant Damage",
+                    "description": "Very large hail causes substantial damage to vehicles, roofing, siding, and outdoor equipment."
+                }
+            elif hail_size >= 1.0:
+                damage_assessment = {
+                    "category": "Large Hail",
+                    "severity": "Minor Damage", 
+                    "description": "Large hail can cause dents to vehicles, cracked windows, damage to roofing materials, siding, and gutters."
+                }
+            else:
+                damage_assessment = {
+                    "category": "Small Hail",
+                    "severity": "Minimal Damage",
+                    "description": "Small hail typically causes minimal damage but can affect crops and outdoor equipment."
+                }
+        elif report.report_type.upper() == "WIND" and magnitude_data["value"]:
+            wind_speed = magnitude_data["value"]
+            if wind_speed >= 75:
+                damage_assessment = {
+                    "category": "Violent Wind",
+                    "severity": "Extreme Damage",
+                    "description": "Violent winds cause widespread damage to structures, trees, and power lines."
+                }
+            elif wind_speed >= 65:
+                damage_assessment = {
+                    "category": "Very Damaging Wind",
+                    "severity": "Significant Damage", 
+                    "description": "Very damaging winds can cause structural damage and widespread power outages."
+                }
+            elif wind_speed >= 58:
+                damage_assessment = {
+                    "category": "Damaging Wind",
+                    "severity": "Moderate Damage",
+                    "description": "Damaging winds can snap tree limbs, damage roofing, and cause power outages."
+                }
+            else:
+                damage_assessment = {
+                    "category": "Strong Wind",
+                    "severity": "Minor Damage",
+                    "description": "Strong winds may cause minor property damage and isolated power outages."
+                }
+        
+        # Format datetime properly
+        datetime_info = {"utc": None, "display": None, "timestamp": None}
+        if report.report_date and report.time_utc:
+            try:
+                if isinstance(report.report_date, str):
+                    date_obj = datetime.strptime(report.report_date, '%Y-%m-%d')
+                else:
+                    date_obj = report.report_date
+                
+                if isinstance(report.time_utc, str) and len(report.time_utc) == 4:
+                    hour = int(report.time_utc[:2])
+                    minute = int(report.time_utc[2:])
+                    dt = datetime.combine(date_obj.date(), datetime.min.time().replace(hour=hour, minute=minute))
+                    datetime_info = {
+                        "utc": dt.isoformat() + "Z",
+                        "display": f"{date_obj.strftime('%B %d, %Y')} at {hour:02d}:{minute:02d} UTC",
+                        "timestamp": int(dt.timestamp())
+                    }
+            except (ValueError, AttributeError):
+                pass
+        
+        # Build unified response
+        response = {
+            "report": {
+                "id": report.id,
+                "type": report.report_type.lower(),
+                "magnitude": magnitude_data,
+                "location": {
+                    "name": report.location,
+                    "county": report.county,
+                    "state": report.state,
+                    "description": f"{report.location}, {report.county} County, {report.state}"
+                },
+                "coordinates": {
+                    "lat": float(report.latitude) if report.latitude else None,
+                    "lon": float(report.longitude) if report.longitude else None
+                },
+                "datetime": datetime_info,
+                "damage_assessment": damage_assessment,
+                "comments": report.comments
+            },
+            "context": {
+                "enhanced_summary": enhanced_context.get("enhanced_summary") if enhanced_context else None,
+                "verified_alerts": enhanced_context.get("alert_count", 0) if enhanced_context else 0,
+                "radar_confirmed": enhanced_context.get("radar_polygon_match", False) if enhanced_context else False,
+                "nearby_locations": enhanced_context.get("location_context", {}).get("nearby_places", []) if enhanced_context else []
+            },
+            "metadata": {
+                "generated_at": enhanced_context.get("generated_at") if enhanced_context else None,
+                "data_quality": "verified" if enhanced_context and enhanced_context.get("has_verified_alerts") else "standard",
+                "enrichment_status": "complete" if enhanced_context else "pending"
+            }
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        logger.error(f"Error in unified report API for {report_id}: {e}")
+        return jsonify({"error": "Internal server error", "report_id": report_id}), 500
+
+@app.route('/api/spc/reports/today')
+def get_spc_reports_today():
+    """Get SPC reports for the current SPC day"""
+    try:
+        from spc_utils import get_current_spc_day_utc
+        
+        # Get current SPC day
+        current_spc_day = get_current_spc_day_utc()
+        
+        # Query reports for current SPC day
+        reports = SPCReport.query.filter(
+            SPCReport.report_date == current_spc_day
+        ).order_by(SPCReport.time_utc.desc()).all()
+        
+        # Format reports using the existing to_dict method
+        formatted_reports = [report.to_dict() for report in reports]
+        
+        return jsonify({
+            'spc_day': current_spc_day,
+            'reports': formatted_reports
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching SPC reports for today: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/spc/reports')
+def get_spc_reports():
+    """Get SPC storm reports with filtering"""
+    try:
+        # Get query parameters
+        report_type = request.args.get('type')  # tornado, wind, hail
+        state = request.args.get('state')
+        county = request.args.get('county')
+        date = request.args.get('date')  # YYYY-MM-DD format
+        limit = min(int(request.args.get('limit', 100)), 500)
+        offset = int(request.args.get('offset', 0))
+        
+        # Build query
+        query = SPCReport.query
+        
+        if report_type:
+            query = query.filter(SPCReport.report_type == report_type)
+        if state:
+            query = query.filter(SPCReport.state == state.upper())
+        if county:
+            query = query.filter(SPCReport.county.ilike(f'%{county}%'))
+        if date:
+            query = query.filter(SPCReport.report_date == date)
+        
+        # Get total count for pagination
+        total_count = query.count()
+        
+        # Get results with pagination
+        reports = query.order_by(SPCReport.report_date.desc(), SPCReport.time_utc.desc()).limit(limit).offset(offset).all()
+        
+        return jsonify({
+            'reports': [report.to_dict() for report in reports],
+            'pagination': {
+                'total': total_count,
+                'limit': limit,
+                'offset': offset,
+                'has_more': offset + limit < total_count
+            },
+            'filters': {
+                'type': report_type,
+                'state': state,
+                'county': county,
+                'date': date
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting SPC reports: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/spc/reports')
+def view_spc_reports():
+    """View SPC reports in web interface with search functionality"""
+    try:
+        # Get search parameters
+        search_query = request.args.get('search', '').strip()
+        report_type = request.args.get('type', '').strip()
+        state = request.args.get('state', '').strip()
+        date = request.args.get('date', '').strip()
+        
+        # Build query
+        query = SPCReport.query
+        
+        # Apply search across multiple fields
+        if search_query:
+            search_pattern = f'%{search_query}%'
+            query = query.filter(
+                db.or_(
+                    SPCReport.location.ilike(search_pattern),
+                    SPCReport.county.ilike(search_pattern),
+                    SPCReport.comments.ilike(search_pattern)
+                )
+            )
+        
+        # Apply filters
+        if report_type:
+            query = query.filter(SPCReport.report_type == report_type)
+        if state:
+            query = query.filter(SPCReport.state.ilike(f'%{state.upper()}%'))
+        if date:
+            try:
+                from datetime import datetime
+                filter_date = datetime.strptime(date, '%Y-%m-%d').date()
+                query = query.filter(SPCReport.report_date == filter_date)
+            except ValueError:
+                pass  # Invalid date format, ignore filter
+        
+        # Get filtered reports
+        reports = query.order_by(
+            SPCReport.report_date.desc(), 
+            SPCReport.time_utc.desc()
+        ).limit(500).all()  # Use configurable limit for search results
+        
+        # Get summary stats (total, not filtered)
+        total_reports = SPCReport.query.count()
+        type_counts = db.session.query(
+            SPCReport.report_type,
+            db.func.count(SPCReport.id).label('count')
+        ).group_by(SPCReport.report_type).all()
+        
+        return render_template('spc_reports.html', 
+                             reports=reports,
+                             total_reports=total_reports,
+                             type_counts={row.report_type: row.count for row in type_counts})
+        
+    except Exception as e:
+        logger.error(f"Error viewing SPC reports: {e}")
+        return render_template('error.html', error=str(e))
+
+@app.route('/spc-reports/<int:report_id>')
+@app.route('/spc/reports/<int:report_id>')
+def view_spc_report_detail(report_id):
+    """View detailed information for a specific SPC report"""
+    try:
+        report = SPCReport.query.get_or_404(report_id)
+        
+        # Get verified alerts that match this SPC report
+        verified_alerts = Alert.query.filter(
+            Alert.spc_verified == True,
+            Alert.spc_reports.isnot(None)
+        ).all()
+        
+        # Filter alerts that actually reference this specific report
+        matching_alerts = []
+        for alert in verified_alerts:
+            if alert.spc_reports:
+                # Check if this report ID is referenced in the alert's SPC reports
+                alert_report_ids = []
+                try:
+                    if isinstance(alert.spc_reports, list):
+                        for spc_rep in alert.spc_reports:
+                            if isinstance(spc_rep, dict) and 'id' in spc_rep:
+                                alert_report_ids.append(spc_rep['id'])
+                except:
+                    pass
+                
+                if report_id in alert_report_ids:
+                    matching_alerts.append(alert)
+        
+        # Add the verified alerts to the report object
+        report.verified_alerts = matching_alerts
+        
+        # Parse enhanced_context JSON if it exists
+        import json
+        enhanced_context_data = None
+        if report.enhanced_context:
+            try:
+                if isinstance(report.enhanced_context, str):
+                    enhanced_context_data = json.loads(report.enhanced_context)
+                else:
+                    enhanced_context_data = report.enhanced_context
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Failed to parse enhanced_context for report {report_id}")
+                enhanced_context_data = None
+        
+        # Extract location context for template
+        primary_location = None
+        nearest_major_city = None
+        nearby_places = []
+        
+        # First try to get from spc_enrichment (Google Places data)
+        if hasattr(report, 'spc_enrichment') and report.spc_enrichment:
+            try:
+                if isinstance(report.spc_enrichment, str):
+                    enrichment = json.loads(report.spc_enrichment)
+                else:
+                    enrichment = report.spc_enrichment
+                
+                # Get primary location (smallest nearby place)
+                if 'primary_location' in enrichment and enrichment['primary_location']:
+                    primary_location = {
+                        'name': enrichment['primary_location'].get('name', ''),
+                        'distance_miles': enrichment['primary_location'].get('distance_miles', 0)
+                    }
+                
+                # Get nearest major city
+                if 'nearest_major_city' in enrichment and enrichment['nearest_major_city']:
+                    nearest_major_city = {
+                        'name': enrichment['nearest_major_city'].get('name', ''),
+                        'distance_miles': enrichment['nearest_major_city'].get('distance_miles', 0)
+                    }
+                
+                # Get nearby places
+                if 'nearby_places' in enrichment:
+                    nearby_places = enrichment['nearby_places']
+                    
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
+        # Fallback to enhanced_context location data if spc_enrichment unavailable
+        if not primary_location and enhanced_context_data and 'location_context' in enhanced_context_data:
+            location_context = enhanced_context_data['location_context']
+            if 'nearby_places' in location_context and location_context['nearby_places']:
+                # Use smallest/closest place as primary location
+                closest_place = min(location_context['nearby_places'], key=lambda x: x.get('distance_miles', 999))
+                primary_location = {
+                    'name': closest_place.get('name', ''),
+                    'distance_miles': closest_place.get('distance_miles', 0)
+                }
+                nearby_places = location_context['nearby_places']
+        
+        # Final fallback - never show county as primary location for end users
+        if not primary_location:
+            # Use SPC location description instead of county
+            primary_location = {
+                'name': report.location if report.location else f"{report.county} County",
+                'distance_miles': 0
+            }
+        
+        # Add alert_count to enhanced_context_data to fix template error
+        if enhanced_context_data:
+            enhanced_context_data['alert_count'] = len(matching_alerts)
+        else:
+            enhanced_context_data = {'alert_count': len(matching_alerts)}
+            
+        return render_template('spc_report_detail.html', 
+                             report=report,
+                             enhanced_context_data=enhanced_context_data,
+                             primary_location=primary_location,
+                             nearest_major_city=nearest_major_city,
+                             nearby_places=nearby_places)
+    except Exception as e:
+        logger.error(f"Error viewing SPC report {report_id}: {e}")
+        return render_template('error.html', error=str(e))
