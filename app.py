@@ -1352,6 +1352,12 @@ def view_spc_report_detail(report_id):
                 'distance_miles': 0
             }
         
+        # Add alert_count to enhanced_context_data to fix template error
+        if enhanced_context_data:
+            enhanced_context_data['alert_count'] = len(matching_alerts)
+        else:
+            enhanced_context_data = {'alert_count': len(matching_alerts)}
+            
         return render_template('spc_report_detail.html', 
                              report=report,
                              enhanced_context_data=enhanced_context_data,
@@ -4318,21 +4324,62 @@ def enhanced_context_backfill():
                 else:
                     magnitude_display = str(magnitude_value) if magnitude_value else "unknown magnitude"
                 
-                # Create Enhanced Context summary
-                enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event was reported at {report.location} in {report.county} County, {report.state}. The {report.report_type.lower()} measured {magnitude_display}."
+                # Get Google Places location enrichment first
+                from google_places_service import GooglePlacesService
+                places_service = GooglePlacesService()
                 
+                # Get location context using Google Places API
+                location_context = places_service.get_nearby_places(
+                    lat=float(report.latitude) if report.latitude else 0,
+                    lon=float(report.longitude) if report.longitude else 0
+                )
+                
+                # Extract primary location (smallest nearby place from Google Places)
+                primary_location_name = report.location  # fallback
+                if location_context and location_context.get('event_location'):
+                    primary_location_name = location_context['event_location']['name']
+                
+                # Create professional Enhanced Context summary using Google Places data
+                if report.report_type.upper() == "WIND" and magnitude_value:
+                    if magnitude_value >= 74:
+                        damage_desc = "Capable of causing significant structural damage to buildings and vehicles."
+                    elif magnitude_value >= 58:
+                        damage_desc = "Strong enough to damage roofs, break windows, and down large trees."
+                    else:
+                        damage_desc = "Sufficient to cause minor property damage and tree limb breakage."
+                    enhanced_summary = f"On {report.report_date}, damaging winds reached {magnitude_display} at {primary_location_name}. {damage_desc}"
+                elif report.report_type.upper() == "HAIL" and magnitude_value:
+                    if magnitude_value >= 2.0:
+                        damage_desc = "Large enough to cause severe vehicle damage and roof penetration."
+                    elif magnitude_value >= 1.0:
+                        damage_desc = "Size sufficient to damage vehicles and cause roof impacts."
+                    else:
+                        damage_desc = "Small hail capable of minor vehicle and property damage."
+                    enhanced_summary = f"On {report.report_date}, hail measuring {magnitude_display} struck {primary_location_name}. {damage_desc}"
+                else:
+                    enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred at {primary_location_name}."
+                
+                # Add NWS comments for additional context
                 if report.comments:
                     enhanced_summary += f" {report.comments}"
                 
-                # Create Enhanced Context data structure
+                # Add nearby location context
+                if location_context and location_context.get('nearest_major_city'):
+                    city_name = location_context['nearest_major_city']['name']
+                    distance = location_context['nearest_major_city']['distance_miles']
+                    enhanced_summary += f" This event occurred approximately {distance:.0f} miles from {city_name}."
+                
+                # Create Enhanced Context data structure with Google Places integration
                 enhanced_context = {
                     "enhanced_summary": enhanced_summary,
                     "version": "v2.0",
                     "generated_at": datetime.utcnow().isoformat(),
+                    "location_context": location_context,
                     "generation_metadata": {
-                        "method": "backfill_batch",
+                        "method": "google_places_enhanced",
                         "report_type": report.report_type,
-                        "magnitude_value": magnitude_value
+                        "magnitude_value": magnitude_value,
+                        "primary_location": primary_location_name
                     }
                 }
                 
