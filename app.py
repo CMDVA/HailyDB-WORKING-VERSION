@@ -4005,8 +4005,8 @@ def api_generate_enhanced_context():
             }), 400
         
         # Use Enhanced Context v2.0 system with production fixes
-        from spc_enhanced_context_v2 import create_enhanced_context_service
-        service = create_enhanced_context_service(db.session)
+        from spc_enhanced_context_v2 import SPCEnhancedContextService
+        service = SPCEnhancedContextService(db.session)
         
         result = service.enrich_spc_report(report_id)
         
