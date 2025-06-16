@@ -24,7 +24,7 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('internal_dashboard') }}">
+            <a class="navbar-brand" href="{{ url_for('web.index') }}">
                 <i class="fas fa-cloud-rain me-2"></i>
                 HailyDB
             </a>
@@ -37,13 +37,13 @@
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'internal_dashboard' %}active{% endif %}" 
-                           href="{{ url_for('internal_dashboard') }}">
+                           href="{{ url_for('web.index') }}">
                             <i class="fas fa-tachometer-alt me-1"></i>Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'view_spc_reports' %}active{% endif %}" 
-                           href="{{ url_for('view_spc_reports') }}">
+                           href="{{ url_for('web.view_spc_reports') }}">
                             <i class="fas fa-bolt me-1"></i>SPC Events
                         </a>
                     </li>
@@ -53,46 +53,41 @@
                             <i class="fas fa-satellite-dish me-1"></i>Radar-Detected
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('view_radar_alerts') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('web.view_radar_alerts') }}">
                                 <i class="fas fa-history me-2"></i>Historical Data
                             </a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('live_radar_dashboard') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('web.live_radar_dashboard') }}">
                                 <i class="fas fa-broadcast-tower me-2"></i>Live Feed
                             </a></li>
                         </ul>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'spc_matches' %}active{% endif %}" 
-                           href="{{ url_for('spc_matches') }}">
+                           href="{{ url_for('web.spc_matches') }}">
                             <i class="fas fa-check-circle me-1"></i>Confirmed
                         </a>
                     </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {% if request.endpoint == 'get_alerts_summary' %}active{% endif %}" 
-                           href="#" id="summariesDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-brain me-1"></i>AI Summaries
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'web.view_spc_reports' %}active{% endif %}" 
+                           href="{{ url_for('web.view_spc_reports') }}">
+                            <i class="fas fa-brain me-1"></i>SPC Reports
                         </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('get_alerts_summary') }}">
-                                <i class="fas fa-list me-2"></i>Alert Summaries
-                            </a></li>
-                        </ul>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'get_alerts' %}active{% endif %}" 
-                           href="{{ url_for('get_alerts') }}">
+                           href="{{ url_for('api.get_alerts') }}">
                             <i class="fas fa-exclamation-triangle me-1"></i>NWS Alerts
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'hurricane_tracks' %}active{% endif %}" 
-                           href="{{ url_for('hurricane_tracks') }}">
+                           href="{{ url_for('web.hurricane_tracks') }}">
                             <i class="fas fa-hurricane me-1"></i>Hurricanes
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'ingestion_logs' %}active{% endif %}" 
-                           href="{{ url_for('ingestion_logs') }}">
+                           href="{{ url_for('admin.ingestion_logs') }}">
                             <i class="fas fa-file-alt me-1"></i>Logs
                         </a>
                     </li>
@@ -103,7 +98,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('internal_status') }}?format=json" target="_blank">
+                        <a class="nav-link" href="{{ url_for('admin.internal_status') }}?format=json" target="_blank">
                             <i class="fas fa-code me-1"></i>API
                         </a>
                     </li>

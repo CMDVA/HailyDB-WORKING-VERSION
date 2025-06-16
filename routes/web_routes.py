@@ -17,7 +17,7 @@ web_bp = Blueprint('web', __name__)
 @web_bp.route('/')
 def index():
     """Main dashboard page"""
-    return render_template('index.html')
+    return render_template('dashboard.html')
 
 @web_bp.route('/spc-reports')
 @handle_errors
