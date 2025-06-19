@@ -179,49 +179,103 @@ class EnhancedContextService:
     def _generate_summary(self, report, magnitude_value: Optional[float], 
                          location_data: Dict[str, Any], damage_probability: Dict[str, Any],
                          verified_warnings: List[Dict[str, Any]]) -> str:
-        """Generate comprehensive Enhanced Context summary with 6 geo data points"""
-        enhanced_summary = f"On {report.report_date}, a {report.report_type.lower()} event occurred"
+        """
+        FIXED Enhanced Context generation protocol - systematic error handling
+        Critical: Must handle all data access safely for 35,000+ reports
+        """
         
-        # Add magnitude information
+        # PROTOCOL FIX: Safe date formatting
+        try:
+            event_date = report.report_date.strftime('%Y-%m-%d') if report.report_date else "Unknown date"
+        except (AttributeError, TypeError):
+            event_date = str(report.report_date) if report.report_date else "Unknown date"
+        
+        # PROTOCOL FIX: Safe event type handling
+        try:
+            event_type = report.report_type.lower() if report.report_type else "weather event"
+        except (AttributeError, TypeError):
+            event_type = "weather event"
+        
+        enhanced_summary = f"On {event_date}, a {event_type} event occurred"
+        
+        # PROTOCOL FIX: Safe magnitude handling
         if magnitude_value:
             try:
                 mag_val = float(magnitude_value)
-                if report.report_type.upper() == "HAIL":
+                if event_type.upper() == "HAIL":
                     enhanced_summary += f" with {mag_val:.2f}\" hail"
-                elif report.report_type.upper() == "WIND":
+                elif event_type.upper() == "WIND":
                     enhanced_summary += f" with {int(mag_val)} mph winds"
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, AttributeError):
                 pass
         
-        # Build comprehensive location context using the 6 geo data points
-        location_text = f" at {report.location}"
+        # PROTOCOL FIX: Safe location handling
+        location_text = ""
+        try:
+            if hasattr(report, 'location') and report.location:
+                location_text = f" at {report.location}"
+        except (AttributeError, TypeError):
+            pass
         
-        if location_data['event_location'] and location_data['event_distance']:
-            if location_data['event_direction']:
-                location_text += f", located {location_data['event_direction']} {location_data['event_distance']:.1f} miles from {location_data['event_location']}"
-            else:
-                location_text += f", located {location_data['event_distance']:.1f} miles from {location_data['event_location']}"
+        # PROTOCOL FIX: Safe distance and direction handling
+        if (location_data.get('event_location') and 
+            location_data.get('event_distance') is not None):
+            try:
+                distance = float(location_data['event_distance'])
+                direction = location_data.get('event_direction', '')
+                event_loc = location_data['event_location']
+                
+                if direction:
+                    location_text += f", located {direction} {distance:.1f} miles from {event_loc}"
+                else:
+                    location_text += f", located {distance:.1f} miles from {event_loc}"
+            except (ValueError, TypeError, KeyError):
+                pass
         
-        if location_data['nearest_major_city'] and location_data['major_city_distance']:
-            if location_data['major_city_direction']:
-                location_text += f", or {location_data['major_city_direction']} {location_data['major_city_distance']:.1f} miles from {location_data['nearest_major_city']}"
-            else:
-                location_text += f", or {location_data['major_city_distance']:.1f} miles from {location_data['nearest_major_city']}"
+        # PROTOCOL FIX: Safe major city handling
+        if (location_data.get('nearest_major_city') and 
+            location_data.get('major_city_distance') is not None):
+            try:
+                city_distance = float(location_data['major_city_distance'])
+                city_direction = location_data.get('major_city_direction', '')
+                major_city = location_data['nearest_major_city']
+                
+                if city_direction:
+                    location_text += f", or {city_direction} {city_distance:.1f} miles from {major_city}"
+                else:
+                    location_text += f", or {city_distance:.1f} miles from {major_city}"
+            except (ValueError, TypeError, KeyError):
+                pass
         
-        enhanced_summary += location_text + location_data['nearby_places_text'] + "."
+        # PROTOCOL FIX: Safe nearby places handling
+        nearby_text = location_data.get('nearby_places_text', '')
+        if nearby_text:
+            location_text += nearby_text
         
-        # Add SPC Comments if available
-        if hasattr(report, 'comments') and report.comments and report.comments.strip():
-            enhanced_summary += f" SPC Notes: {report.comments.strip()}"
+        enhanced_summary += location_text + "."
         
-        # Add damage probability assessment
-        if damage_probability and damage_probability.get('assessment'):
-            enhanced_summary += f" {damage_probability['assessment']}"
+        # PROTOCOL FIX: Safe SPC comments handling
+        try:
+            if hasattr(report, 'comments') and report.comments:
+                comments = str(report.comments).strip()
+                if comments and comments != '':
+                    enhanced_summary += f" SPC Notes: {comments}"
+        except (AttributeError, TypeError):
+            pass
         
-        # Add verified warnings information
-        if verified_warnings:
-            warning_text = f" Verified Reports: {len(verified_warnings)} active NWS warning(s) during this event"
-            enhanced_summary += warning_text
+        # PROTOCOL FIX: Safe damage assessment handling
+        try:
+            if damage_probability and damage_probability.get('assessment'):
+                enhanced_summary += f" {damage_probability['assessment']}"
+        except (TypeError, KeyError):
+            pass
+        
+        # PROTOCOL FIX: Safe verified warnings handling
+        try:
+            if verified_warnings and len(verified_warnings) > 0:
+                enhanced_summary += f" Verified Reports: {len(verified_warnings)} active NWS warning(s) during this event"
+        except (TypeError, AttributeError):
+            pass
         
         return enhanced_summary
     
