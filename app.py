@@ -3977,6 +3977,87 @@ def api_get_spc_enhanced_context(report_id):
         logger.error(f"Error retrieving enhanced context: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/spc-reports/enhanced-context/bulk-generate', methods=['POST'])
+def api_bulk_generate_enhanced_context():
+    """
+    Bulk Enhanced Context generation endpoint - processes all reports missing Enhanced Context
+    """
+    try:
+        data = request.get_json() or {}
+        batch_size = data.get('batch_size', 100)
+        max_batches = data.get('max_batches', 10)
+        
+        # Get reports missing Enhanced Context
+        reports_missing_context = db.session.query(SPCReport).filter(
+            db.or_(
+                SPCReport.enhanced_context.is_(None),
+                SPCReport.enhanced_context == {}
+            )
+        ).limit(batch_size * max_batches).all()
+        
+        processed_count = 0
+        success_count = 0
+        error_count = 0
+        
+        for report in reports_missing_context:
+            try:
+                result = enhanced_context_service.generate_enhanced_context(report, db.session)
+                if result.get('success'):
+                    success_count += 1
+                else:
+                    error_count += 1
+                processed_count += 1
+                
+                # Commit every 10 reports
+                if processed_count % 10 == 0:
+                    db.session.commit()
+                    
+            except Exception as e:
+                logger.error(f"Error generating enhanced context for report {report.id}: {e}")
+                error_count += 1
+                processed_count += 1
+                continue
+        
+        # Final commit
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "processed": processed_count,
+            "successful": success_count,
+            "errors": error_count,
+            "remaining": len(reports_missing_context) - processed_count
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in bulk enhanced context generation: {e}")
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/spc-reports/enhanced-context/stats', methods=['GET'])
+def api_enhanced_context_stats():
+    """
+    Get Enhanced Context generation statistics
+    """
+    try:
+        total_reports = db.session.query(SPCReport).count()
+        with_context = db.session.query(SPCReport).filter(
+            SPCReport.enhanced_context.isnot(None),
+            SPCReport.enhanced_context != {}
+        ).count()
+        missing_context = total_reports - with_context
+        
+        return jsonify({
+            "total_reports": total_reports,
+            "with_enhanced_context": with_context,
+            "missing_enhanced_context": missing_context,
+            "completion_percentage": round((with_context / total_reports * 100), 2) if total_reports > 0 else 0
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting enhanced context stats: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/spc-reports/enhanced-context/generate', methods=['POST'])
 def api_generate_enhanced_context():
     """
