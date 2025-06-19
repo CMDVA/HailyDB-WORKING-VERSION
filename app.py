@@ -953,7 +953,7 @@ def get_unenriched_counts():
             'error': str(e)
         }), 500
 
-@app.route('/api/reports/<int:report_id>')
+@app.route('/api/spc-reports/unified/<int:report_id>')
 def get_unified_report(report_id):
     """
     Unified production API endpoint for complete SPC report data
