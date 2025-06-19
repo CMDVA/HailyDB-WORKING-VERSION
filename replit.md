@@ -98,6 +98,12 @@ The system integrates with multiple authoritative weather data sources:
 
 ```
 Changelog:
+- June 19, 2025: UNIVERSAL ENHANCED CONTEXT SUMMARY TEMPLATE IMPLEMENTED
+  * UNIVERSAL DISPLAY: Enhanced Context Summary section now appears on ALL SPC report detail pages regardless of data availability
+  * GENERATE ON-DEMAND: Reports without Enhanced Context show "Generate Enhanced Context" button for immediate generation
+  * DISTANCE BADGE FIX: Corrected "exact location" logic to only show when distance is exactly 0.0 miles (was incorrectly showing for 0.2+ mile distances)
+  * TEMPLATE-BASED SOLUTION: Eliminated conditional rendering that caused Enhanced Context sections to disappear entirely
+  * USER EXPERIENCE: All reports now have consistent interface with ability to generate or regenerate Enhanced Context summaries
 - June 16, 2025: SPC REPORT DETAIL PAGE CONSISTENCY FIXED
   * TEMPLATE CLEANUP: Eliminated complex conditional logic causing inconsistent page layouts across different report IDs
   * UNIFIED DATA HANDLING: Route handler now provides consistent variables (primary_location, nearest_major_city, nearby_places) regardless of data source
