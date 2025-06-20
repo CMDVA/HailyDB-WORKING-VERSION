@@ -4078,8 +4078,10 @@ def api_generate_enhanced_context():
         if not report:
             return jsonify({"success": False, "error": f"Report {report_id} not found"}), 404
         
-        # Use the new Enhanced Context Service for clean separation of concerns
-        result = enhanced_context_service.generate_enhanced_context(report, db.session)
+        # Use Enhanced Context Service v3.0 with 6 geo data points format
+        from enhanced_context_service_v3 import EnhancedContextServiceV3
+        service = EnhancedContextServiceV3(db.session)
+        result = service.generate_enhanced_context(report_id)
         
         return jsonify(result)
         
