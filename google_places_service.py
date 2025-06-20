@@ -28,9 +28,8 @@ class GooglePlacesService:
     """
     
     def __init__(self):
-        self.api_key = os.environ.get("GOOGLE_PLACES_API_KEY")
-        if not self.api_key:
-            raise ValueError("GOOGLE_PLACES_API_KEY not found in environment")
+        # GOOGLE API COMPLETELY DISABLED - NO KEY REQUIRED
+        self.api_key = None  # Disabled to prevent any charges
         
         # Priority place types for Event Location search
         self.priority_place_types = [
