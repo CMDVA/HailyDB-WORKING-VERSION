@@ -73,42 +73,42 @@ class GooglePlacesService:
             # Convert miles to meters for Google API
             radius_meters = int(radius_miles * 1609.34)
             
-            for place_type in self.priority_place_types:
-                url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-                params = {
-                    'location': f"{lat},{lon}",
-                    'radius': radius_meters,
-                    'type': place_type,
-                    'key': self.api_key
-                }
-                
-                response = requests.get(url, params=params, timeout=10)
-                response.raise_for_status()
-                data = response.json()
-                
-                if data.get('results'):
-                    # Get closest place of this type
-                    closest_place = min(data['results'], key=lambda p: self._calculate_distance(
-                        lat, lon, 
-                        p['geometry']['location']['lat'], 
-                        p['geometry']['location']['lng']
-                    ))
-                    
-                    distance = self._calculate_distance(
-                        lat, lon,
-                        closest_place['geometry']['location']['lat'],
-                        closest_place['geometry']['location']['lng']
-                    )
-                    
-                    if distance <= radius_miles:
-                        return PlaceResult(
-                            name=closest_place['name'],
-                            distance_miles=round(distance, 1),
-                            lat=closest_place['geometry']['location']['lat'],
-                            lon=closest_place['geometry']['location']['lng'],
-                            place_type=place_type,
-                            place_id=closest_place.get('place_id')
-                        )
+            # GOOGLE API DISABLED - COST TOO HIGH
+            # for place_type in self.priority_place_types:
+            #     url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+            #     params = {
+            #         'location': f"{lat},{lon}",
+            #         'radius': radius_meters,
+            #         'type': place_type,
+            #         'key': self.api_key
+            #     }
+            #     
+            #     response = requests.get(url, params=params, timeout=10)
+            #     response.raise_for_status()
+            #     data = response.json()
+            #     
+            #         # Get closest place of this type
+            #         closest_place = min(data['results'], key=lambda p: self._calculate_distance(
+            #             lat, lon, 
+            #             p['geometry']['location']['lat'], 
+            #             p['geometry']['location']['lng']
+            #         ))
+            #         
+            #         distance = self._calculate_distance(
+            #             lat, lon,
+            #             closest_place['geometry']['location']['lat'],
+            #             closest_place['geometry']['location']['lng']
+            #         )
+            #         
+            #         if distance <= radius_miles:
+            #             return PlaceResult(
+            #                 name=closest_place['name'],
+            #                 distance_miles=round(distance, 1),
+            #                 lat=closest_place['geometry']['location']['lat'],
+            #                 lon=closest_place['geometry']['location']['lng'],
+            #                 place_type=place_type,
+            #                 place_id=closest_place.get('place_id')
+            #             )
             
             return None
             
@@ -148,62 +148,10 @@ class GooglePlacesService:
     def find_nearest_place_by_geocoding(self, lat: float, lon: float) -> Optional[PlaceResult]:
         """
         Phase 2: Fallback to Google Reverse Geocoding
-        Returns nearest CDP/town/city name with precise coordinates
-        Filters out large geographical areas
+        DISABLED - Using free alternative instead of expensive Google API
         """
-        try:
-            url = "https://maps.googleapis.com/maps/api/geocode/json"
-            params = {
-                'latlng': f"{lat},{lon}",
-                'key': self.api_key,
-                'result_type': 'locality|sublocality|neighborhood|administrative_area_level_3'
-            }
-            
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            if data.get('results'):
-                # Get the most specific place name
-                for result in data['results']:
-                    place_name = None
-                    place_types = result.get('types', [])
-                    
-                    # Extract locality name from address components
-                    for component in result['address_components']:
-                        types = component['types']
-                        if 'locality' in types:
-                            place_name = component['long_name']
-                            break
-                        elif 'sublocality' in types:
-                            place_name = component['long_name']
-                            break
-                        elif 'neighborhood' in types:
-                            place_name = component['long_name']
-                            break
-                        elif 'administrative_area_level_3' in types:
-                            place_name = component['long_name']
-                            break
-                    
-                    # Check if this is a valid place name (not a large geographical area)
-                    if place_name and self._is_valid_place_name(place_name, place_types):
-                        place_lat = result['geometry']['location']['lat']
-                        place_lon = result['geometry']['location']['lng']
-                        distance = self._calculate_distance(lat, lon, place_lat, place_lon)
-                        
-                        return PlaceResult(
-                            name=place_name,
-                            distance_miles=round(distance, 1),
-                            lat=place_lat,
-                            lon=place_lon,
-                            place_type='locality'
-                        )
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error in Google reverse geocoding: {e}")
-            return None
+        # GOOGLE API DISABLED - COST TOO HIGH - USING FREE ALTERNATIVE
+        return None
     
     def _find_comprehensive_regional_cities(self, lat: float, lon: float) -> List[Dict]:
         """
