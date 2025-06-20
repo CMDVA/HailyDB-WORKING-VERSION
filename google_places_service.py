@@ -501,49 +501,29 @@ class GooglePlacesService:
             # Search for various place types
             search_types = ['locality', 'sublocality', 'natural_feature', 'park', 'point_of_interest']
             
-            for place_type in search_types:
-                url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-                params = {
-                    'location': f"{lat},{lon}",
-                    'radius': radius_meters,
-                    'type': place_type,
-                    'key': self.api_key
-                }
-                
-                response = requests.get(url, params=params, timeout=10)
-                response.raise_for_status()
-                data = response.json()
-                
-                for result in data.get('results', [])[:5]:  # Limit results per type
-                    place_name = result['name']
-                    result_types = result.get('types', [])
-                    
-                    # Filter out large geographical areas
-                    if not self._is_valid_place_name(place_name, result_types):
-                        continue
-                        
-                    distance = self._calculate_distance(
-                        lat, lon,
-                        result['geometry']['location']['lat'],
-                        result['geometry']['location']['lng']
-                    )
-                    
-                    if distance <= radius_miles:
-                        places.append(PlaceResult(
-                            name=place_name,
-                            distance_miles=round(distance, 1),
-                            lat=result['geometry']['location']['lat'],
-                            lon=result['geometry']['location']['lng'],
-                            place_type=place_type
-                        ))
+            # GOOGLE API DISABLED - COST TOO HIGH - USING FREE ALTERNATIVE
+            # for place_type in search_types:
+            #     url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+            #     params = {
+            #         'location': f"{lat},{lon}",
+            #         'radius': radius_meters,
+            #         'type': place_type,
+            #         'key': self.api_key
+            #     }
+            #     
+            #     response = requests.get(url, params=params, timeout=10)
+            #     response.raise_for_status()
+            #     data = response.json()
+            #         place_name = result['name']
+            #         result_types = result.get('types', [])
+            #         if not self._is_valid_place_name(place_name, result_types):
+            #             continue
+            #         distance = self._calculate_distance(lat, lon, result['geometry']['location']['lat'], result['geometry']['location']['lng'])
+            #         if distance <= radius_miles:
+            #             places.append(PlaceResult(name=place_name, distance_miles=round(distance, 1), lat=result['geometry']['location']['lat'], lon=result['geometry']['location']['lng'], place_type=place_type))
             
-            # Remove duplicates and sort by distance
-            unique_places = {}
-            for place in places:
-                if place.name not in unique_places or place.distance_miles < unique_places[place.name].distance_miles:
-                    unique_places[place.name] = place
-            
-            return sorted(unique_places.values(), key=lambda p: p.distance_miles)[:6]
+            # USING FREE ALTERNATIVE INSTEAD OF EXPENSIVE GOOGLE API
+            return []
             
         except Exception as e:
             logger.error(f"Error finding nearby places: {e}")
