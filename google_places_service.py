@@ -330,37 +330,37 @@ class GooglePlacesService:
                 if suitable_cities:
                     closest = suitable_cities[0]
                     
-                    # Verify coordinates with Google Places for accuracy (optional enhancement)
-                    try:
-                        url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
-                        params = {
-                            'input': closest['name'],
-                            'inputtype': 'textquery',
-                            'fields': 'name,geometry',
-                            'key': self.api_key
-                        }
-                        
-                        response = requests.get(url, params=params, timeout=10)
-                        response.raise_for_status()
-                        data = response.json()
-                        
-                        if data.get('candidates') and len(data['candidates']) > 0:
-                            candidate = data['candidates'][0]
-                            exact_distance = self._calculate_distance(
-                                lat, lon,
-                                candidate['geometry']['location']['lat'],
-                                candidate['geometry']['location']['lng']
-                            )
-                            
-                            return PlaceResult(
-                                name=candidate['name'],
-                                distance_miles=round(exact_distance, 1),
-                                lat=candidate['geometry']['location']['lat'],
-                                lon=candidate['geometry']['location']['lng'],
-                                place_type='major_city'
-                            )
-                    except Exception as geocode_error:
-                        logger.warning(f"Could not verify coordinates with Google Places for {closest['name']}: {geocode_error}")
+                    # GOOGLE API DISABLED - USING FREE REGIONAL DATABASE ONLY
+                    # try:
+                    #     url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
+                    #     params = {
+                    #         'input': closest['name'],
+                    #         'inputtype': 'textquery',
+                    #         'fields': 'name,geometry',
+                    #         'key': self.api_key
+                    #     }
+                    #     
+                    #     response = requests.get(url, params=params, timeout=10)
+                    #     response.raise_for_status()
+                    #     data = response.json()
+                    #     
+                    #     if data.get('candidates') and len(data['candidates']) > 0:
+                    #         candidate = data['candidates'][0]
+                    #         exact_distance = self._calculate_distance(
+                    #             lat, lon,
+                    #             candidate['geometry']['location']['lat'],
+                    #             candidate['geometry']['location']['lng']
+                    #         )
+                    #         
+                    #         return PlaceResult(
+                    #             name=candidate['name'],
+                    #             distance_miles=round(exact_distance, 1),
+                    #             lat=candidate['geometry']['location']['lat'],
+                    #             lon=candidate['geometry']['location']['lng'],
+                    #             place_type='major_city'
+                    #         )
+                    # except Exception as geocode_error:
+                    #     logger.warning(f"Could not verify coordinates with Google Places for {closest['name']}: {geocode_error}")
                     
                     # Use regional database coordinates
                     return PlaceResult(
@@ -405,19 +405,21 @@ class GooglePlacesService:
             # Convert miles to meters for Google API
             radius_meters = int(radius_miles * 1609.34)
             
-            url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-            params = {
-                'location': f"{lat},{lon}",
-                'radius': radius_meters,
-                'key': self.api_key,
-                'type': 'establishment'
-            }
+            # GOOGLE API DISABLED - COST TOO HIGH - USING FREE ALTERNATIVE
+            # url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+            # params = {
+            #     'location': f"{lat},{lon}",
+            #     'radius': radius_meters,
+            #     'key': self.api_key,
+            #     'type': 'establishment'
+            # }
+            # 
+            # response = requests.get(url, params=params, timeout=10)
+            # response.raise_for_status()
+            # data = response.json()
             
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            if data.get('results'):
+            # Using free alternative - skip expensive establishment lookup
+            if False:  # Disabled Google API call
                 for place in data['results'][:20]:  # Get more results to filter
                     place_types = place.get('types', [])
                     place_name = place['name']
