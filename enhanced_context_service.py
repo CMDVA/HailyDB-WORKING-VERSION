@@ -105,7 +105,7 @@ class EnhancedContextService:
         return magnitude_value
     
     def _build_location_context(self, report, location_context: Dict) -> Dict[str, Any]:
-        """Build comprehensive location context with directional data"""
+        """Build comprehensive location context with 6 geo data points format"""
         location_data = {
             'event_location': None,
             'event_distance': None,
@@ -121,11 +121,23 @@ class EnhancedContextService:
             
         nearby_places = location_context['nearby_places']
         
-        # Extract event location (primary_location)
-        for place in nearby_places:
-            if place.get('type') == 'primary_location':
+        # Sort places by distance to find closest event location
+        sorted_places = sorted(nearby_places, key=lambda x: x.get('distance_miles', 999))
+        
+        # Find event location (closest place under 25 miles, excluding major cities)
+        event_location_found = False
+        for place in sorted_places:
+            distance = place.get('distance_miles', 999)
+            place_type = place.get('type', '')
+            
+            # Skip if it's too far or already marked as major city
+            if distance > 25 or place_type == 'nearest_city':
+                continue
+                
+            # Use first suitable place as event location
+            if not event_location_found:
                 location_data['event_location'] = place.get('name')
-                location_data['event_distance'] = place.get('distance_miles')
+                location_data['event_distance'] = distance
                 
                 # Calculate direction FROM event coordinates TO the location
                 if (report.latitude and report.longitude and 
@@ -134,6 +146,7 @@ class EnhancedContextService:
                         float(report.latitude), float(report.longitude),
                         float(place['approx_lat']), float(place['approx_lon'])
                     )
+                event_location_found = True
                 break
         
         # Extract nearest major city with direction
@@ -151,17 +164,25 @@ class EnhancedContextService:
                     )
                 break
         
-        # Build nearby places text (closest 2-3 places)
+        # Build nearby places text (closest 3 places, excluding event location and major city)
         nearby_place_items = []
-        for place in nearby_places:
-            if place.get('type') == 'nearby_place' and len(nearby_place_items) < 3:
-                name = place.get('name')
-                distance = place.get('distance_miles')
-                if name and distance:
-                    nearby_place_items.append(f"{name} ({distance:.1f} mi)")
+        event_name = location_data.get('event_location', '')
+        major_city_name = location_data.get('nearest_major_city', '')
+        
+        for place in sorted_places:
+            place_name = place.get('name', '')
+            distance = place.get('distance_miles')
+            
+            # Skip if it's the event location, major city, or invalid
+            if (place_name == event_name or place_name == major_city_name or 
+                not place_name or not distance):
+                continue
+                
+            if len(nearby_place_items) < 3:
+                nearby_place_items.append(f"{place_name} ({distance:.1f} mi)")
         
         if nearby_place_items:
-            location_data['nearby_places_text'] = f". Nearby places include {', '.join(nearby_place_items)}"
+            location_data['nearby_places_text'] = f" Nearby places include {', '.join(nearby_place_items)}"
             
         return location_data
     
@@ -209,15 +230,18 @@ class EnhancedContextService:
             except (ValueError, TypeError, AttributeError):
                 pass
         
-        # PROTOCOL FIX: Safe location handling
+        # 6 GEO DATA POINTS FORMAT: [direction] [distance] miles from [event location] ([SPC location]), or [direction] [distance] from [major city]. Nearby places [closest (mi), second (mi), third (mi)]
         location_text = ""
+        
+        # Get SPC location for preservation
+        spc_location = ""
         try:
             if hasattr(report, 'location') and report.location:
-                location_text = f" at {report.location}"
+                spc_location = str(report.location).strip()
         except (AttributeError, TypeError):
             pass
         
-        # PROTOCOL FIX: Safe distance and direction handling
+        # Build location hierarchy with event location and SPC preservation
         if (location_data.get('event_location') and 
             location_data.get('event_distance') is not None):
             try:
@@ -225,14 +249,22 @@ class EnhancedContextService:
                 direction = location_data.get('event_direction', '')
                 event_loc = location_data['event_location']
                 
-                if direction:
-                    location_text += f", located {direction} {distance:.1f} miles from {event_loc}"
+                if direction and spc_location:
+                    location_text += f" located {direction} {distance:.1f} miles from {event_loc} ({spc_location})"
+                elif spc_location:
+                    location_text += f" located {distance:.1f} miles from {event_loc} ({spc_location})"
+                elif direction:
+                    location_text += f" located {direction} {distance:.1f} miles from {event_loc}"
                 else:
-                    location_text += f", located {distance:.1f} miles from {event_loc}"
+                    location_text += f" located {distance:.1f} miles from {event_loc}"
             except (ValueError, TypeError, KeyError):
-                pass
+                # Fallback to SPC location only
+                if spc_location:
+                    location_text += f" at {spc_location}"
+        elif spc_location:
+            location_text += f" at {spc_location}"
         
-        # PROTOCOL FIX: Safe major city handling
+        # Add major city with direction
         if (location_data.get('nearest_major_city') and 
             location_data.get('major_city_distance') is not None):
             try:
@@ -247,10 +279,10 @@ class EnhancedContextService:
             except (ValueError, TypeError, KeyError):
                 pass
         
-        # PROTOCOL FIX: Safe nearby places handling
+        # Add nearby places list
         nearby_text = location_data.get('nearby_places_text', '')
         if nearby_text:
-            location_text += nearby_text
+            location_text += f".{nearby_text}"
         
         enhanced_summary += location_text + "."
         
