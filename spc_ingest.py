@@ -823,6 +823,23 @@ class SPCIngestService:
                         except (json.JSONDecodeError, TypeError):
                             magnitude_data = {}
                     
+                    # Check for location-based duplicates first
+                    existing_location_duplicate = None
+                    if report_data.get('latitude') and report_data.get('longitude'):
+                        existing_location_duplicate = SPCReport.query.filter(
+                            SPCReport.report_date == report_data['report_date'],
+                            SPCReport.report_type == report_data['report_type'],
+                            SPCReport.latitude == report_data['latitude'],
+                            SPCReport.longitude == report_data['longitude'],
+                            SPCReport.location == report_data['location']
+                        ).first()
+                    
+                    if existing_location_duplicate:
+                        # True location-based duplicate - skip
+                        duplicates_skipped += 1
+                        logger.debug(f"Location duplicate skipped: {report_data['location']} at {report_data['latitude']}, {report_data['longitude']}")
+                        continue
+                    
                     # Create SPCReport object
                     report = SPCReport()
                     report.report_date = report_data['report_date']
