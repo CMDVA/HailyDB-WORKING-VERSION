@@ -30,8 +30,15 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 # Configure the database
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "postgresql://localhost/nws_alerts")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
+    "pool_recycle": 180,  # Reduced from 300 to handle SSL timeouts
     "pool_pre_ping": True,
+    "pool_reset_on_return": "commit",  # Reset connections on return
+    "pool_size": 10,  # Connection pool size
+    "max_overflow": 20,  # Additional connections if needed
+    "connect_args": {
+        "connect_timeout": 30,
+        "application_name": "HailyDB_Storm_Tracker"
+    }
 }
 
 # Initialize the app with the extension
@@ -404,7 +411,15 @@ def get_live_radar_service():
 def get_alert(alert_id):
     """Get single enriched alert - supports both historical and live radar alerts"""
     
-    # Check if this is a live radar alert (URN format)
+    # First check the main alerts table (NWS alerts)
+    alert = Alert.query.filter_by(id=alert_id).first()
+    
+    if alert:
+        if request.args.get('format') == 'json':
+            return jsonify(alert.to_dict())
+        return render_template('alert_detail.html', alert=alert)
+    
+    # If not found in main alerts, check live radar alerts (URN format)
     if alert_id.startswith('urn:oid:'):
         live_service = get_live_radar_service()
         if live_service:
@@ -416,10 +431,10 @@ def get_alert(alert_id):
                 if request.args.get('format') == 'json':
                     return jsonify(live_alert)
                 return render_template('live_alert_detail.html', alert=live_alert)
-        
-        # Live alert not found
-        return render_template('404.html', 
-                             message=f"Live radar alert {alert_id} not found or expired"), 404
+    
+    # Alert not found in either location
+    return render_template('404.html', 
+                         message=f"Alert {alert_id} not found or expired"), 404
     
     # Historical alert lookup
     alert = Alert.query.get_or_404(alert_id)

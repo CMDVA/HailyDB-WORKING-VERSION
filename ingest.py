@@ -23,7 +23,7 @@ class IngestService:
     def __init__(self, db):
         self.db = db
         self.config = Config()
-        self.db_write_batch_size = int(os.getenv("DB_WRITE_BATCH_SIZE", "500"))
+        self.db_write_batch_size = int(os.getenv("DB_WRITE_BATCH_SIZE", "100"))  # Reduced batch size for connection stability
         
     def poll_nws_alerts(self) -> int:
         """
@@ -106,14 +106,27 @@ class IngestService:
                         logger.error(f"Error processing alert feature: {e}")
                         continue
                 
-                # Commit this batch
-                try:
-                    self.db.session.commit()
-                    logger.debug(f"Committed batch of {len(batch)} alerts")
-                except Exception as e:
-                    logger.error(f"Error committing batch: {e}")
-                    self.db.session.rollback()
-                    continue
+                # Commit this batch with retry logic
+                max_retries = 3
+                for retry_count in range(max_retries):
+                    try:
+                        self.db.session.commit()
+                        logger.debug(f"Committed batch of {len(batch)} alerts (attempt {retry_count + 1})")
+                        break
+                    except Exception as e:
+                        logger.warning(f"Error committing batch (attempt {retry_count + 1}): {e}")
+                        self.db.session.rollback()
+                        
+                        if retry_count == max_retries - 1:
+                            logger.error(f"Failed to commit batch after {max_retries} attempts, skipping batch")
+                            continue
+                        else:
+                            # Brief delay before retry
+                            import time
+                            time.sleep(0.5)
+                            # Create fresh session for retry
+                            self.db.session.close()
+                            continue
             
             # Calculate processing duration
             processing_duration = (datetime.utcnow() - start_time).total_seconds()
