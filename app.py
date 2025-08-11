@@ -2698,6 +2698,56 @@ def live_radar_dashboard():
     """Live Radar Alerts Dashboard"""
     return render_template('live_radar_dashboard.html')
 
+@app.route('/api/live-radar-alerts')
+def get_live_radar_alerts():
+    """API endpoint for live radar alerts - returns radar-detected events from LiveRadarAlertService"""
+    try:
+        live_service = get_live_radar_service()
+        
+        if not live_service:
+            return jsonify({
+                'status': 'error',
+                'message': 'Live radar service not available',
+                'alerts': []
+            }), 503
+        
+        # Get active alerts from live radar service
+        live_alerts = live_service.get_active_alerts()
+        
+        # Filter for only radar-indicated alerts (hail > 0 OR wind >= 50 mph)
+        radar_alerts = []
+        for alert in live_alerts:
+            radar_data = alert.get('radar_data', {})
+            has_hail = radar_data.get('hail_inches', 0) > 0
+            has_wind = radar_data.get('wind_mph', 0) >= 50
+            
+            if has_hail or has_wind:
+                radar_alerts.append({
+                    'id': alert.get('id'),
+                    'event': alert.get('event'),
+                    'area_desc': alert.get('area_desc'),
+                    'severity': alert.get('severity'),
+                    'effective': alert.get('effective'),
+                    'expires': alert.get('expires'),
+                    'radar_data': radar_data,
+                    'is_radar_indicated': True
+                })
+        
+        return jsonify({
+            'status': 'success',
+            'count': len(radar_alerts),
+            'alerts': radar_alerts,
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting live radar alerts: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'alerts': []
+        }), 500
+
 @app.route('/spc-matches/data')
 def spc_matches_data():
     """API endpoint for SPC verified matches data"""
