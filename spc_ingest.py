@@ -867,11 +867,9 @@ class SPCIngestService:
                         if enrich_result.get('successful_enrichments', 0) > 0:
                             logger.debug(f"Auto-enriched SPC report {report.id} with location data")
                         
-                        # Step 2: Enhanced Context Summary (after location enrichment)
-                        from spc_enhanced_context import enrich_spc_report_context
-                        context_result = enrich_spc_report_context(report.id)
-                        if context_result:
-                            logger.debug(f"Auto-generated enhanced context for SPC report {report.id}")
+                        # Step 2: Enhanced Context Summary (disabled - causing import errors)  
+                        # Enhanced context generation is handled separately via dashboard
+                        logger.debug(f"Location enrichment completed for SPC report {report.id}")
                             
                     except Exception as enrich_error:
                         logger.warning(f"Failed to auto-enrich SPC report {report.id}: {enrich_error}")
@@ -927,11 +925,9 @@ class SPCIngestService:
                                     if enrich_result.get('successful_enrichments', 0) > 0:
                                         logger.debug(f"Auto-enriched SPC report {report.id} with location data (retry)")
                                     
-                                    # Step 2: Enhanced Context Summary (after location enrichment)
-                                    from spc_enhanced_context import enrich_spc_report_context
-                                    context_result = enrich_spc_report_context(report.id)
-                                    if context_result:
-                                        logger.debug(f"Auto-generated enhanced context for SPC report {report.id} (retry)")
+                                    # Step 2: Enhanced Context Summary (disabled - causing import errors)
+                                    # Enhanced context generation is handled separately via dashboard  
+                                    logger.debug(f"Location enrichment completed for SPC report {report.id} (retry)")
                                         
                                 except Exception as enrich_error:
                                     logger.warning(f"Failed to auto-enrich SPC report {report.id} (retry): {enrich_error}")
