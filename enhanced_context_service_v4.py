@@ -308,69 +308,46 @@ class EnhancedContextServiceV4:
     def _build_verified_event_summary(self, alert_data: Dict[str, Any], 
                                     spc_data: Dict[str, Any], 
                                     location_data: Dict[str, Any]) -> str:
-        """Build summary for SPC-verified events with rich alert integration"""
+        """Build location-focused summary for SPC-verified events (Confirmed Warning Reports handle damage assessment)"""
         
-        # Start with verification context
-        event_date = spc_data.get('event_date', 'Unknown date')
-        alert_type = alert_data.get('event_type', 'severe weather alert')
-        severity = alert_data.get('severity', 'severe')
-        certainty = alert_data.get('certainty', 'observed')
+        # Start with simple event description
+        event_date_str = spc_data.get('event_date', 'Unknown date')
+        if ' ' in event_date_str:
+            event_date_str = event_date_str.split(' ')[0]  # Extract just the date part
         
-        summary = f"On {event_date}, this SPC report verified a {alert_type.lower()} "
+        event_type = spc_data.get('event_type', 'weather event')
+        magnitude = spc_data.get('magnitude', {})
         
-        # Add severity and certainty context
-        if severity and certainty:
-            summary += f"({severity.lower()} severity, {certainty.lower()}) "
+        summary = f"On {event_date_str}, a {event_type.lower()} event"
         
-        # Add location with SPC precision
+        # Add magnitude
+        if magnitude and magnitude.get('description'):
+            summary += f" with {magnitude['description']} occurred"
+        else:
+            summary += " occurred"
+        
+        # Add comprehensive location information
         location_desc = self._format_location_description(location_data, detailed=True)
         if location_desc:
-            summary += f"that occurred {location_desc}"
+            summary += f" {location_desc}"
         
-        # Add technical verification details
-        radar_data = alert_data.get('radar_detected', {})
-        spc_magnitude = spc_data.get('magnitude', {})
-        
-        if radar_data and spc_magnitude:
-            summary += f". The National Weather Service initially detected "
+        # Add nearby places (the 6-point geo format)
+        nearby_places = location_data.get('nearby_places', [])
+        if nearby_places:
+            place_items = []
+            for place in nearby_places[:3]:
+                name = place.get('name', '')
+                distance = place.get('distance_miles', 0)
+                if name and distance:
+                    place_items.append(f"{name} ({distance:.1f} mi)")
             
-            # Add radar parameters
-            radar_params = []
-            if radar_data.get('hail_size'):
-                radar_params.append(f"{radar_data['hail_size']:.2f}\" hail")
-            if radar_data.get('wind_speed'):
-                radar_params.append(f"{radar_data['wind_speed']} mph winds")
-            
-            if radar_params:
-                summary += f"{' and '.join(radar_params)} via radar, "
-            
-            # Add SPC verification
-            summary += f"which SPC verified as {spc_magnitude.get('description', 'severe weather')}"
+            if place_items:
+                summary += f". Nearby places include {', '.join(place_items)}"
         
-        # Add affected areas with technical precision
-        affected_areas = alert_data.get('affected_areas', '')
-        if affected_areas:
-            # Extract county information
-            counties = self._extract_counties_from_description(affected_areas)
-            if counties:
-                summary += f", affecting {', '.join(counties[:3])} " + ("counties" if len(counties) > 1 else "county")
-        
-        # Add technical alert details
-        vtec_code = alert_data.get('vtec_code', '')
-        awips_id = alert_data.get('awips_id', '')
-        if vtec_code or awips_id:
-            summary += f". Technical identifiers: "
-            tech_details = []
-            if vtec_code:
-                tech_details.append(f"VTEC {vtec_code}")
-            if awips_id:
-                tech_details.append(f"AWIPS {awips_id}")
-            summary += ", ".join(tech_details)
-        
-        # Add meaningful SPC comments if available
+        # Add meaningful SPC comments if available (but not damage assessment)
         spc_comments = spc_data.get('comments')
         if spc_comments:
-            summary += f". Field observations: {spc_comments}"
+            summary += f". SPC notes: {spc_comments}"
         
         return summary
 
