@@ -4272,7 +4272,7 @@ def api_enhanced_context_stats():
 @app.route('/api/spc-reports/enhanced-context/generate', methods=['POST'])
 def api_generate_enhanced_context():
     """
-    Enhanced Context generation endpoint v2.0 - production-grade with transaction isolation
+    Enhanced Context generation endpoint v4.0 - intelligent alert integration with conditional SPC matching
     """
     try:
         data = request.get_json() or {}
@@ -4289,10 +4289,10 @@ def api_generate_enhanced_context():
         if not report:
             return jsonify({"success": False, "error": f"Report {report_id} not found"}), 404
         
-        # Use Enhanced Context Service v3.0 with 6 geo data points format
-        from enhanced_context_service_v3 import EnhancedContextServiceV3
-        service = EnhancedContextServiceV3(db.session)
-        result = service.generate_enhanced_context(report_id)
+        # Use Enhanced Context Service v4.0 with intelligent alert integration
+        from enhanced_context_service_v4 import EnhancedContextServiceV4
+        service = EnhancedContextServiceV4(db.session)
+        result = service.generate_enhanced_context(report)
         
         return jsonify(result)
         
