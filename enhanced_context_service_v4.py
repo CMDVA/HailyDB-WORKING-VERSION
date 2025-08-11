@@ -344,12 +344,46 @@ class EnhancedContextServiceV4:
             if place_items:
                 summary += f". Nearby places include {', '.join(place_items)}"
         
-        # Add meaningful SPC comments if available (but not damage assessment)
+        # Add meaningful SPC comments if available
         spc_comments = spc_data.get('comments')
         if spc_comments:
             summary += f". SPC notes: {spc_comments}"
         
+        # Add damage assessment for verified events (integrating with Confirmed Warning Report data)
+        if alert_data and magnitude:
+            damage_assessment = self._get_damage_assessment_for_verified_event(magnitude)
+            if damage_assessment:
+                summary += f" {damage_assessment}"
+        
         return summary
+    
+    def _get_damage_assessment_for_verified_event(self, magnitude: Dict[str, Any]) -> str:
+        """Get damage assessment text for verified SPC events"""
+        try:
+            mag_type = magnitude.get('type', '').lower()
+            
+            if mag_type == 'hail':
+                size_inches = magnitude.get('size_inches', 0)
+                if size_inches >= 2.0:
+                    return "Large hail likely caused significant damage to vehicles, roofing materials, siding, and outdoor equipment."
+                elif size_inches >= 1.0:
+                    return "Hail likely caused dents to vehicles, cracked windows, damage to roofing materials, siding, and gutters."
+                else:
+                    return "Small hail likely caused minor damage to crops and vegetation."
+            
+            elif mag_type == 'wind':
+                speed_mph = magnitude.get('speed_mph', 0)
+                if speed_mph >= 75:
+                    return "Severe winds likely caused structural damage, downed large trees, and widespread power outages."
+                elif speed_mph >= 58:
+                    return "Severe winds likely caused tree damage and power outages in the area."
+                else:
+                    return "Strong winds likely caused minor tree damage and scattered power outages."
+            
+            return ""
+            
+        except (AttributeError, TypeError, KeyError):
+            return ""
 
     def _build_standard_event_summary(self, spc_data: Dict[str, Any], 
                                     location_data: Dict[str, Any]) -> str:
