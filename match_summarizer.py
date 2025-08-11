@@ -173,7 +173,9 @@ Make it sound like a professional weather report you'd hear on the evening news 
                 else:
                     verification_details.append(f"{data['magnitude']} mph winds")
             
-            summary_parts.append(f"Storm spotters subsequently verified {', '.join(verification_details)} in the area.")
+            # Determine the source description from SPC comments
+            source_info = self._extract_source_description(damage_data)
+            summary_parts.append(f"{source_info} subsequently verified {', '.join(verification_details)} in the area.")
             
             # Add damage details if available
             damage_comments = [data['details'] for data in damage_data if data['details']]
@@ -182,12 +184,16 @@ Make it sound like a professional weather report you'd hear on the evening news 
         
         # Convert predicted impact to confirmed assessment
         if radar_data['impact_text']:
-            # Convert future tense impact to past tense confirmed potential
+            # Convert future tense impact to past tense confirmed potential  
             impact_text = radar_data['impact_text'].lower()
-            impact_text = impact_text.replace('expect damage', 'confirmed damage potential')
-            impact_text = impact_text.replace('may cause', 'likely caused')
-            impact_text = impact_text.replace('expect', 'confirmed')
-            summary_parts.append(f"This confirmed {impact_text} in the immediate area.")
+            if 'expect damage' in impact_text:
+                impact_text = impact_text.replace('expect damage', 'damage potential')
+                summary_parts.append(f"This confirmed {impact_text} in the immediate area.")
+            elif 'expect' in impact_text:
+                impact_text = impact_text.replace('expect', '')
+                summary_parts.append(f"This confirmed{impact_text} in the immediate area.")
+            else:
+                summary_parts.append(f"This confirmed {impact_text} in the immediate area.")
         else:
             # Fallback damage assessment
             damage_potential = []
@@ -321,6 +327,37 @@ Make it sound like a professional weather report you'd hear on the evening news 
                 radar_data['locations_impacted'] = locations_match.group(1).strip()
         
         return radar_data
+    
+    def _extract_source_description(self, damage_data: List[Dict]) -> str:
+        """Extract factual source description from SPC report comments"""
+        if not damage_data:
+            return "Reports"
+        
+        # Analyze the source comments to determine what actually reported the data
+        comments = [data.get('details', '') for data in damage_data if data.get('details')]
+        
+        sources = []
+        for comment in comments:
+            comment_lower = comment.lower()
+            if 'site ' in comment_lower and 'measured' in comment_lower:
+                sources.append("weather station measurements")
+            elif 'mping' in comment_lower:
+                sources.append("mPING reports") 
+            elif 'social media' in comment_lower:
+                sources.append("social media reports")
+            elif 'delayed report' in comment_lower:
+                sources.append("field reports")
+            elif comment.strip() and not comment.strip().startswith('(') and len(comment.strip()) > 5:
+                sources.append("field reports")
+        
+        if sources:
+            unique_sources = list(set(sources))
+            if len(unique_sources) == 1:
+                return unique_sources[0].capitalize()
+            else:
+                return "Multiple sources"
+        else:
+            return "SPC reports"
     
     def _build_verification_prompt(self, alert: Dict, spc_reports: List[Dict]) -> str:
         """Build weatherman-style report prompt integrating radar detection and verified reports"""
