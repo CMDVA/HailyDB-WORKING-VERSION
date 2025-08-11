@@ -227,9 +227,9 @@ with app.app_context():
     from autonomous_scheduler import AutonomousScheduler
     autonomous_scheduler = AutonomousScheduler(db)
 
-# API Routes
-@app.route('/alerts')
-def get_alerts():
+# API Routes - Legacy NWS Alerts (being phased out)
+@app.route('/alerts-legacy')
+def get_alerts_legacy():
     """Get recent alerts with optional filtering"""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
@@ -2633,10 +2633,17 @@ def hurricane_tracks():
     """View hurricane tracks page"""
     return render_template('hurricane_tracks.html')
 
+# NEW: Consolidated alerts interface with radar-style visual presentation
+@app.route('/alerts')
+def get_alerts():
+    """View enhanced alerts interface with immediate visual understanding of hail/wind data"""
+    return render_template('radar_alerts.html')
+
 @app.route('/radar-alerts')
 def view_radar_alerts():
-    """View radar-detected alerts interface"""
-    return render_template('radar_alerts.html')
+    """DEPRECATED: Redirect to consolidated alerts interface"""
+    from flask import redirect, url_for
+    return redirect(url_for('get_alerts'), code=301)
 
 @app.route('/api/state-enrichment/stats')
 def get_state_enrichment_stats():
@@ -3603,10 +3610,11 @@ def get_radar_alerts_stats():
         logger.error(f"Failed to get radar alerts stats: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/radar-alerts/direct')
-def get_direct_radar_alerts():
+@app.route('/api/alerts/direct')
+def get_direct_alerts():
     """
-    Direct query combining both alerts table and radar_alerts table for complete historical data
+    NEW: Direct query combining both alerts table and radar_alerts table for complete historical data
+    This now serves as the primary alerts API with radar-style visual data
     """
     try:
         # Get query parameters

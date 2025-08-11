@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Radar-Detected Alerts - HailyDB{% endblock %}
+{% block title %}Weather Alerts - HailyDB{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -8,8 +8,8 @@
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1 class="h3 mb-0">
-                <i class="fas fa-satellite-dish me-2"></i>
-                Radar-Detected Severe Weather
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Weather Alerts with Radar Intelligence
             </h1>
             <div class="btn-group" role="group">
                 <button type="button" class="btn btn-outline-primary" onclick="refreshAlerts()">
@@ -30,10 +30,10 @@
             <div class="d-flex align-items-center">
                 <i class="fas fa-info-circle fa-2x me-3 text-info"></i>
                 <div>
-                    <h5 class="alert-heading mb-1">Real-Time Radar Analysis</h5>
+                    <h5 class="alert-heading mb-1">Enhanced Weather Intelligence</h5>
                     <p class="mb-0">
-                        Display severe weather alerts with confirmed radar-indicated hail sizes and wind speeds. 
-                        This data provides actionable intelligence for insurance adjusters, restoration contractors, 
+                        Complete NWS alert coverage with enhanced radar-indicated hail sizes and wind speeds for immediate visual understanding. 
+                        This consolidated view provides actionable intelligence for insurance adjusters, restoration contractors, 
                         and emergency management teams requiring precise damage assessment capabilities.
                     </p>
                 </div>
@@ -362,7 +362,7 @@ function loadRadarAlerts(page = 1) {
     document.getElementById('directRadarTableBody').innerHTML = 
         '<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0 text-muted">Loading radar-detected alerts...</p></td></tr>';
     
-    fetch(`/api/radar-alerts/direct?${params.toString()}`)
+    fetch(`/api/alerts/direct?${params.toString()}`)
         .then(response => response.json())
         .then(data => {
             updateStatistics(data.alerts || []);
@@ -669,7 +669,7 @@ async function loadDirectRadarAlerts(page = 1) {
             ...currentFilters
         });
         
-        const response = await fetch(`/api/radar-alerts/direct?${params.toString()}`);
+        const response = await fetch(`/api/alerts/direct?${params.toString()}`);
         const data = await response.json();
         
         if (data.error) {
