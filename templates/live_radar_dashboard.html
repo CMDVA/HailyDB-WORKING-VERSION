@@ -640,7 +640,7 @@ function updateStatistics(stats) {
     
     if (elements.hail) elements.hail.textContent = stats.hail_alerts || 0;
     if (elements.wind) elements.wind.textContent = stats.wind_alerts || 0;
-    if (elements.active) elements.active.textContent = stats.total_alerts || 0;
+    if (elements.active) elements.active.textContent = stats.active_alerts || 0;
     if (elements.states) elements.states.textContent = stats.states_affected || 0;
     
     console.log('Statistics updated successfully');

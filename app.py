@@ -2700,7 +2700,7 @@ def live_radar_dashboard():
 
 @app.route('/api/live-radar-alerts')
 def get_live_radar_alerts():
-    """API endpoint for live radar alerts - returns radar-detected events from LiveRadarAlertService"""
+    """API endpoint for live radar alerts - returns radar-detected events from LiveRadarAlertService with comprehensive statistics"""
     try:
         live_service = get_live_radar_service()
         
@@ -2733,10 +2733,63 @@ def get_live_radar_alerts():
                     'is_radar_indicated': True
                 })
         
+        # Calculate comprehensive dashboard statistics from historical radar data
+        try:
+            # Get historical radar statistics (last 7 days for context)
+            since_date = datetime.utcnow() - timedelta(days=7)
+            
+            # Count historical radar-detected alerts
+            hail_alerts = Alert.query.filter(
+                Alert.radar_indicated.op('->>')('hail_inches').astext.cast(db.Float) > 0,
+                Alert.ingested_at >= since_date
+            ).count()
+            
+            wind_alerts = Alert.query.filter(
+                Alert.radar_indicated.op('->>')('wind_mph').astext.cast(db.Integer) >= 50,
+                Alert.ingested_at >= since_date
+            ).count()
+            
+            # Count currently active alerts (any type)
+            active_alerts = Alert.query.filter(
+                Alert.expires > datetime.utcnow()
+            ).count()
+            
+            # Count unique states affected by radar alerts in last 7 days
+            states_affected = db.session.query(
+                db.func.count(db.func.distinct(
+                    db.func.regexp_replace(Alert.area_desc, r'.*, ([A-Z]{2})$', r'\1')
+                ))
+            ).filter(
+                Alert.radar_indicated.isnot(None),
+                Alert.ingested_at >= since_date
+            ).scalar() or 0
+            
+            statistics = {
+                'hail_alerts': hail_alerts,
+                'wind_alerts': wind_alerts, 
+                'active_alerts': active_alerts,
+                'states_affected': states_affected,
+                'live_radar_count': len(radar_alerts),
+                'period': '7 days'
+            }
+            
+        except Exception as stats_error:
+            logger.warning(f"Error calculating statistics: {stats_error}")
+            # Fallback statistics
+            statistics = {
+                'hail_alerts': 0,
+                'wind_alerts': 0,
+                'active_alerts': 0,
+                'states_affected': 0,
+                'live_radar_count': len(radar_alerts),
+                'period': 'current'
+            }
+        
         return jsonify({
             'status': 'success',
             'count': len(radar_alerts),
             'alerts': radar_alerts,
+            'statistics': statistics,
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
         
@@ -2745,7 +2798,15 @@ def get_live_radar_alerts():
         return jsonify({
             'status': 'error',
             'message': str(e),
-            'alerts': []
+            'alerts': [],
+            'statistics': {
+                'hail_alerts': 0,
+                'wind_alerts': 0,
+                'active_alerts': 0,
+                'states_affected': 0,
+                'live_radar_count': 0,
+                'period': 'error'
+            }
         }), 500
 
 @app.route('/spc-matches/data')
