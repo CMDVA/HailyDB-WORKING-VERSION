@@ -216,18 +216,32 @@ class EnhancedContextServiceV4:
             if hasattr(alert, 'response'):
                 alert_context['response'] = alert.response
             
-            # Extract technical details
+            # Extract comprehensive technical details
             if alert.properties:
                 props = alert.properties
-                alert_context.update({
-                    'hazards': props.get('hazard', []),
-                    'vtec_code': props.get('vtec', ''),
-                    'wmo_id': props.get('wmoId', ''),
-                    'awips_id': props.get('awipsId', ''),
-                    'distribution_channels': props.get('distributionChannels', []),
-                    'geocodes': props.get('geocode', {}),
-                    'affected_zones': props.get('affectedZones', [])
-                })
+                
+                # Technical identifiers  
+                alert_context['technical_details'] = {
+                    'vtec_code': props.get('VTEC', ''),
+                    'wmo_id': props.get('WMOheader', ''),
+                    'awips_id': props.get('AWIPSidentifier', ''),
+                    'message_type': props.get('messageType', ''),
+                    'response_type': props.get('response', ''),
+                    'hazards': props.get('parameters', {}).get('NWSheadline', [])
+                }
+                
+                # Distribution information
+                if 'parameters' in props:
+                    params = props['parameters']
+                    alert_context['distribution'] = {
+                        'channels': params.get('BLOCKCHANNEL', []),
+                        'eas_activation': params.get('EAS-ORG', []),
+                        'cmas_activation': params.get('CMASTYPE', [])
+                    }
+                
+                # Geocode and zone information
+                alert_context['geocodes'] = props.get('geocode', {})
+                alert_context['affected_zones'] = props.get('affectedZones', [])
             
             # Extract radar-detected parameters if available
             if hasattr(alert, 'radar_indicated') and alert.radar_indicated:
@@ -238,6 +252,18 @@ class EnhancedContextServiceV4:
                     'storm_motion': radar_data.get('storm_motion'),
                     'hazard_description': radar_data.get('hazard_text', '')
                 }
+            
+            # Extract polygon coverage and coordinate information
+            if hasattr(alert, 'geometry') and alert.geometry:
+                polygon_data = self._extract_polygon_coverage(alert.geometry)
+                if polygon_data:
+                    alert_context['polygon_coverage'] = polygon_data
+                    
+            # Extract FIPS and county data
+            if hasattr(alert, 'fips_codes') and alert.fips_codes:
+                alert_context['affected_counties_fips'] = alert.fips_codes
+            if hasattr(alert, 'county_names') and alert.county_names:
+                alert_context['affected_counties'] = alert.county_names
             
             return alert_context
             
@@ -358,27 +384,26 @@ class EnhancedContextServiceV4:
         elif damage_assessment:
             summary += f". SPC Notes: {damage_assessment}"
         
-        # PART 2: Full Confirmed Warning Report Integration
+        # PART 2: Full Confirmed Warning Report Integration with Storm Tracking
         if alert_data:
-            confirmed_report = self._build_confirmed_warning_report(alert_data, spc_data, location_data)
+            confirmed_report = self._build_comprehensive_confirmed_warning_report(alert_data, spc_data, location_data)
             if confirmed_report:
                 summary += f"\n\n{confirmed_report}"
         
         return summary
     
-    def _build_confirmed_warning_report(self, alert_data: Dict[str, Any], 
-                                      spc_data: Dict[str, Any], 
-                                      location_data: Dict[str, Any]) -> str:
-        """Build the Confirmed Warning Report section"""
+    def _build_comprehensive_confirmed_warning_report(self, alert_data: Dict[str, Any], 
+                                                    spc_data: Dict[str, Any], 
+                                                    location_data: Dict[str, Any]) -> str:
+        """Build comprehensive Confirmed Warning Report with ALL storm tracking data"""
         try:
             # Extract alert timing and details
             effective_time = alert_data.get('alert_timing', {}).get('effective', '')
             if effective_time:
-                # Convert to readable format with AM/PM and timezone
                 from datetime import datetime
                 try:
                     dt = datetime.fromisoformat(effective_time.replace('Z', '+00:00'))
-                    time_str = dt.strftime('%I:%M:%S %p UTC').lstrip('0')  # Remove leading zero
+                    time_str = dt.strftime('%I:%M:%S %p UTC').lstrip('0')
                 except:
                     time_str = effective_time
             else:
@@ -395,28 +420,103 @@ class EnhancedContextServiceV4:
             magnitude = spc_data.get('magnitude', {})
             spc_size = magnitude.get('description', '1.0" hail')
             
-            # Build the report
+            # Build the comprehensive report
             report = f"The report came after a National Weather Service issued a {event_type} on "
             report += f"{spc_data.get('event_date', '2025-08-10').split(' ')[0]} at {time_str} "
             report += f"in {county_str}, when radar detected 60 mph wind gusts and nickel size hail. "
+            
+            # Add technical alert details
+            tech_details = alert_data.get('technical_details', {})
+            if tech_details:
+                vtec = tech_details.get('vtec_code', '')
+                wmo_id = tech_details.get('wmo_id', '')
+                awips = tech_details.get('awips_id', '')
+                
+                if vtec or wmo_id or awips:
+                    report += f"Technical identifiers: "
+                    tech_items = []
+                    if vtec:
+                        tech_items.append(f"VTEC {vtec}")
+                    if wmo_id:
+                        tech_items.append(f"WMO {wmo_id}")
+                    if awips:
+                        tech_items.append(f"AWIPS {awips}")
+                    report += f"{', '.join(tech_items)}. "
+            
+            # Add polygon coverage information
+            polygon_data = alert_data.get('polygon_coverage')
+            if polygon_data:
+                coverage = polygon_data.get('coverage_area', {})
+                affected_locations = polygon_data.get('affected_locations', [])
+                
+                if coverage:
+                    lat_miles = coverage.get('lat_range_miles', 0)
+                    lon_miles = coverage.get('lon_range_miles', 0) 
+                    if lat_miles and lon_miles:
+                        report += f"The storm warning covered approximately {lat_miles:.1f} by {lon_miles:.1f} miles. "
+                        
+                        # Add bounding coordinates
+                        bbox = polygon_data.get('bounding_box', {})
+                        if bbox:
+                            report += f"Storm polygon boundaries: NW {bbox.get('north', 0):.2f}°N {bbox.get('west', 0):.2f}°W to SE {bbox.get('south', 0):.2f}°N {bbox.get('east', 0):.2f}°W. "
+                
+                if affected_locations:
+                    location_names = [loc['name'] for loc in affected_locations[:4]]
+                    if location_names:
+                        report += f"Storm path affected: {', '.join(location_names)}. "
+                        
+                # Add human-readable storm path description
+                storm_path = polygon_data.get('storm_path_description', '')
+                if storm_path:
+                    report += f"{storm_path}. "
+            
+            # Add SPC verification
             report += f"SPC reports subsequently verified {spc_size} in the area. "
             
-            # Add damage reports
+            # Add field damage reports
             spc_comments = spc_data.get('comments') or ''
             if spc_comments:
                 spc_comments = str(spc_comments).strip()
             if spc_comments and spc_comments.lower() != 'none':
-                report += f"Damage reports included: {spc_comments}. "
+                report += f"Field damage reports: {spc_comments}. "
             
             # Add confirmed damage potential
             damage_potential = self._get_damage_potential_text(magnitude)
             if damage_potential:
                 report += f"This confirmed {damage_potential} in the immediate area."
             
+            # Add FIPS and county zone information
+            fips_codes = alert_data.get('affected_counties_fips', [])
+            geocodes = alert_data.get('geocodes', {})
+            affected_zones = alert_data.get('affected_zones', [])
+            
+            if fips_codes or geocodes or affected_zones:
+                report += f" Affected zones: "
+                zone_info = []
+                
+                # Add FIPS codes if available
+                if fips_codes:
+                    zone_info.append(f"FIPS {', '.join(fips_codes[:3])}")
+                
+                # Add NWS zones from geocodes
+                if geocodes and 'UGC' in geocodes:
+                    ugc_codes = geocodes['UGC'][:3] if isinstance(geocodes['UGC'], list) else [str(geocodes['UGC'])[:3]]
+                    zone_info.append(f"UGC {', '.join(ugc_codes)}")
+                
+                if zone_info:
+                    report += f"{', '.join(zone_info)}. "
+            
+            # Add distribution channel information
+            distribution = alert_data.get('distribution', {})
+            if distribution and distribution.get('channels'):
+                channels = distribution['channels']
+                if channels:
+                    report += f"Alert distributed via: {', '.join(channels[:3])}."
+            
             return report
             
         except Exception as e:
-            logger.error(f"Error building confirmed warning report: {str(e)}")
+            logger.error(f"Error building comprehensive confirmed warning report: {str(e)}")
             return ""
     
     def _get_damage_potential_text(self, magnitude: Dict[str, Any]) -> str:
@@ -437,6 +537,125 @@ class EnhancedContextServiceV4:
             
         except (AttributeError, TypeError, KeyError):
             return "damage potential in the affected area"
+    
+    def _extract_polygon_coverage(self, geometry_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Extract polygon coverage information and convert to human-readable locations"""
+        try:
+            if not geometry_data or 'coordinates' not in geometry_data:
+                return None
+            
+            coordinates = geometry_data.get('coordinates', [])
+            if not coordinates:
+                return None
+            
+            # Handle different geometry types
+            polygon_coords = None
+            if geometry_data.get('type') == 'Polygon':
+                polygon_coords = coordinates[0] if coordinates else None
+            elif geometry_data.get('type') == 'MultiPolygon':
+                polygon_coords = coordinates[0][0] if coordinates and coordinates[0] else None
+            
+            if not polygon_coords or len(polygon_coords) < 4:
+                return None
+            
+            # Extract corner coordinates
+            lats = [coord[1] for coord in polygon_coords]
+            lons = [coord[0] for coord in polygon_coords]
+            
+            min_lat, max_lat = min(lats), max(lats)
+            min_lon, max_lon = min(lons), max(lons)
+            
+            # Calculate coverage area dimensions
+            lat_range = max_lat - min_lat
+            lon_range = max_lon - min_lon
+            
+            # Convert to approximate miles
+            lat_miles = lat_range * 69  # 1 degree lat ≈ 69 miles
+            lon_miles = lon_range * 69 * abs(math.cos(math.radians((min_lat + max_lat) / 2)))
+            
+            # Find affected locations within polygon area
+            affected_locations = self._find_cities_in_coverage_area(min_lat, max_lat, min_lon, max_lon)
+            
+            return {
+                'coordinates': polygon_coords,
+                'coverage_area': {
+                    'lat_range_miles': round(lat_miles, 1),
+                    'lon_range_miles': round(lon_miles, 1),
+                    'total_area_sq_miles': round(lat_miles * lon_miles, 1)
+                },
+                'bounding_box': {
+                    'north': max_lat,
+                    'south': min_lat,
+                    'east': max_lon,
+                    'west': min_lon
+                },
+                'affected_locations': affected_locations,
+                'storm_path_description': self._generate_storm_path_description(polygon_coords, affected_locations)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error extracting polygon coverage: {str(e)}")
+            return None
+    
+    def _find_cities_in_coverage_area(self, min_lat: float, max_lat: float, 
+                                    min_lon: float, max_lon: float) -> List[Dict[str, Any]]:
+        """Find cities within the coverage area bounding box"""
+        try:
+            affected_locations = []
+            
+            # Expand bounding box slightly for coverage
+            lat_buffer = (max_lat - min_lat) * 0.1
+            lon_buffer = (max_lon - min_lon) * 0.1
+            
+            for city in self.COMPREHENSIVE_CITIES:
+                city_lat, city_lon = city['lat'], city['lon']
+                
+                if (min_lat - lat_buffer <= city_lat <= max_lat + lat_buffer and
+                    min_lon - lon_buffer <= city_lon <= max_lon + lon_buffer):
+                    
+                    # Calculate distance from coverage center
+                    center_lat = (min_lat + max_lat) / 2
+                    center_lon = (min_lon + max_lon) / 2
+                    distance = self._calculate_distance(city_lat, city_lon, center_lat, center_lon)
+                    
+                    affected_locations.append({
+                        'name': city['name'],
+                        'coordinates': [city_lat, city_lon],
+                        'distance_from_center': round(distance, 1),
+                        'population': city.get('population', 0)
+                    })
+            
+            # Sort by distance from center and return top locations
+            affected_locations.sort(key=lambda x: x['distance_from_center'])
+            return affected_locations[:8]
+            
+        except Exception as e:
+            logger.error(f"Error finding cities in coverage area: {str(e)}")
+            return []
+    
+    def _generate_storm_path_description(self, polygon_coords: List[List[float]], 
+                                       affected_locations: List[Dict[str, Any]]) -> str:
+        """Generate human-readable description of storm path from polygon coordinates"""
+        try:
+            if not polygon_coords or not affected_locations:
+                return ""
+            
+            # Get major affected locations
+            major_locations = [loc['name'] for loc in affected_locations[:4] if loc.get('population', 0) > 5000]
+            
+            if major_locations:
+                if len(major_locations) == 1:
+                    return f"Storm path centered on {major_locations[0]}"
+                elif len(major_locations) == 2:
+                    return f"Storm path from {major_locations[0]} to {major_locations[1]}"
+                else:
+                    return f"Storm path through {major_locations[0]}, {major_locations[1]}, and {len(major_locations)-2} other areas"
+            
+            return ""
+            
+        except Exception as e:
+            logger.error(f"Error generating storm path description: {str(e)}")
+            return ""
     
     def _get_damage_assessment_for_verified_event(self, magnitude: Dict[str, Any]) -> str:
         """Get damage assessment text for verified SPC events"""
