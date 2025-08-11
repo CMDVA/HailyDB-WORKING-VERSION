@@ -520,6 +520,53 @@ async function generateEnhancedContext(reportId, button) {
     }
 }
 
+// Regenerate function for existing enhanced context
+async function regenerateEnhancedContext(reportId) {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Regenerating...';
+    button.disabled = true;
+    
+    try {
+        const response = await fetch('/api/spc-reports/enhanced-context/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                'report_id': reportId
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            // Show success and force immediate page reload with cache bypass
+            button.innerHTML = '<i class="fas fa-check me-1"></i>Regenerated!';
+            button.className = 'btn btn-success btn-sm';
+            
+            // Force hard refresh immediately
+            window.location.href = window.location.protocol + '//' + window.location.host + window.location.pathname + '?t=' + new Date().getTime();
+        } else {
+            throw new Error(result.error || 'Enhanced context regeneration failed');
+        }
+        
+    } catch (error) {
+        console.error('Enhanced context regeneration failed:', error);
+        button.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Failed';
+        button.className = 'btn btn-danger btn-sm';
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.className = 'btn btn-outline-primary btn-sm';
+            button.disabled = false;
+        }, 3000);
+    }
+}
+
 // Alias for backward compatibility
 const regenerateContext = generateEnhancedContext;
 </script>
