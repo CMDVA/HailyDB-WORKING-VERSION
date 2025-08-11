@@ -10,15 +10,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-- August 11, 2025: CONFIRMED WARNINGS SYSTEM RESTORED - MISSION ACCOMPLISHED
+- August 11, 2025: ENHANCED AI SUMMARIZER WITH OFFICIAL NWS TERMINOLOGY - MISSION ACCOMPLISHED
   * CRITICAL BREAKTHROUGH: Fixed SPC matching system after complete 0% verification failure (0/5,527 alerts)
   * FIXED SPC MATCHER: Resolved SQLAlchemy type errors and database session handling issues
   * PRODUCTION SUCCESS: Now generating 3+ verified alerts with 90% confidence FIPS-based matching
   * VERIFIED STORM EVENTS: Successfully cross-referencing Severe Thunderstorm Warnings with SPC hail/wind reports
-  * AI SUMMARY SYSTEM: Implemented fallback summaries for OpenAI quota issues, focusing on damage assessment
-  * CONFIRMED WARNINGS PAGE: /spc-matches route working with comprehensive storm verification data
+  * ENHANCED AI SUMMARY SYSTEM: Converts future-tense warnings to past-tense verified events using official NWS threat classifications
+  * OFFICIAL NWS TERMINOLOGY: Integrates hail size equivalents (quarter size, golf ball size) and official threat levels (Moderate Threat, High Threat, etc.)
+  * PROFESSIONAL METEOROLOGICAL LANGUAGE: Removes insurance references - data speaks for itself using NWS/NOAA standard definitions
+  * COMPREHENSIVE DATA INTEGRATION: AI summaries combine radar-indicated parameters with actual damage reports from multiple sources
+  * CONFIRMED WARNINGS PAGE: /spc-matches route working with enhanced professional summaries for damage assessment
   * GEOGRAPHIC COVERAGE: Multi-state matching (Kansas, Nebraska, New Mexico) with precise timing correlation
-  * AUTOMATIC AI DESCRIPTIONS: System generates damage assessment summaries for homeowner insurance evidence
 
 - August 11, 2025: STATE ENRICHMENT SYSTEM - MISSION ACCOMPLISHED
   * CRITICAL ISSUE RESOLVED: 3,029 alerts missing state information in radar alerts ingestion

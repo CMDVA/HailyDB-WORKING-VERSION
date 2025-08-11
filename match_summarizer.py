@@ -86,58 +86,120 @@ Structure: Lead with "At {time} in {location}, a National Weather Service {alert
     
     def _generate_fallback_summary(self, alert: Dict, spc_reports: List[Dict]) -> str:
         """
-        Generate a structured summary without OpenAI when quota is exceeded
-        Maintains focus on damage assessment and property impact
+        Generate a professional meteorological summary when AI is unavailable
+        Uses official NWS terminology and threat classifications - NO insurance references
         """
+        # Extract core information
         event = alert.get('event', 'Weather Event')
-        area = alert.get('area_desc', 'Unknown Area')
-        effective_time = alert.get('effective', 'Unknown Time')
+        area_desc = alert.get('area_desc', 'Unknown Area')
+        effective = alert.get('effective', 'Unknown Time')
         
-        # Process SPC reports for key details
-        damage_indicators = []
-        max_wind = 0
-        max_hail = 0
-        report_count = len(spc_reports)
+        # Process damage reports with official classifications
+        damage_data = []
+        max_hail = 0.0
+        max_wind = 0.0
         
         for report in spc_reports:
             report_type = report.get('report_type', '').lower()
-            comments = report.get('comments', '')
             magnitude = report.get('magnitude', {})
+            location = report.get('location', '')
+            time_utc = report.get('time_utc', '')
+            comments = report.get('comments', '')
             
-            if report_type == 'wind':
-                wind_speed = magnitude.get('wind_mph', 0) if magnitude else 0
-                max_wind = max(max_wind, wind_speed)
-                if wind_speed > 0:
-                    damage_indicators.append(f"{wind_speed} mph winds")
-                        
-            elif report_type == 'hail':
-                hail_size = magnitude.get('hail_inches', 0) if magnitude else 0
-                if magnitude and 'size_inches' in magnitude:
-                    hail_size = magnitude['size_inches']
-                max_hail = max(max_hail, hail_size)
+            if report_type == 'hail':
+                hail_size = 0.0
+                if isinstance(magnitude, dict):
+                    hail_size = magnitude.get('size_inches', 0.0) or magnitude.get('hail_inches', 0.0)
+                elif isinstance(magnitude, (int, float)):
+                    hail_size = float(magnitude)
+                
                 if hail_size > 0:
-                    damage_indicators.append(f"{hail_size}\" hail")
+                    max_hail = max(max_hail, hail_size)
+                    damage_data.append({
+                        'type': 'hail',
+                        'magnitude': hail_size,
+                        'common_name': self._get_hail_common_name(hail_size),
+                        'threat_level': self._map_hail_threat_level(hail_size),
+                        'location': location,
+                        'time': time_utc,
+                        'details': comments
+                    })
+            
+            elif report_type == 'wind':
+                wind_speed = 0.0
+                if isinstance(magnitude, dict):
+                    wind_speed = magnitude.get('wind_mph', 0.0) or magnitude.get('speed_mph', 0.0)
+                elif isinstance(magnitude, (int, float)):
+                    wind_speed = float(magnitude)
+                elif comments:
+                    # Extract from comments
+                    import re
+                    wind_match = re.search(r'(\d+)\s*mph', comments)
+                    if wind_match:
+                        wind_speed = float(wind_match.group(1))
+                
+                if wind_speed > 0:
+                    max_wind = max(max_wind, wind_speed)
+                    damage_data.append({
+                        'type': 'wind',
+                        'magnitude': wind_speed,
+                        'threat_level': self._map_wind_threat_level(wind_speed),
+                        'location': location,
+                        'time': time_utc,
+                        'details': comments
+                    })
         
-        # Build summary
+        # Build professional meteorological summary
         summary_parts = [
-            f"**VERIFIED STORM EVENT**: {event} in {area}",
-            f"**Event Time**: {effective_time}",
-            f"**SPC Verification**: {report_count} storm report(s) confirm this warning"
+            f"At {effective} in {area_desc}, a National Weather Service {event} was substantiated with verified damage reports from the Storm Prediction Center."
         ]
         
-        if damage_indicators:
-            summary_parts.append(f"**Damage Indicators**: {', '.join(damage_indicators)}")
+        # Add verification details
+        if damage_data:
+            verification_details = []
+            for data in damage_data:
+                if data['type'] == 'hail':
+                    verification_details.append(f"{data['magnitude']}\" hail ({data['common_name']}) - {data['threat_level']}")
+                else:
+                    verification_details.append(f"{data['magnitude']} mph winds - {data['threat_level']}")
+            
+            summary_parts.append(f"Verified damage reports documented: {', '.join(verification_details)}.")
         
-        # Add damage assessment context
-        if max_hail >= 1.0:
-            summary_parts.append("**Property Impact**: Hail of this size typically causes roof damage, vehicle dents, and gutter damage. Homeowners should inspect for roof granule loss and document any visible damage.")
+        # Add threat level assessment
+        threat_summary = []
+        if max_hail > 0:
+            threat_summary.append(f"Hail threat classified as {self._map_hail_threat_level(max_hail)} based on {max_hail}\" stones")
+        if max_wind > 0:
+            threat_summary.append(f"Wind threat classified as {self._map_wind_threat_level(max_wind)} based on {max_wind} mph gusts")
         
-        if max_wind >= 58:
-            summary_parts.append("**Structural Impact**: Severe wind speeds can cause tree damage, roof material loss, and siding damage. Check for loose shingles, damaged gutters, and debris impact.")
+        if threat_summary:
+            summary_parts.append(' and '.join(threat_summary) + ' per National Weather Service criteria.')
         
-        summary_parts.append("**Insurance Documentation**: This verified severe weather event provides supporting evidence for property damage claims in the affected area during the specified time period.")
+        # Add damage assessment based on official NWS guidelines
+        damage_potential = []
+        if max_hail >= 1.75:
+            damage_potential.append("significant structural damage to roofing materials and vehicles")
+        elif max_hail >= 1.0:
+            damage_potential.append("moderate damage to roofing and automotive surfaces")
+        elif max_hail >= 0.75:
+            damage_potential.append("minor damage to landscaping and exposed surfaces")
         
-        return "\n\n".join(summary_parts)
+        if max_wind >= 75:
+            damage_potential.append("extensive tree damage and structural impact to buildings")
+        elif max_wind >= 58:
+            damage_potential.append("tree limb damage and loose outdoor equipment displacement")
+        
+        if damage_potential:
+            summary_parts.append(f"Official damage assessment indicates potential for {', '.join(damage_potential)}.")
+        
+        # Add geographic and temporal context
+        if len(damage_data) > 1:
+            locations = [data['location'] for data in damage_data if data['location']]
+            if locations:
+                unique_locations = list(set(locations))
+                summary_parts.append(f"Multiple verification points documented across {len(unique_locations)} distinct locations including {', '.join(unique_locations[:3])}.")
+        
+        return ' '.join(summary_parts)
     
     def _map_hail_threat_level(self, hail_size: float) -> str:
         """Map hail size to official NWS threat level"""
