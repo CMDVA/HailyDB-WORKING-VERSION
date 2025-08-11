@@ -1,0 +1,35 @@
+Dashboard JavaScript loaded successfully
+=== DOM CONTENT LOADED ===
+Page ready state: interactive
+Dashboard initialized successfully
+Autonomous scheduler started successfully
+=== STARTING LIVE RADAR FEED ===
+Modal element found: 
+<div id="startModal" class="position-fixed w-100 h-100 d-flex align-items-center justify-content-center d-none" style="top: 0px; left: 0px; background-color: rgba(0, 0, 0, 0.5); z-index: 1050; display: none; visibility: hidden;">…</div>
+Hiding modal...
+Modal hidden successfully
+=== loadLiveAlerts() START ===
+Response status: 404 Not Found
+=== ERROR in loadLiveAlerts ===
+at t.value (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+Error type: SyntaxError
+at t.value (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+Error message: Failed to execute 'json' on 'Response': Unexpected token '<', "<!doctype "... is not valid JSON
+at t.value (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+Error stack: SyntaxError: Unexpected token '<', "<!doctype "... is not valid JSON
+    at loadLiveAlerts (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/live-radar-dashboard:529:37)
+at loadLiveAlerts (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/live-radar-dashboard:529:37)
+at t.value (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://b39f3a59-cba9-411d-a929-796ce937d19e-00-armj78gt4vv9.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+No alerts loaded, displaying empty state

@@ -358,32 +358,44 @@ class IngestService:
         return radar_data if radar_data else None
     
     def _extract_hail_size(self, text: str) -> Optional[float]:
-        """Extract hail size in inches from text"""
+        """Extract hail size in inches from text - ONLY for hail, not rain"""
         try:
+            # CRITICAL: Skip extraction for flood warnings and advisories
+            # These often contain "inches of rain" which should never be parsed as hail
+            flood_keywords = ['flood warning', 'flood advisory', 'flash flood', 'inches of rain', 'rainfall']
+            text_lower = text.lower()
+            for keyword in flood_keywords:
+                if keyword in text_lower:
+                    return None
+            
             # Use centralized NWS hail size chart
             size_map = Config.NWS_HAIL_SIZE_CHART
             
-            # Pattern 1: "hail up to X inch" or "hail up to X inches"
+            # Pattern 1: "hail up to X inch" or "hail up to X inches" (STRICT: must contain "hail")
             pattern1 = r'hail up to (\d+(?:\.\d+)?)\s*inch'
             match = re.search(pattern1, text)
             if match:
                 return float(match.group(1))
             
-            # Pattern 2: "hail size of X inch" or "X inch hail"
-            pattern2 = r'(?:hail size of |)(\d+(?:\.\d+)?)\s*inch'
+            # Pattern 2: "X inch hail" ONLY (STRICT: must end with "hail")
+            pattern2 = r'(\d+(?:\.\d+)?)\s*inch[es]*\s+hail'
             match = re.search(pattern2, text)
             if match:
                 return float(match.group(1))
             
-            # Pattern 3: Named sizes (quarter size hail, golf ball hail, etc.)
-            # Use word boundaries to avoid partial matches
+            # Pattern 3: Named sizes (STRICT: must be associated with "hail")
             for size_name, inches in size_map.items():
-                # Create pattern with word boundaries for exact matches
-                pattern = r'\b' + re.escape(size_name) + r'\b.*hail|\bhail.*\b' + re.escape(size_name) + r'\b'
-                if re.search(pattern, text, re.IGNORECASE):
-                    return inches
+                # Only match if explicitly connected to "hail"
+                patterns = [
+                    r'\b' + re.escape(size_name) + r'\s+size[d]?\s+hail',
+                    r'hail.*\b' + re.escape(size_name) + r'\b',
+                    r'\b' + re.escape(size_name) + r'\s+hail'
+                ]
+                for pattern in patterns:
+                    if re.search(pattern, text, re.IGNORECASE):
+                        return inches
             
-            # Pattern 4: "X inch diameter hail"
+            # Pattern 4: "X inch diameter hail" (STRICT: must contain "hail")
             pattern4 = r'(\d+(?:\.\d+)?)\s*inch diameter hail'
             match = re.search(pattern4, text)
             if match:

@@ -1,0 +1,151 @@
+{
+    "@context": [
+        "https://geojson.org/geojson-ld/geojson-context.jsonld",
+        {
+            "@version": "1.1",
+            "wx": "https://api.weather.gov/ontology#",
+            "@vocab": "https://api.weather.gov/ontology#"
+        }
+    ],
+    "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.5574c951842467b9e6f02a0cb9e888b16ce6b477.001.1",
+    "type": "Feature",
+    "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+            [
+                [
+                    -79.9599999,
+                    32.78
+                ],
+                [
+                    -79.97,
+                    32.79
+                ],
+                [
+                    -79.97,
+                    32.839999999999996
+                ],
+                [
+                    -79.95,
+                    32.849999999999994
+                ],
+                [
+                    -79.94,
+                    32.849999999999994
+                ],
+                [
+                    -79.92999999999999,
+                    32.82999999999999
+                ],
+                [
+                    -79.91,
+                    32.80999999999999
+                ],
+                [
+                    -79.91,
+                    32.76999999999999
+                ],
+                [
+                    -79.92999999999999,
+                    32.75999999999999
+                ],
+                [
+                    -79.9599999,
+                    32.78
+                ]
+            ]
+        ]
+    },
+    "properties": {
+        "@id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.5574c951842467b9e6f02a0cb9e888b16ce6b477.001.1",
+        "@type": "wx:Alert",
+        "id": "urn:oid:2.49.0.1.840.0.5574c951842467b9e6f02a0cb9e888b16ce6b477.001.1",
+        "areaDesc": "Charleston, SC",
+        "geocode": {
+            "SAME": [
+                "045019"
+            ],
+            "UGC": [
+                "SCC019"
+            ]
+        },
+        "affectedZones": [
+            "https://api.weather.gov/zones/county/SCC019"
+        ],
+        "references": [
+            {
+                "@id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.7a81fef0b2f6293b2a00dfbebaea2bf9a75a2081.001.1",
+                "identifier": "urn:oid:2.49.0.1.840.0.7a81fef0b2f6293b2a00dfbebaea2bf9a75a2081.001.1",
+                "sender": "w-nws.webmaster@noaa.gov",
+                "sent": "2025-08-11T10:19:00-04:00"
+            },
+            {
+                "@id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.fb2c4d59fc3db268012c5deaa9728ed21cd73957.001.1",
+                "identifier": "urn:oid:2.49.0.1.840.0.fb2c4d59fc3db268012c5deaa9728ed21cd73957.001.1",
+                "sender": "w-nws.webmaster@noaa.gov",
+                "sent": "2025-08-11T09:34:00-04:00"
+            }
+        ],
+        "sent": "2025-08-11T10:46:00-04:00",
+        "effective": "2025-08-11T10:46:00-04:00",
+        "onset": "2025-08-11T10:46:00-04:00",
+        "expires": "2025-08-11T12:30:00-04:00",
+        "ends": "2025-08-11T12:30:00-04:00",
+        "status": "Actual",
+        "messageType": "Update",
+        "category": "Met",
+        "severity": "Severe",
+        "certainty": "Likely",
+        "urgency": "Immediate",
+        "event": "Flash Flood Warning",
+        "sender": "w-nws.webmaster@noaa.gov",
+        "senderName": "NWS Charleston SC",
+        "headline": "Flash Flood Warning issued August 11 at 10:46AM EDT until August 11 at 12:30PM EDT by NWS Charleston SC",
+        "description": "At 1046 AM EDT, Law Enforcement reports numerous road flooded and\nclosed, and water approaching some businesses in Downtown\nCharleston. Between 1 and 2.5 inches of rain have fallen. Additional\nrainfall amounts up to 1 inch are possible in the warned area. Flash\nflooding is already occurring.\n\nHAZARD...Life threatening flash flooding. Thunderstorms producing\nflash flooding.\n\nSOURCE...Radar indicated.\n\nIMPACT...Life threatening flash flooding of creeks and streams,\nurban areas, highways, streets and underpasses.\n\nSome locations that will experience flash flooding include...\nNorth Charleston, Mount Pleasant, Downtown Charleston, Daniel\nIsland, West Ashley, Charleston Naval Complex, Columbus Street\nTerminal, Marion Square, Medical University Of South Carolina and\nThe Citadel.",
+        "instruction": "Turn around, don't drown when encountering flooded roads. Most flood\ndeaths occur in vehicles.\n\nBe aware of your surroundings and do not drive on flooded roads.\n\nHigh tide will inhibit runoff of heavy rain, flooding areas of poor\ndrainage in Downtown Charleston. Areas most prone to flooding\ninclude the Market, Crosstown, East Bay Street and Morrison Drive.",
+        "response": "Avoid",
+        "parameters": {
+            "AWIPSidentifier": [
+                "FFSCHS"
+            ],
+            "WMOidentifier": [
+                "WGUS72 KCHS 111446"
+            ],
+            "NWSheadline": [
+                "FLASH FLOOD WARNING REMAINS IN EFFECT UNTIL 1230 PM EDT THIS AFTERNOON FOR CHARLESTON COUNTY"
+            ],
+            "flashFloodDetection": [
+                "RADAR INDICATED"
+            ],
+            "flashFloodDamageThreat": [
+                "CONSIDERABLE"
+            ],
+            "BLOCKCHANNEL": [
+                "EAS",
+                "NWEM",
+                "CMAS"
+            ],
+            "EAS-ORG": [
+                "WXR"
+            ],
+            "VTEC": [
+                "/O.CON.KCHS.FF.W.0013.000000T0000Z-250811T1630Z/"
+            ],
+            "eventEndingTime": [
+                "2025-08-11T12:30:00-04:00"
+            ]
+        },
+        "scope": "Public",
+        "code": "IPAWSv1.0",
+        "language": "en-US",
+        "web": "http://www.weather.gov",
+        "eventCode": {
+            "SAME": [
+                "FFS"
+            ],
+            "NationalWeatherService": [
+                "FFW"
+            ]
+        }
+    }
+}
