@@ -10,15 +10,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-- August 11, 2025: LIVE NWS ALERTS - DIRECT API MIRROR IMPLEMENTATION - MISSION ACCOMPLISHED
-  * DIRECT NWS API MIRROR: Complete transformation from filtered radar alerts to direct mirror of https://api.weather.gov/alerts/active
-  * API ENDPOINT OVERHAUL: /api/live-radar-alerts now fetches directly from NWS API instead of using LiveRadarAlertService filtering
-  * COMPREHENSIVE COVERAGE: All 346+ active NWS alerts displayed without filtering - includes all weather event types
-  * NWS DATA STRUCTURE: Updated display to use proper NWS fields (event, area_desc, severity, urgency, certainty, effective, expires)
-  * REAL-TIME MIRRORING: Live dashboard updates every 30 seconds with fresh data directly from National Weather Service
-  * PROFESSIONAL PRESENTATION: Clean table format showing all essential NWS alert information with appropriate badges and formatting
-  * COMPLETE ALIGNMENT: Interface now perfectly mirrors NWS active alerts feed as requested by user
-  * STATISTICS INTEGRATION: Maintains historical context while showing current active alert counts from live NWS data
+- August 11, 2025: LIVE NWS ALERTS - DATABASE RADAR FILTERING IMPLEMENTATION - MISSION ACCOMPLISHED
+  * DATABASE INTEGRATION: Complete transformation to use ingested HailyDB alerts instead of direct NWS API mirror
+  * RADAR CRITERIA FILTERING: /api/live-radar-alerts now queries database for issued/unexpired alerts with hail ANY size OR winds 50+ mph
+  * PRECISE TARGETING: Focus on radar-detected severe weather from ingested alerts - eliminates irrelevant alerts like small craft advisories
+  * HAIL/WIND DISPLAY: Proper column mapping showing actual hail size (inches) and wind speed (mph) from radar_indicated data
+  * DATABASE SOURCING: Uses Alert model with radar_indicated JSON field containing parsed hail_inches and wind_mph values
+  * ACTIVE ALERT FILTERING: Only displays alerts where expires > current_time, ensuring truly active weather events
+  * COMPREHENSIVE SCANNING: Scans ALL data from each qualifying alert to extract complete hail and wind information
+  * STATE INTEGRATION: Extracts state information from affected_states or area_desc for proper geographic context
+  * REAL-TIME STATISTICS: Shows 24 qualifying live alerts from 287 total active database alerts with proper hail/wind metrics
 
 - August 11, 2025: CONSOLIDATED ALERTS INTERFACE - ARCHITECTURAL BREAKTHROUGH
   * URL CONSOLIDATION: `/alerts` now serves radar-style visual interface with immediate hail/wind understanding

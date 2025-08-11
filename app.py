@@ -2747,61 +2747,75 @@ def live_radar_dashboard():
 
 @app.route('/api/live-radar-alerts')
 def get_live_radar_alerts():
-    """API endpoint for live NWS alerts - direct mirror of https://api.weather.gov/alerts/ with comprehensive statistics"""
+    """API endpoint for live NWS alerts - filters ingested database alerts for hail ANY size or winds 50+ mph"""
     try:
-        # Direct fetch from NWS API to mirror their data exactly
-        import requests
+        from datetime import datetime, timedelta
         
-        nws_url = "https://api.weather.gov/alerts/active"
-        headers = {
-            'User-Agent': 'HailyDB/2.0 (live-nws-mirror)',
-            'Accept': 'application/geo+json'
-        }
+        # Query our database for active alerts with radar-detected hail/wind criteria
+        current_time = datetime.utcnow()
         
-        response = requests.get(nws_url, headers=headers, timeout=30)
-        response.raise_for_status()
+        # Get active alerts from our database that are not expired 
+        query = Alert.query.filter(
+            Alert.expires > current_time
+        )
         
-        nws_data = response.json()
-        features = nws_data.get('features', [])
+        active_alerts = query.all()
         
-        # Convert NWS format to our display format (direct mirror)
-        live_alerts = []
-        for feature in features:
-            props = feature.get('properties', {})
-            live_alerts.append({
-                'id': props.get('id'),
-                'event': props.get('event'),
-                'area_desc': props.get('areaDesc'),
-                'severity': props.get('severity'),
-                'certainty': props.get('certainty'),
-                'urgency': props.get('urgency'),
-                'effective': props.get('effective'),
-                'expires': props.get('expires'),
-                'headline': props.get('headline'),
-                'description': props.get('description'),
-                'instruction': props.get('instruction'),
-                'response': props.get('response'),
-                'status': props.get('status'),
-                'messageType': props.get('messageType'),
-                'category': props.get('category'),
-                'sender': props.get('sender'),
-                'senderName': props.get('senderName'),
-                'sent': props.get('sent'),
-                'onset': props.get('onset'),
-                'ends': props.get('ends'),
-                'geometry': feature.get('geometry'),
-                'is_nws_mirror': True
-            })
+        # Filter for hail of ANY size OR winds 50+ mph from radar data
+        qualifying_alerts = []
+        for alert in active_alerts:
+            radar_data = alert.radar_indicated or {}
+            
+            # Extract hail and wind data
+            hail_inches = radar_data.get('hail_inches', 0) or 0
+            wind_mph = radar_data.get('wind_mph', 0) or 0
+            
+            # Check if alert qualifies: hail ANY size OR wind 50+ mph
+            has_qualifying_hail = hail_inches > 0
+            has_qualifying_wind = wind_mph >= 50
+            
+            if has_qualifying_hail or has_qualifying_wind:
+                # Calculate if expired
+                is_expired = alert.expires and alert.expires <= current_time
+                
+                # Extract state from affected_states or area_desc
+                state = None
+                if alert.affected_states and len(alert.affected_states) > 0:
+                    state = alert.affected_states[0]
+                else:
+                    # Extract state from area_desc as fallback
+                    import re
+                    state_match = re.findall(r'\b[A-Z]{2}\b', alert.area_desc or '')
+                    if state_match:
+                        state = state_match[-1]  # Get last state mentioned
+                
+                # Get message type from properties if available
+                message_type = 'Alert'
+                if alert.properties and 'messageType' in alert.properties:
+                    message_type = alert.properties['messageType']
+                
+                qualifying_alerts.append({
+                    'id': alert.id,  # Use correct id field
+                    'event': alert.event,
+                    'area_desc': alert.area_desc,
+                    'severity': alert.severity,
+                    'effective': alert.effective.isoformat() if alert.effective else None,
+                    'expires': alert.expires.isoformat() if alert.expires else None,
+                    'message_type': message_type,
+                    'hail_size': hail_inches,
+                    'wind_speed': wind_mph,
+                    'is_expired': is_expired,
+                    'state': state,
+                    'headline': alert.properties.get('headline') if alert.properties else None,
+                    'description': alert.properties.get('description') if alert.properties else None
+                })
         
-        # Calculate comprehensive dashboard statistics from current NWS data
+        # Calculate comprehensive dashboard statistics
         try:
             # Get historical statistics (last 7 days for context)
-            since_date = datetime.utcnow() - timedelta(days=7)
+            since_date = current_time - timedelta(days=7)
             
-            # Count active alerts by type from our mirrored data
-            current_active_count = len(live_alerts)
-            
-            # Count historical alerts from database 
+            # Count historical alerts with radar-detected hail/wind
             hail_alerts = Alert.query.filter(
                 Alert.radar_indicated.op('->>')('hail_inches').astext.cast(db.Float) > 0,
                 Alert.ingested_at >= since_date
@@ -2812,67 +2826,58 @@ def get_live_radar_alerts():
                 Alert.ingested_at >= since_date
             ).count()
             
-            # Count unique states affected by current alerts
+            # Count currently active alerts in database
+            active_alerts_count = Alert.query.filter(
+                Alert.expires > current_time
+            ).count()
+            
+            # Count unique states affected by qualifying alerts
             current_states = set()
-            for alert in live_alerts:
-                area_desc = alert.get('area_desc', '')
-                # Extract state codes from area description
-                import re
-                states = re.findall(r'\b[A-Z]{2}\b', area_desc)
-                current_states.update(states)
+            for alert in qualifying_alerts:
+                if alert.get('state'):
+                    current_states.add(alert['state'])
             
             states_affected = len(current_states)
-            
-            # Count unique states from database (last 7 days)
-            db_states_affected = db.session.query(
-                db.func.count(db.func.distinct(
-                    db.func.regexp_replace(Alert.area_desc, r'.*, ([A-Z]{2})$', r'\1')
-                ))
-            ).filter(
-                Alert.ingested_at >= since_date
-            ).scalar() or 0
 
             return jsonify({
                 'status': 'success',
-                'alerts': live_alerts,
-                'count': len(live_alerts),
+                'alerts': qualifying_alerts,
+                'count': len(qualifying_alerts),
                 'statistics': {
                     'hail_alerts': hail_alerts,
                     'wind_alerts': wind_alerts,
-                    'active_alerts': current_active_count,
-                    'states_affected': max(states_affected, db_states_affected),
-                    'live_radar_count': len(live_alerts),
+                    'active_alerts': active_alerts_count,
+                    'states_affected': states_affected,
+                    'live_radar_count': len(qualifying_alerts),
                     'period': '7 days'
                 },
-                'timestamp': datetime.utcnow().isoformat() + 'Z',
-                'nws_mirror': True,
-                'source': 'https://api.weather.gov/alerts/active'
+                'timestamp': current_time.isoformat() + 'Z',
+                'source': 'HailyDB ingested alerts with radar criteria'
             })
             
         except Exception as stats_error:
-            logger.error(f"Error calculating NWS mirror statistics: {stats_error}")
+            logger.error(f"Error calculating live radar statistics: {stats_error}")
             return jsonify({
                 'status': 'success',
-                'alerts': live_alerts,
-                'count': len(live_alerts),
+                'alerts': qualifying_alerts,
+                'count': len(qualifying_alerts),
                 'statistics': {
                     'hail_alerts': 0,
                     'wind_alerts': 0,
-                    'active_alerts': len(live_alerts),
+                    'active_alerts': 0,
                     'states_affected': 0,
-                    'live_radar_count': len(live_alerts),
+                    'live_radar_count': len(qualifying_alerts),
                     'period': 'error'
                 },
-                'timestamp': datetime.utcnow().isoformat() + 'Z',
-                'nws_mirror': True,
-                'source': 'https://api.weather.gov/alerts/active'
+                'timestamp': current_time.isoformat() + 'Z',
+                'source': 'HailyDB ingested alerts with radar criteria'
             })
         
     except Exception as e:
-        logger.error(f"Error getting live NWS alerts: {e}")
+        logger.error(f"Error getting live radar alerts: {e}")
         return jsonify({
             'status': 'error',
-            'message': f'Error fetching NWS alerts: {str(e)}',
+            'message': f'Error fetching live radar alerts: {str(e)}',
             'alerts': [],
             'statistics': {
                 'hail_alerts': 0,
@@ -2882,8 +2887,7 @@ def get_live_radar_alerts():
                 'live_radar_count': 0,
                 'period': 'error'
             },
-            'nws_mirror': True,
-            'source': 'https://api.weather.gov/alerts/active'
+            'source': 'HailyDB ingested alerts with radar criteria'
         }), 500
 
 @app.route('/spc-matches/data')
