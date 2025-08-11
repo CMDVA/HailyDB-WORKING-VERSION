@@ -278,6 +278,22 @@ class Alert(db.Model):
         states = self.extract_states()
         counties = self.extract_counties()
         
+        # Enhanced state extraction from UGC and SAME codes
+        if self.properties:
+            geocode = self.properties.get('geocode', {})
+            if isinstance(geocode, dict):
+                # Extract states from UGC codes
+                ugc_codes = geocode.get('UGC', [])
+                if isinstance(ugc_codes, list):
+                    ugc_states = self._extract_states_from_ugc(ugc_codes)
+                    states.extend(ugc_states)
+                
+                # Extract states from SAME codes
+                same_codes = geocode.get('SAME', [])
+                if isinstance(same_codes, list):
+                    same_states = self._extract_states_from_same(same_codes)
+                    states.extend(same_states)
+        
         # Build county-state mapping
         county_state_mapping = []
         if self.area_desc:
@@ -296,7 +312,55 @@ class Alert(db.Model):
                         })
         
         self.county_names = county_state_mapping
-        self.affected_states = states
+        self.affected_states = list(set(states))  # Remove duplicates
+    
+    def _extract_states_from_ugc(self, ugc_codes: list) -> list:
+        """Extract state codes from UGC codes"""
+        ugc_state_mapping = {
+            'AL': 'AL', 'AK': 'AK', 'AZ': 'AZ', 'AR': 'AR', 'CA': 'CA', 'CO': 'CO',
+            'CT': 'CT', 'DE': 'DE', 'FL': 'FL', 'GA': 'GA', 'HI': 'HI', 'ID': 'ID',
+            'IL': 'IL', 'IN': 'IN', 'IA': 'IA', 'KS': 'KS', 'KY': 'KY', 'LA': 'LA',
+            'ME': 'ME', 'MD': 'MD', 'MA': 'MA', 'MI': 'MI', 'MN': 'MN', 'MS': 'MS',
+            'MO': 'MO', 'MT': 'MT', 'NE': 'NE', 'NV': 'NV', 'NH': 'NH', 'NJ': 'NJ',
+            'NM': 'NM', 'NY': 'NY', 'NC': 'NC', 'ND': 'ND', 'OH': 'OH', 'OK': 'OK',
+            'OR': 'OR', 'PA': 'PA', 'RI': 'RI', 'SC': 'SC', 'SD': 'SD', 'TN': 'TN',
+            'TX': 'TX', 'UT': 'UT', 'VT': 'VT', 'VA': 'VA', 'WA': 'WA', 'WV': 'WV',
+            'WI': 'WI', 'WY': 'WY', 'DC': 'DC',
+            # Marine zones
+            'PZ': 'CA', 'AM': 'AK', 'GM': 'FL', 'PK': 'AK', 'AN': 'NC', 'AS': 'FL',
+        }
+        
+        states = []
+        for ugc in ugc_codes:
+            if isinstance(ugc, str) and len(ugc) >= 2:
+                state_prefix = ugc[:2].upper()
+                if state_prefix in ugc_state_mapping:
+                    states.append(ugc_state_mapping[state_prefix])
+        return states
+    
+    def _extract_states_from_same(self, same_codes: list) -> list:
+        """Extract state codes from SAME codes"""
+        same_state_mapping = {
+            '001': 'AL', '002': 'AK', '004': 'AZ', '005': 'AR', '006': 'CA', '008': 'CO',
+            '009': 'CT', '010': 'DE', '011': 'DC', '012': 'FL', '013': 'GA', '015': 'HI',
+            '016': 'ID', '017': 'IL', '018': 'IN', '019': 'IA', '020': 'KS', '021': 'KY',
+            '022': 'LA', '023': 'ME', '024': 'MD', '025': 'MA', '026': 'MI', '027': 'MN',
+            '028': 'MS', '029': 'MO', '030': 'MT', '031': 'NE', '032': 'NV', '033': 'NH',
+            '034': 'NJ', '035': 'NM', '036': 'NY', '037': 'NC', '038': 'ND', '039': 'OH',
+            '040': 'OK', '041': 'OR', '042': 'PA', '044': 'RI', '045': 'SC', '046': 'SD',
+            '047': 'TN', '048': 'TX', '049': 'UT', '050': 'VT', '051': 'VA', '053': 'WA',
+            '054': 'WV', '055': 'WI', '056': 'WY',
+            # Marine/coastal SAME codes
+            '057': 'CA', '058': 'FL', '059': 'TX',
+        }
+        
+        states = []
+        for same in same_codes:
+            if isinstance(same, str) and len(same) >= 3:
+                state_code = same[:3]
+                if state_code in same_state_mapping:
+                    states.append(same_state_mapping[state_code])
+        return states
     
     def get_enhanced_geometry_info(self):
         """Get comprehensive geometry information for API responses"""

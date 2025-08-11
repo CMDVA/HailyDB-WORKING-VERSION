@@ -2683,6 +2683,90 @@ def view_radar_alerts():
     """View radar-detected alerts interface"""
     return render_template('radar_alerts.html')
 
+@app.route('/api/state-enrichment/stats')
+def get_state_enrichment_stats():
+    """Get statistics about alerts missing state information"""
+    try:
+        from models import Alert
+        
+        # Count alerts with missing states
+        total_alerts = Alert.query.count()
+        missing_states = Alert.query.filter(
+            db.or_(
+                Alert.affected_states.is_(None),
+                Alert.affected_states == '[]'
+            )
+        ).count()
+        
+        enriched_alerts = total_alerts - missing_states
+        
+        stats = {
+            'total_alerts': total_alerts,
+            'missing_states': missing_states,
+            'enriched_alerts': enriched_alerts,
+            'completion_percentage': (enriched_alerts / total_alerts * 100) if total_alerts > 0 else 0
+        }
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Error getting state enrichment stats: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/state-enrichment/enrich', methods=['POST'])
+def trigger_state_enrichment():
+    """Trigger state enrichment for alerts with missing state information"""
+    try:
+        from state_enrichment_service import StateEnrichmentService
+        
+        # Get batch size from request
+        batch_size = request.json.get('batch_size', 1000) if request.is_json else 1000
+        
+        # Initialize enrichment service
+        enrichment_service = StateEnrichmentService()
+        
+        # Run enrichment
+        results = enrichment_service.enrich_alerts_batch(db, batch_size)
+        
+        return jsonify({
+            'status': 'success',
+            'results': results
+        })
+        
+    except Exception as e:
+        logger.error(f"Error triggering state enrichment: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/state-enrichment/enrich-all', methods=['POST'])
+def trigger_complete_state_enrichment():
+    """Trigger complete state enrichment for all alerts with missing state information"""
+    try:
+        from state_enrichment_service import StateEnrichmentService
+        
+        # Get batch size from request
+        batch_size = request.json.get('batch_size', 1000) if request.is_json else 1000
+        
+        # Initialize enrichment service
+        enrichment_service = StateEnrichmentService()
+        
+        # Run complete enrichment
+        results = enrichment_service.enrich_all_alerts(db, batch_size)
+        
+        return jsonify({
+            'status': 'success',
+            'results': results
+        })
+        
+    except Exception as e:
+        logger.error(f"Error triggering complete state enrichment: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
 @app.route('/address-targeting')
 def address_targeting():
     """Address-specific weather event targeting interface"""

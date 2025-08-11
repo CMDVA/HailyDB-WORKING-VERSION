@@ -42,6 +42,26 @@
     </div>
 </div>
 
+<!-- State Enrichment Status -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-success border-0 shadow-sm" id="enrichmentStatus" style="display: none;">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-check-circle fa-2x me-3 text-success"></i>
+                <div>
+                    <h5 class="alert-heading mb-1">State Data Enrichment</h5>
+                    <p class="mb-0">
+                        <span id="enrichmentStats">Loading...</span>
+                        <button class="btn btn-sm btn-outline-success ms-2" onclick="enrichStates()" id="enrichBtn">
+                            <i class="fas fa-magic me-1"></i>Enrich Missing States
+                        </button>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Search & Filter -->
 <div class="row mb-4">
     <div class="col-12">
@@ -788,14 +808,91 @@ function exportData() {
     window.open(`/alerts/search?${params.toString()}`, '_blank');
 }
 
+// State enrichment functionality
+function loadEnrichmentStats() {
+    fetch('/api/state-enrichment/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Error loading enrichment stats:', data.error);
+                return;
+            }
+            
+            const completionRate = data.completion_percentage.toFixed(1);
+            const statsText = `${data.enriched_alerts} of ${data.total_alerts} alerts have state data (${completionRate}% complete)`;
+            document.getElementById('enrichmentStats').textContent = statsText;
+            
+            // Show enrichment panel if there are missing states
+            if (data.missing_states > 0) {
+                document.getElementById('enrichmentStatus').style.display = 'block';
+                // Change alert type based on completion rate
+                const alertDiv = document.getElementById('enrichmentStatus');
+                if (data.completion_percentage >= 90) {
+                    alertDiv.className = 'alert alert-success border-0 shadow-sm';
+                } else if (data.completion_percentage >= 70) {
+                    alertDiv.className = 'alert alert-warning border-0 shadow-sm';
+                } else {
+                    alertDiv.className = 'alert alert-info border-0 shadow-sm';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading enrichment stats:', error);
+        });
+}
+
+function enrichStates() {
+    const enrichBtn = document.getElementById('enrichBtn');
+    const originalText = enrichBtn.innerHTML;
+    
+    enrichBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processing...';
+    enrichBtn.disabled = true;
+    
+    fetch('/api/state-enrichment/enrich', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ batch_size: 500 })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success' && data.results) {
+            const results = data.results;
+            alert(`State enrichment completed!\n\nProcessed: ${results.processed} alerts\nEnriched: ${results.enriched} alerts\nSuccess rate: ${results.success_rate.toFixed(1)}%`);
+            
+            // Reload stats and alerts
+            loadEnrichmentStats();
+            loadRadarAlerts(currentPage);
+        } else {
+            alert('State enrichment failed: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error during state enrichment:', error);
+        alert('State enrichment failed: ' + error.message);
+    })
+    .finally(() => {
+        enrichBtn.innerHTML = originalText;
+        enrichBtn.disabled = false;
+    });
+}
+
 // Initialize page when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Set default date range
     document.getElementById('startDate').value = '2025-06-02';
     document.getElementById('endDate').value = '2025-06-07';
     
-    // Load radar alerts table
+    // Load radar alerts table and enrichment stats
     loadRadarAlerts(1);
+    loadEnrichmentStats();
 });
+
+// Auto-refresh every 60 seconds
+setInterval(() => {
+    loadRadarAlerts(currentPage);
+    loadEnrichmentStats();
+}, 60000);
 </script>
 {% endblock %}
