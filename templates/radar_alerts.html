@@ -489,9 +489,9 @@ function formatLocationInfo(alert) {
     }
     
     // Final fallback to area description
-    if (alert.areaDesc) {
-        const shortArea = alert.areaDesc.length > 50 ? 
-            alert.areaDesc.substring(0, 50) + '...' : alert.areaDesc;
+    if (alert.area_desc) {
+        const shortArea = alert.area_desc.length > 50 ? 
+            alert.area_desc.substring(0, 50) + '...' : alert.area_desc;
         return shortArea;
     }
     
