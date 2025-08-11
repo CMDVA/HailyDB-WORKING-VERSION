@@ -50,7 +50,7 @@ class MatchSummarizer:
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a professional television meteorologist writing a factual weather report about verified storm events. Write like a seasoned TV weatherman reporting on what actually happened during a confirmed severe weather event.
+                        "content": """You are a professional meteorological analyst writing a factual weather report about verified storm events. Write like a seasoned meteorological professional reporting on what actually happened during a confirmed severe weather event.
 
 WRITING STYLE REQUIREMENTS:
 1. Write as a factual historical report - NO threat classifications or warning language
