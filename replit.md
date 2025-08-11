@@ -14,7 +14,9 @@ Preferred communication style: Simple, everyday language.
   * URL CONSOLIDATION: `/alerts` now serves radar-style visual interface with immediate hail/wind understanding
   * INTERFACE UNIFICATION: Merged `/radar-alerts` functionality into `/alerts` for single source of truth
   * API CONSISTENCY: New `/api/alerts/direct` endpoint serves all alerts with radar intelligence
-  * NAVIGATION REORDERED: Menu sequence now Dashboard → SPC Reports → NWS Alerts → Live Radar → Confirmed
+  * NAVIGATION REORDERED: Menu sequence now Dashboard → SPC Reports → NWS Alerts → Live NWS Alerts → Confirmed
+  * LIVE NWS ALERTS: Renamed "Live Radar" to "Live NWS Alerts" - focuses on winds 50+ mph and any hail size
+  * NOTIFICATION CLEANUP: Removed unnecessary banners, implemented automatic state enrichment during ingestion
   * REDUNDANCY ELIMINATION: Removed duplicate radar-detected dropdown, consolidated to clean single navigation
   * PROGRESSIVE ENHANCEMENT: `/alerts-legacy` preserves old interface while phasing toward radar-style presentation
   * SYSTEM EFFICIENCY: Eliminated 15+ redundant routes through interface consolidation

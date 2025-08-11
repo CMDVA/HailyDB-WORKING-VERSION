@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Live Radar Alerts - HailyDB{% endblock %}
+{% block title %}Live NWS Alerts Dashboard - HailyDB{% endblock %}
 
 {% block content %}
 <!-- Start Modal Overlay -->
@@ -8,8 +8,8 @@
     <div class="text-center text-white">
         <div class="mb-4">
             <i class="fas fa-satellite-dish fa-4x mb-3"></i>
-            <h2 class="h3 mb-2">Live Radar Alerts</h2>
-            <p class="lead mb-4">Start monitoring real-time weather alerts</p>
+            <h2 class="h3 mb-2">Live NWS Alerts</h2>
+            <p class="lead mb-4">Start monitoring real-time NWS alerts with 50+ mph winds or any hail</p>
         </div>
         <button id="startButton" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow-lg" onclick="startLiveRadar()">
             <i class="fas fa-play me-2"></i>
@@ -23,8 +23,8 @@
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1 class="h3 mb-0">
-                <i class="fas fa-satellite-dish me-2"></i>
-                Live Radar Alerts Feed
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Live NWS Alerts Feed
             </h1>
             <div class="btn-group" role="group">
                 <button type="button" class="btn btn-outline-secondary" onclick="enableAutoRefresh()">
@@ -40,12 +40,12 @@
     <div class="col-12">
         <div class="alert alert-info border-0 shadow-sm">
             <div class="d-flex align-items-center">
-                <i class="fas fa-satellite-dish fa-2x me-3 text-info"></i>
+                <i class="fas fa-exclamation-triangle fa-2x me-3 text-info"></i>
                 <div>
-                    <h5 class="alert-heading mb-1">Live Radar Alerts Feed</h5>
+                    <h5 class="alert-heading mb-1">Live NWS Alerts Feed</h5>
                     <p class="mb-0">
-                        Real-time streaming of NWS Active Alerts enriched with radar-indicated hail sizes and wind speeds. 
-                        Focus on hail events (any size) and wind speeds 50 mph and greater for actionable damage assessment.
+                        Real-time monitoring of active NWS alerts featuring winds 50+ mph or hail of any size. 
+                        Provides immediate identification of qualifying severe weather events for damage assessment and emergency response.
                     </p>
                 </div>
             </div>
