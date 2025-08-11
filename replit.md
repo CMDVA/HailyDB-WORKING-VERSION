@@ -10,6 +10,12 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- August 11, 2025: LOCATION DATA DISPLAY FIX - RESOLVED
+  * FIXED: "Location data unavailable" issue in live radar dashboard
+  * ROOT CAUSE: JavaScript field name mismatch (alert.areaDesc vs alert.area_desc)
+  * VERIFICATION: Alert location data now displays correctly ("Alpena" instead of "unavailable")
+  * IMPACT: All radar alerts now show proper location information in dashboard views
+
 - August 11, 2025: COMPLETE HISTORICAL SPC BACKFILL SYSTEM - MISSION ACCOMPLISHED
   * TOTAL COVERAGE: Successfully completed 20 months of historical data (January 2024 - August 2025)
   * PROCESSING STATISTICS: 610 days processed with 100% success rate across all months
