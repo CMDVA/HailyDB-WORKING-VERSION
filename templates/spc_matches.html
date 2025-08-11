@@ -220,6 +220,11 @@
             fetch(`/spc-matches/data?${params}`)
                 .then(response => response.json())
                 .then(data => {
+                    console.log('=== loadMatches DEBUG ===');
+                    console.log('Full API response:', data);
+                    console.log('data.matches:', data.matches);
+                    console.log('data.matches length:', data.matches ? data.matches.length : 'undefined');
+                    
                     updateSummaryStats(data.summary);
                     updateMatchesTable(data.matches);
                     populateStateFilter(data.states);
@@ -291,6 +296,13 @@
         function updateMatchesTable(matches) {
             const tbody = document.getElementById('matches-tbody');
             const matchCount = document.getElementById('match-count');
+            
+            // Debug logging
+            console.log('=== updateMatchesTable DEBUG ===');
+            console.log('matches received:', matches);
+            console.log('matches type:', typeof matches);
+            console.log('matches length:', matches ? matches.length : 'undefined');
+            console.log('matches is array:', Array.isArray(matches));
             
             // Update match count
             matchCount.textContent = `${matches.length} matches found`;
