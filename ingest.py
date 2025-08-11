@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Optional, Dict, List, Iterator
 from models import Alert, IngestionLog
 from config import Config
+from state_enrichment_service import StateEnrichmentService
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class IngestService:
         self.db = db
         self.config = Config()
         self.db_write_batch_size = int(os.getenv("DB_WRITE_BATCH_SIZE", "100"))  # Reduced batch size for connection stability
+        self.state_enrichment = StateEnrichmentService()  # Initialize state enrichment
         
     def poll_nws_alerts(self) -> int:
         """
@@ -261,6 +263,9 @@ class IngestService:
         # Process full geometry for Feature 3: Full Geometry & County Mapping
         alert.process_full_geometry()
         
+        # Automatic state enrichment if missing
+        self._enrich_alert_states(alert)
+        
         self.db.session.add(alert)
         return alert
     
@@ -282,6 +287,9 @@ class IngestService:
         
         # Process full geometry for Feature 3: Full Geometry & County Mapping
         alert.process_full_geometry()
+        
+        # Automatic state enrichment if missing
+        self._enrich_alert_states(alert)
         
         return alert
     
@@ -322,6 +330,32 @@ class IngestService:
             } if latest_log else None
         }
     
+    def _enrich_alert_states(self, alert: Alert) -> None:
+        """
+        Automatically enrich alert with state information if missing
+        """
+        try:
+            # Check if alert already has state information
+            if alert.affected_states and isinstance(alert.affected_states, list) and len(alert.affected_states) > 0:
+                return  # Already enriched
+                
+            # Extract UGC codes from geocode data
+            ugc_codes = []
+            if alert.properties and 'geocode' in alert.properties:
+                geocode = alert.properties['geocode']
+                if 'UGC' in geocode:
+                    ugc_codes = geocode['UGC']
+            
+            # Enrich states using the service
+            if ugc_codes:
+                states = list(self.state_enrichment.extract_states_from_ugc(ugc_codes))
+                if states:
+                    alert.affected_states = states
+                    logger.debug(f"Auto-enriched alert {alert.id} with states: {states}")
+                    
+        except Exception as e:
+            logger.warning(f"Failed to auto-enrich states for alert {alert.id}: {e}")
+
     def _parse_radar_indicated(self, properties: Dict) -> Optional[Dict]:
         """
         Parse radar-indicated hail and wind data from NWS alerts
