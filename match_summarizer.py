@@ -50,17 +50,20 @@ class MatchSummarizer:
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a professional meteorological data analyst specializing in precise threat-level weather summaries aligned to official NWS guidance, designed for actionable intelligence in storm restoration, insurance, and public safety.
+                        "content": """You are a professional television meteorologist writing a factual weather report about verified storm events. Write like a seasoned TV weatherman reporting on what actually happened during a confirmed severe weather event.
 
-CRITICAL REQUIREMENTS:
-1. Convert all future tense language from the original warning into past tense verified events
-2. Use ONLY official NWS threat classifications: "Very Low Threat", "Low Threat", "Moderate Threat", "High Threat", "Extreme Threat"
-3. Integrate ALL data from both NWS alert and SPC damage reports into a single comprehensive description
-4. Reference specific times, locations, and verified damage per official reports
-5. NEVER reference insurance directly - let the data speak for itself
-6. Include hail size equivalents (quarter size, golf ball size, etc.) and wind speeds with official damage ratings
+WRITING STYLE REQUIREMENTS:
+1. Write as a factual historical report - NO threat classifications or warning language
+2. Start with the National Weather Service alert and what radar initially detected  
+3. Then describe what was actually verified by storm spotters and damage reports
+4. Use the verified SPC magnitude as the authoritative measurement (this overrides radar estimates)
+5. Convert predicted impacts to confirmed damage potential in surrounding areas
+6. Include specific locations, times, and radar parameters from the original alert
+7. Write in past tense as a completed weather event story
 
-Structure: Lead with "At {time} in {location}, a National Weather Service {alert type} was substantiated with {damage type} at {time} in {location}..." and continue integrating all available data."""
+STRUCTURE: "At {time} in {location}, the National Weather Service issued a {alert type} when radar detected {radar parameters}. Storm spotters subsequently verified {actual verified measurements} with {specific damage details if any}. This confirms that {impact assessment} occurred in the immediate area."
+
+Make it sound like a professional weather report you'd hear on the evening news about a storm that already happened."""
                     },
                     {
                         "role": "user",
@@ -149,55 +152,59 @@ Structure: Lead with "At {time} in {location}, a National Weather Service {alert
                         'details': comments
                     })
         
-        # Build professional meteorological summary
-        summary_parts = [
-            f"At {effective} in {area_desc}, a National Weather Service {event} was substantiated with verified damage reports from the Storm Prediction Center."
-        ]
+        # Extract radar information from original alert
+        radar_data = self._extract_radar_parameters(alert)
         
-        # Add verification details
+        # Build weatherman-style report
+        summary_parts = []
+        
+        # Start with radar detection
+        if radar_data['hazard_text']:
+            summary_parts.append(f"At {effective} in {area_desc}, the National Weather Service issued a {event} when radar detected {radar_data['hazard_text'].lower()}.")
+        else:
+            summary_parts.append(f"At {effective} in {area_desc}, the National Weather Service issued a {event}.")
+        
+        # Add verified reports
         if damage_data:
             verification_details = []
             for data in damage_data:
                 if data['type'] == 'hail':
-                    verification_details.append(f"{data['magnitude']}\" hail ({data['common_name']}) - {data['threat_level']}")
+                    verification_details.append(f"{data['magnitude']}\" hail ({data['common_name']})")
                 else:
-                    verification_details.append(f"{data['magnitude']} mph winds - {data['threat_level']}")
+                    verification_details.append(f"{data['magnitude']} mph winds")
             
-            summary_parts.append(f"Verified damage reports documented: {', '.join(verification_details)}.")
+            summary_parts.append(f"Storm spotters subsequently verified {', '.join(verification_details)} in the area.")
+            
+            # Add damage details if available
+            damage_comments = [data['details'] for data in damage_data if data['details']]
+            if damage_comments:
+                summary_parts.append(f"Damage reports included: {damage_comments[0][:100]}.")
         
-        # Add threat level assessment
-        threat_summary = []
-        if max_hail > 0:
-            threat_summary.append(f"Hail threat classified as {self._map_hail_threat_level(max_hail)} based on {max_hail}\" stones")
-        if max_wind > 0:
-            threat_summary.append(f"Wind threat classified as {self._map_wind_threat_level(max_wind)} based on {max_wind} mph gusts")
+        # Convert predicted impact to confirmed assessment
+        if radar_data['impact_text']:
+            # Convert future tense impact to past tense confirmed potential
+            impact_text = radar_data['impact_text'].lower()
+            impact_text = impact_text.replace('expect damage', 'confirmed damage potential')
+            impact_text = impact_text.replace('may cause', 'likely caused')
+            impact_text = impact_text.replace('expect', 'confirmed')
+            summary_parts.append(f"This confirmed {impact_text} in the immediate area.")
+        else:
+            # Fallback damage assessment
+            damage_potential = []
+            if max_hail >= 1.0:
+                damage_potential.append("damage to roofing materials and vehicles")
+            if max_wind >= 58:
+                damage_potential.append("tree damage and structural impact")
+            
+            if damage_potential:
+                summary_parts.append(f"This confirms that {', '.join(damage_potential)} occurred in the immediate area.")
         
-        if threat_summary:
-            summary_parts.append(' and '.join(threat_summary) + ' per National Weather Service criteria.')
-        
-        # Add damage assessment based on official NWS guidelines
-        damage_potential = []
-        if max_hail >= 1.75:
-            damage_potential.append("significant structural damage to roofing materials and vehicles")
-        elif max_hail >= 1.0:
-            damage_potential.append("moderate damage to roofing and automotive surfaces")
-        elif max_hail >= 0.75:
-            damage_potential.append("minor damage to landscaping and exposed surfaces")
-        
-        if max_wind >= 75:
-            damage_potential.append("extensive tree damage and structural impact to buildings")
-        elif max_wind >= 58:
-            damage_potential.append("tree limb damage and loose outdoor equipment displacement")
-        
-        if damage_potential:
-            summary_parts.append(f"Official damage assessment indicates potential for {', '.join(damage_potential)}.")
-        
-        # Add geographic and temporal context
+        # Add geographic context if multiple locations
         if len(damage_data) > 1:
             locations = [data['location'] for data in damage_data if data['location']]
             if locations:
                 unique_locations = list(set(locations))
-                summary_parts.append(f"Multiple verification points documented across {len(unique_locations)} distinct locations including {', '.join(unique_locations[:3])}.")
+                summary_parts.append(f"Verification came from {len(unique_locations)} locations including {', '.join(unique_locations[:2])}.")
         
         return ' '.join(summary_parts)
     
@@ -256,44 +263,80 @@ Structure: Lead with "At {time} in {location}, a National Weather Service {alert
         else:
             return f"{hail_size}\" diameter"
     
-    def _extract_radar_parameters(self, alert: Dict) -> Dict[str, float]:
-        """Extract radar-indicated parameters from alert description"""
+    def _extract_radar_parameters(self, alert: Dict) -> Dict[str, any]:
+        """Extract comprehensive radar parameters and hazard information from alert description"""
         description = ""
-        if alert.get('properties', {}).get('description'):
-            description = alert['properties']['description']
-        elif alert.get('raw', {}).get('properties', {}).get('description'):
-            description = alert['raw']['properties']['description']
+        # Try multiple sources for the description
+        sources = [
+            alert.get('raw', {}).get('properties', {}).get('description'),
+            alert.get('properties', {}).get('description'),
+            alert.get('description')
+        ]
         
-        radar_params = {'hail_inches': 0.0, 'wind_mph': 0.0}
+        for source in sources:
+            if source:
+                description = source
+                break
+        
+        radar_data = {
+            'hail_inches': 0.0, 
+            'wind_mph': 0.0,
+            'hail_size_name': '',
+            'hazard_text': '',
+            'impact_text': '',
+            'locations_impacted': ''
+        }
         
         if description:
-            # Extract hail size
-            hail_match = re.search(r'hail.*?(\d+(?:\.\d+)?)\s*(?:inch|in|")', description, re.IGNORECASE)
-            if hail_match:
-                radar_params['hail_inches'] = float(hail_match.group(1))
+            # Extract HAZARD section
+            hazard_match = re.search(r'HAZARD\.\.\.(.+?)(?:SOURCE|IMPACT|$)', description, re.IGNORECASE | re.DOTALL)
+            if hazard_match:
+                radar_data['hazard_text'] = hazard_match.group(1).strip()
+                
+                # Extract hail size and name from hazard
+                hail_match = re.search(r'(\w+\s*\w*)\s+size\s+hail', radar_data['hazard_text'], re.IGNORECASE)
+                if hail_match:
+                    radar_data['hail_size_name'] = hail_match.group(1).strip()
+                    # Convert common names to inches
+                    size_mapping = {
+                        'pea': 0.25, 'marble': 0.5, 'penny': 0.75, 'nickel': 0.88, 
+                        'quarter': 1.0, 'half dollar': 1.25, 'ping pong': 1.5, 
+                        'golf ball': 1.75, 'tennis ball': 2.5, 'baseball': 2.75
+                    }
+                    radar_data['hail_inches'] = size_mapping.get(radar_data['hail_size_name'].lower(), 0.0)
+                
+                # Extract wind speed from hazard
+                wind_match = re.search(r'(\d+)\s*mph\s+wind', radar_data['hazard_text'], re.IGNORECASE)
+                if wind_match:
+                    radar_data['wind_mph'] = float(wind_match.group(1))
             
-            # Extract wind speed
-            wind_match = re.search(r'wind.*?(\d+)\s*mph', description, re.IGNORECASE)
-            if wind_match:
-                radar_params['wind_mph'] = float(wind_match.group(1))
+            # Extract IMPACT section
+            impact_match = re.search(r'IMPACT\.\.\.(.+?)(?:\*|$)', description, re.IGNORECASE | re.DOTALL)
+            if impact_match:
+                radar_data['impact_text'] = impact_match.group(1).strip()
+            
+            # Extract locations impacted
+            locations_match = re.search(r'Locations impacted include\.\.\.(.+?)\.', description, re.IGNORECASE | re.DOTALL)
+            if locations_match:
+                radar_data['locations_impacted'] = locations_match.group(1).strip()
         
-        return radar_params
+        return radar_data
     
     def _build_verification_prompt(self, alert: Dict, spc_reports: List[Dict]) -> str:
-        """Build comprehensive prompt integrating all NWS and SPC data"""
+        """Build weatherman-style report prompt integrating radar detection and verified reports"""
         
         # Extract core alert information
         event_type = alert.get('event', 'Weather Event')
         area_desc = alert.get('area_desc', 'Unknown Area')
         effective_time = alert.get('effective', 'Unknown Time')
         
-        # Extract radar parameters
-        radar_params = self._extract_radar_parameters(alert)
+        # Extract comprehensive radar data including HAZARD and IMPACT sections
+        radar_data = self._extract_radar_parameters(alert)
         
-        # Process all SPC reports for comprehensive damage data
-        damage_reports = []
-        max_hail = 0.0
-        max_wind = 0.0
+        # Process SPC reports to get verified measurements
+        verified_reports = []
+        authoritative_hail = 0.0
+        authoritative_wind = 0.0
         
         for report in spc_reports:
             report_type = report.get('report_type', '').lower()
@@ -302,22 +345,20 @@ Structure: Lead with "At {time} in {location}, a National Weather Service {alert
             location = report.get('location', '')
             time_utc = report.get('time_utc', '')
             
-            # Extract magnitudes
             if report_type == 'hail':
                 hail_size = 0.0
                 if magnitude and isinstance(magnitude, dict):
                     hail_size = magnitude.get('size_inches', 0.0) or magnitude.get('hail_inches', 0.0)
-                max_hail = max(max_hail, hail_size)
                 
                 if hail_size > 0:
-                    damage_reports.append({
-                        'type': 'hail',
-                        'magnitude': hail_size,
+                    authoritative_hail = max(authoritative_hail, hail_size)
+                    verified_reports.append({
+                        'type': 'HAIL',
+                        'verified_magnitude': hail_size,
                         'common_name': self._get_hail_common_name(hail_size),
-                        'threat_level': self._map_hail_threat_level(hail_size),
                         'location': location,
                         'time': time_utc,
-                        'comments': comments
+                        'details': comments
                     })
             
             elif report_type == 'wind':
@@ -325,65 +366,60 @@ Structure: Lead with "At {time} in {location}, a National Weather Service {alert
                 if magnitude and isinstance(magnitude, dict):
                     wind_speed = magnitude.get('wind_mph', 0.0) or magnitude.get('speed_mph', 0.0)
                 elif comments:
-                    # Try to extract from comments
                     wind_match = re.search(r'(\d+)\s*mph', comments)
                     if wind_match:
                         wind_speed = float(wind_match.group(1))
                 
-                max_wind = max(max_wind, wind_speed)
-                
                 if wind_speed > 0:
-                    damage_reports.append({
-                        'type': 'wind',
-                        'magnitude': wind_speed,
-                        'threat_level': self._map_wind_threat_level(wind_speed),
+                    authoritative_wind = max(authoritative_wind, wind_speed)
+                    verified_reports.append({
+                        'type': 'WIND',
+                        'verified_magnitude': wind_speed,
                         'location': location,
                         'time': time_utc,
-                        'comments': comments
+                        'details': comments
                     })
         
-        # Build comprehensive prompt
+        # Build weatherman report prompt
         prompt_parts = [
-            f"VERIFIED WEATHER EVENT DATA INTEGRATION:",
+            f"WEATHER EVENT STORY DATA:",
             f"",
-            f"NWS ALERT:",
-            f"- Event Type: {event_type}",
-            f"- Alert Time: {effective_time}",
-            f"- Area Description: {area_desc}",
-            f"- Radar-Indicated Hail: {radar_params['hail_inches']}\" ({self._get_hail_common_name(radar_params['hail_inches'])})" if radar_params['hail_inches'] > 0 else "",
-            f"- Radar-Indicated Wind: {radar_params['wind_mph']} mph" if radar_params['wind_mph'] > 0 else "",
+            f"ORIGINAL ALERT DETAILS:",
+            f"- Event: {event_type}",
+            f"- Time Issued: {effective_time}",
+            f"- Areas: {area_desc}",
+            f"- Radar Initially Detected: {radar_data['hazard_text']}" if radar_data['hazard_text'] else "",
+            f"- Predicted Impact: {radar_data['impact_text']}" if radar_data['impact_text'] else "",
+            f"- Areas Expected to be Affected: {radar_data['locations_impacted']}" if radar_data['locations_impacted'] else "",
             f"",
-            f"VERIFIED SPC DAMAGE REPORTS ({len(spc_reports)} reports):"
+            f"VERIFIED STORM REPORTS:"
         ]
         
-        # Add each damage report with full details
-        for i, report in enumerate(damage_reports, 1):
-            magnitude_unit = '"' if report['type'] == 'hail' else ' mph'
-            common_name = report.get('common_name', '')
-            details_text = f"  - Details: {report['comments'][:100]}..." if report['comments'] else "  - No additional details"
+        # Add verified reports
+        for i, report in enumerate(verified_reports, 1):
+            unit = '\" hail' if report['type'] == 'HAIL' else ' mph winds'
+            common_name = f" ({report.get('common_name', '')})" if report['type'] == 'HAIL' else ""
             
             prompt_parts.extend([
-                f"Report {i}: {report['type'].upper()}",
-                f"  - Magnitude: {report['magnitude']}{magnitude_unit} ({common_name})",
-                f"  - Threat Level: {report['threat_level']}",
+                f"Report {i}: {report['type']}",
+                f"  - Verified: {report['verified_magnitude']}{unit}{common_name}",
                 f"  - Location: {report['location']}",
                 f"  - Time: {report['time']} UTC",
-                details_text,
+                f"  - Additional Details: {report['details'][:100]}..." if report['details'] else "  - No additional damage details",
                 ""
             ])
         
-        # Add analysis requirements
+        # Add weatherman instructions
         prompt_parts.extend([
-            f"ANALYSIS REQUIREMENTS:",
-            f"1. Begin with: 'At {effective_time} in {area_desc}, a National Weather Service {event_type} was substantiated with [damage type] at [time] in [location]...'",
-            f"2. Convert ALL future tense language to past tense verified events",
-            f"3. Integrate radar-indicated parameters with actual damage reports",
-            f"4. Use official NWS threat levels: {self._map_hail_threat_level(max_hail) if max_hail > 0 else ''} {self._map_wind_threat_level(max_wind) if max_wind > 0 else ''}",
-            f"5. Include specific times, locations, and damage details from SPC reports",
-            f"6. Mention geographic polygon coverage and likely damage areas beyond report points",
-            f"7. End with official damage rating based on verified magnitudes",
+            f"WRITE A PROFESSIONAL WEATHER REPORT:",
             f"",
-            f"Generate a comprehensive summary integrating ALL data points above into a single coherent description."
+            f"Start with: 'At {effective_time} in {area_desc}, the National Weather Service issued a {event_type} when radar detected [original radar parameters].'",
+            f"",
+            f"Then continue: 'Storm spotters subsequently verified [use the VERIFIED magnitudes as authoritative - these override radar estimates] with [specific damage details if available].'",
+            f"",
+            f"Conclude with: 'This confirms that [convert the predicted IMPACT to past tense confirmed damage potential] occurred in the immediate area surrounding [verified locations].'",
+            f"",
+            f"CRITICAL: Use the VERIFIED SPC measurements as the authoritative magnitude, not the radar estimates. Write as a factual weather report about what actually happened."
         ])
         
         return "\n".join(filter(None, prompt_parts))

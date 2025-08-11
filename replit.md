@@ -10,17 +10,18 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-- August 11, 2025: ENHANCED AI SUMMARIZER WITH OFFICIAL NWS TERMINOLOGY - MISSION ACCOMPLISHED
+- August 11, 2025: WEATHERMAN-STYLE AI SUMMARIZER - MISSION ACCOMPLISHED
   * CRITICAL BREAKTHROUGH: Fixed SPC matching system after complete 0% verification failure (0/5,527 alerts)
   * FIXED SPC MATCHER: Resolved SQLAlchemy type errors and database session handling issues
   * PRODUCTION SUCCESS: Now generating 3+ verified alerts with 90% confidence FIPS-based matching
   * VERIFIED STORM EVENTS: Successfully cross-referencing Severe Thunderstorm Warnings with SPC hail/wind reports
-  * ENHANCED AI SUMMARY SYSTEM: Converts future-tense warnings to past-tense verified events using official NWS threat classifications
-  * OFFICIAL NWS TERMINOLOGY: Integrates hail size equivalents (quarter size, golf ball size) and official threat levels (Moderate Threat, High Threat, etc.)
-  * PROFESSIONAL METEOROLOGICAL LANGUAGE: Removes insurance references - data speaks for itself using NWS/NOAA standard definitions
-  * COMPREHENSIVE DATA INTEGRATION: AI summaries combine radar-indicated parameters with actual damage reports from multiple sources
-  * CONFIRMED WARNINGS PAGE: /spc-matches route working with enhanced professional summaries for damage assessment
-  * GEOGRAPHIC COVERAGE: Multi-state matching (Kansas, Nebraska, New Mexico) with precise timing correlation
+  * WEATHERMAN-STYLE REPORTS: Professional TV meteorologist writing style for factual historical storm event reporting
+  * RADAR-TO-VERIFIED INTEGRATION: Extracts HAZARD section from original NWS alerts ("radar detected 60 mph wind gusts and nickel size hail") then compares with verified SPC measurements
+  * AUTHORITATIVE MEASUREMENTS: Uses verified SPC magnitude as definitive measurement (1.0" hail overrides radar estimates)
+  * IMPACT CONVERSION: Converts predicted impacts to confirmed damage assessment ("confirmed damage potential to roofs, siding, and trees")
+  * NO INSURANCE LANGUAGE: Professional meteorological reports let data speak for itself without explaining purpose
+  * COMPREHENSIVE DATA INTEGRATION: AI summaries tell complete story from radar detection through verification with specific locations and times
+  * CONFIRMED WARNINGS PAGE: /spc-matches route working with enhanced weatherman-style summaries for damage assessment
 
 - August 11, 2025: STATE ENRICHMENT SYSTEM - MISSION ACCOMPLISHED
   * CRITICAL ISSUE RESOLVED: 3,029 alerts missing state information in radar alerts ingestion
