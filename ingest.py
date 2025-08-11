@@ -172,9 +172,26 @@ class IngestService:
             alert_id = properties.get('id')
             event_type = properties.get('event', '')
             
-            # CRITICAL: Filter out test messages to prevent database pollution
-            if event_type == 'Test Message':
-                logger.debug(f"Skipping test message alert: {alert_id}")
+            # CRITICAL: Enhanced test message filtering to prevent database pollution
+            status = properties.get('status', '')
+            description = properties.get('description', '')
+            instruction = properties.get('instruction', '')
+            headline = properties.get('headline', '')
+            
+            # Comprehensive test message detection patterns
+            is_test_message = (
+                event_type == 'Test Message' or
+                status == 'Test' or
+                'monitoring message only' in description.lower() or
+                'monitoring message only' in instruction.lower() or
+                'please disregard' in description.lower() or
+                'please disregard' in instruction.lower() or
+                'test message' in headline.lower() or
+                'KEEPALIVE' in alert_id
+            )
+            
+            if is_test_message:
+                logger.debug(f"Skipping test message alert: {alert_id} (event: {event_type}, status: {status})")
                 return 'skipped'
             
             if not alert_id:

@@ -153,6 +153,28 @@ class LiveRadarAlertService:
             alert_id = properties.get('id', '')
             event = properties.get('event', '')
             
+            # CRITICAL: Filter out test messages before processing
+            status = properties.get('status', '')
+            description = properties.get('description', '')
+            instruction = properties.get('instruction', '')
+            headline = properties.get('headline', '')
+            
+            # Comprehensive test message detection patterns (with null safety)
+            is_test_message = (
+                event == 'Test Message' or
+                status == 'Test' or
+                'monitoring message only' in (description or '').lower() or
+                'monitoring message only' in (instruction or '').lower() or
+                'please disregard' in (description or '').lower() or
+                'please disregard' in (instruction or '').lower() or
+                'test message' in (headline or '').lower() or
+                'KEEPALIVE' in (alert_id or '')
+            )
+            
+            if is_test_message:
+                logger.debug(f"Live Radar: Skipping test message alert: {alert_id}")
+                return None
+            
             # Extract parameters for wind/hail filtering
             parameters = properties.get('parameters', {})
             max_wind_gust = self._extract_wind_parameter(parameters)
