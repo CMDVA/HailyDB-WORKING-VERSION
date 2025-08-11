@@ -2747,45 +2747,61 @@ def live_radar_dashboard():
 
 @app.route('/api/live-radar-alerts')
 def get_live_radar_alerts():
-    """API endpoint for live radar alerts - returns radar-detected events from LiveRadarAlertService with comprehensive statistics"""
+    """API endpoint for live NWS alerts - direct mirror of https://api.weather.gov/alerts/ with comprehensive statistics"""
     try:
-        live_service = get_live_radar_service()
+        # Direct fetch from NWS API to mirror their data exactly
+        import requests
         
-        if not live_service:
-            return jsonify({
-                'status': 'error',
-                'message': 'Live radar service not available',
-                'alerts': []
-            }), 503
+        nws_url = "https://api.weather.gov/alerts/active"
+        headers = {
+            'User-Agent': 'HailyDB/2.0 (live-nws-mirror)',
+            'Accept': 'application/geo+json'
+        }
         
-        # Get active alerts from live radar service
-        live_alerts = live_service.get_active_alerts()
+        response = requests.get(nws_url, headers=headers, timeout=30)
+        response.raise_for_status()
         
-        # Filter for only radar-indicated alerts (hail > 0 OR wind >= 50 mph)
-        radar_alerts = []
-        for alert in live_alerts:
-            radar_data = alert.get('radar_data', {})
-            has_hail = radar_data.get('hail_inches', 0) > 0
-            has_wind = radar_data.get('wind_mph', 0) >= 50
-            
-            if has_hail or has_wind:
-                radar_alerts.append({
-                    'id': alert.get('id'),
-                    'event': alert.get('event'),
-                    'area_desc': alert.get('area_desc'),
-                    'severity': alert.get('severity'),
-                    'effective': alert.get('effective'),
-                    'expires': alert.get('expires'),
-                    'radar_data': radar_data,
-                    'is_radar_indicated': True
-                })
+        nws_data = response.json()
+        features = nws_data.get('features', [])
         
-        # Calculate comprehensive dashboard statistics from historical radar data
+        # Convert NWS format to our display format (direct mirror)
+        live_alerts = []
+        for feature in features:
+            props = feature.get('properties', {})
+            live_alerts.append({
+                'id': props.get('id'),
+                'event': props.get('event'),
+                'area_desc': props.get('areaDesc'),
+                'severity': props.get('severity'),
+                'certainty': props.get('certainty'),
+                'urgency': props.get('urgency'),
+                'effective': props.get('effective'),
+                'expires': props.get('expires'),
+                'headline': props.get('headline'),
+                'description': props.get('description'),
+                'instruction': props.get('instruction'),
+                'response': props.get('response'),
+                'status': props.get('status'),
+                'messageType': props.get('messageType'),
+                'category': props.get('category'),
+                'sender': props.get('sender'),
+                'senderName': props.get('senderName'),
+                'sent': props.get('sent'),
+                'onset': props.get('onset'),
+                'ends': props.get('ends'),
+                'geometry': feature.get('geometry'),
+                'is_nws_mirror': True
+            })
+        
+        # Calculate comprehensive dashboard statistics from current NWS data
         try:
-            # Get historical radar statistics (last 7 days for context)
+            # Get historical statistics (last 7 days for context)
             since_date = datetime.utcnow() - timedelta(days=7)
             
-            # Count historical radar-detected alerts
+            # Count active alerts by type from our mirrored data
+            current_active_count = len(live_alerts)
+            
+            # Count historical alerts from database 
             hail_alerts = Alert.query.filter(
                 Alert.radar_indicated.op('->>')('hail_inches').astext.cast(db.Float) > 0,
                 Alert.ingested_at >= since_date
@@ -2796,55 +2812,67 @@ def get_live_radar_alerts():
                 Alert.ingested_at >= since_date
             ).count()
             
-            # Count currently active alerts (any type)
-            active_alerts = Alert.query.filter(
-                Alert.expires > datetime.utcnow()
-            ).count()
+            # Count unique states affected by current alerts
+            current_states = set()
+            for alert in live_alerts:
+                area_desc = alert.get('area_desc', '')
+                # Extract state codes from area description
+                import re
+                states = re.findall(r'\b[A-Z]{2}\b', area_desc)
+                current_states.update(states)
             
-            # Count unique states affected by radar alerts in last 7 days
-            states_affected = db.session.query(
+            states_affected = len(current_states)
+            
+            # Count unique states from database (last 7 days)
+            db_states_affected = db.session.query(
                 db.func.count(db.func.distinct(
                     db.func.regexp_replace(Alert.area_desc, r'.*, ([A-Z]{2})$', r'\1')
                 ))
             ).filter(
-                Alert.radar_indicated.isnot(None),
                 Alert.ingested_at >= since_date
             ).scalar() or 0
-            
-            statistics = {
-                'hail_alerts': hail_alerts,
-                'wind_alerts': wind_alerts, 
-                'active_alerts': active_alerts,
-                'states_affected': states_affected,
-                'live_radar_count': len(radar_alerts),
-                'period': '7 days'
-            }
+
+            return jsonify({
+                'status': 'success',
+                'alerts': live_alerts,
+                'count': len(live_alerts),
+                'statistics': {
+                    'hail_alerts': hail_alerts,
+                    'wind_alerts': wind_alerts,
+                    'active_alerts': current_active_count,
+                    'states_affected': max(states_affected, db_states_affected),
+                    'live_radar_count': len(live_alerts),
+                    'period': '7 days'
+                },
+                'timestamp': datetime.utcnow().isoformat() + 'Z',
+                'nws_mirror': True,
+                'source': 'https://api.weather.gov/alerts/active'
+            })
             
         except Exception as stats_error:
-            logger.warning(f"Error calculating statistics: {stats_error}")
-            # Fallback statistics
-            statistics = {
-                'hail_alerts': 0,
-                'wind_alerts': 0,
-                'active_alerts': 0,
-                'states_affected': 0,
-                'live_radar_count': len(radar_alerts),
-                'period': 'current'
-            }
-        
-        return jsonify({
-            'status': 'success',
-            'count': len(radar_alerts),
-            'alerts': radar_alerts,
-            'statistics': statistics,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
+            logger.error(f"Error calculating NWS mirror statistics: {stats_error}")
+            return jsonify({
+                'status': 'success',
+                'alerts': live_alerts,
+                'count': len(live_alerts),
+                'statistics': {
+                    'hail_alerts': 0,
+                    'wind_alerts': 0,
+                    'active_alerts': len(live_alerts),
+                    'states_affected': 0,
+                    'live_radar_count': len(live_alerts),
+                    'period': 'error'
+                },
+                'timestamp': datetime.utcnow().isoformat() + 'Z',
+                'nws_mirror': True,
+                'source': 'https://api.weather.gov/alerts/active'
+            })
         
     except Exception as e:
-        logger.error(f"Error getting live radar alerts: {e}")
+        logger.error(f"Error getting live NWS alerts: {e}")
         return jsonify({
             'status': 'error',
-            'message': str(e),
+            'message': f'Error fetching NWS alerts: {str(e)}',
             'alerts': [],
             'statistics': {
                 'hail_alerts': 0,
@@ -2853,7 +2881,9 @@ def get_live_radar_alerts():
                 'states_affected': 0,
                 'live_radar_count': 0,
                 'period': 'error'
-            }
+            },
+            'nws_mirror': True,
+            'source': 'https://api.weather.gov/alerts/active'
         }), 500
 
 @app.route('/spc-matches/data')

@@ -9,7 +9,7 @@
         <div class="mb-4">
             <i class="fas fa-satellite-dish fa-4x mb-3"></i>
             <h2 class="h3 mb-2">Live NWS Alerts</h2>
-            <p class="lead mb-4">Start monitoring real-time NWS alerts with 50+ mph winds or any hail</p>
+            <p class="lead mb-4">Direct mirror of all active National Weather Service alerts</p>
         </div>
         <button id="startButton" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow-lg" onclick="startLiveRadar()">
             <i class="fas fa-play me-2"></i>
@@ -44,8 +44,8 @@
                 <div>
                     <h5 class="alert-heading mb-1">Live NWS Alerts Feed</h5>
                     <p class="mb-0">
-                        Real-time monitoring of active NWS alerts featuring winds 50+ mph or hail of any size. 
-                        Provides immediate identification of qualifying severe weather events for damage assessment and emergency response.
+                        Direct mirror of the National Weather Service active alerts feed (https://api.weather.gov/alerts/active). 
+                        Real-time display of all current NWS weather alerts with complete details and comprehensive coverage.
                     </p>
                 </div>
             </div>
@@ -431,7 +431,7 @@ async function loadLiveAlerts() {
         console.error('Error type:', error.constructor.name);
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
-        displayError('Failed to load live radar alerts: ' + error.message);
+        displayError('Failed to load live NWS alerts: ' + error.message);
     } finally {
         // Always ensure loading spinner is cleared
         updateLastRefreshTime();
@@ -440,7 +440,7 @@ async function loadLiveAlerts() {
             console.log('No alerts loaded, displaying empty state');
             const tbody = document.getElementById('liveRadarTableBody');
             if (tbody && tbody.innerHTML.includes('Loading live radar alerts')) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No live radar alerts currently active.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No live NWS alerts currently active.</td></tr>';
             }
         }
     }
@@ -490,7 +490,7 @@ function proceedWithDisplay(tbody, alerts) {
         
         if (!alerts || alerts.length === 0) {
             console.log('No alerts received, showing empty message');
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No live radar alerts currently active.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No live NWS alerts currently active.</td></tr>';
             return;
         }
         
@@ -514,57 +514,52 @@ function proceedWithDisplay(tbody, alerts) {
         const message = selectedFilter === 'all' ? 
             'No live radar alerts currently active.' :
             `No ${selectedFilter} alerts currently active.`;
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">${message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">${message}</td></tr>`;
         return;
     }
     
     console.log('Building table rows for', filteredAlerts.length, 'alerts...');
     
     tbody.innerHTML = filteredAlerts.map(alert => {
-        // Extract wind and hail data using correct API field names
-        let hailSize = alert.maxHailSize || 0;
-        let windSpeed = alert.maxWindGust || 0;
+        // Use NWS API structure for direct mirror
+        const effective = alert.effective ? new Date(alert.effective).toLocaleString() : 'Unknown';
+        const expires = alert.expires ? new Date(alert.expires).toLocaleString() : 'Unknown';
+        const location = alert.area_desc || 'Unknown';
+        const event = alert.event || 'Weather Alert';
+        const severity = alert.severity || 'Unknown';
+        const urgency = alert.urgency || 'Unknown';
+        const certainty = alert.certainty || 'Unknown';
         
-        console.log(`Alert ${alert.id}: hailSize=${hailSize}, windSpeed=${windSpeed}`);
+        // Extract state from area description
+        const stateMatch = location.match(/\b[A-Z]{2}\b/g);
+        const state = stateMatch ? stateMatch[stateMatch.length - 1] : 'N/A';
         
-        const hailDisplay = hailSize > 0 ? 
-            `<span class="badge ${getHailSizeClass(hailSize)}">${hailSize}"</span><br><small class="text-muted">${getHailSizeName(hailSize)}</small>` : 
-            '<span class="text-muted">None</span>';
-            
-        const windDisplay = windSpeed > 0 ? 
-            `<span class="badge ${getWindSpeedClass(windSpeed)}">${windSpeed} mph</span><br><small class="text-muted">${getWindSeverity(windSpeed)}</small>` : 
-            '<span class="text-muted">None</span>';
-            
-        const severity = getSeverityBadge(hailSize, windSpeed);
-        
-        const time = alert.effective_time ? new Date(alert.effective_time).toLocaleString() : 'Unknown';
-        const location = alert.county_names && alert.county_names.length > 0 ? 
-            alert.county_names.join(', ') : (alert.area_desc || 'Unknown');
-        const state = alert.affected_states && alert.affected_states.length > 0 ? 
-            alert.affected_states[0] : extractState(alert.area_desc || '');
-        
-        // Determine status display
-        const status = alert.status || 'Active';
-        const isExpired = alert.is_expired || false;
+        // Status badge based on current time vs expires
+        const now = new Date();
+        const expiresTime = alert.expires ? new Date(alert.expires) : null;
+        const isExpired = expiresTime && now > expiresTime;
         const statusBadge = isExpired ? 
             '<span class="badge bg-secondary">Expired</span>' : 
             '<span class="badge bg-success">Active</span>';
         
-        // Add visual styling for expired alerts
+        // Row styling for expired alerts
         const rowClass = isExpired ? 'class="table-secondary opacity-75"' : '';
+        
+        // Severity badge styling
+        const severityClass = severity === 'Severe' ? 'bg-danger' : 
+                              severity === 'Moderate' ? 'bg-warning' : 'bg-info';
         
         return `
             <tr ${rowClass}>
-                <td>${time}</td>
-                <td><span class="badge bg-primary">${alert.event || 'Severe Thunderstorm Warning'}</span></td>
-                <td>${location}</td>
-                <td><strong>${state}</strong></td>
-                <td>${hailDisplay}</td>
-                <td>${windDisplay}</td>
-                <td>${severity}</td>
-                <td>${statusBadge}</td>
+                <td><span class="badge bg-primary">${event}</span></td>
+                <td title="${location}">${location.length > 40 ? location.substring(0, 37) + '...' : location}</td>
+                <td><span class="badge ${severityClass}">${severity}</span></td>
+                <td><span class="badge bg-secondary">${urgency}</span></td>
+                <td><span class="badge bg-light text-dark">${certainty}</span></td>
+                <td><small>${effective}</small></td>
+                <td><small>${expires}</small></td>
                 <td>
-                    <button class="btn btn-outline-primary btn-sm btn-view" onclick="viewAlert('${alert.id}')">
+                    <button class="btn btn-outline-primary btn-sm btn-view" onclick="viewNWSAlert('${alert.id}', '${event}', '${location}', '${severity}', '${effective}', '${expires}')">
                         <i class="fas fa-eye me-1"></i>View
                     </button>
                 </td>
