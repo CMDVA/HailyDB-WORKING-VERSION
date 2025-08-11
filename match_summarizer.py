@@ -61,7 +61,67 @@ class MatchSummarizer:
             print(f"Error generating match summary: {e}")
             import traceback
             traceback.print_exc()
+            
+            # Create a fallback summary without OpenAI when quota is exceeded
+            if "insufficient_quota" in str(e) or "quota" in str(e).lower():
+                return self._generate_fallback_summary(alert, spc_reports)
+            
             return None
+    
+    def _generate_fallback_summary(self, alert: Dict, spc_reports: List[Dict]) -> str:
+        """
+        Generate a structured summary without OpenAI when quota is exceeded
+        Maintains focus on damage assessment and property impact
+        """
+        event = alert.get('event', 'Weather Event')
+        area = alert.get('area_desc', 'Unknown Area')
+        effective_time = alert.get('effective', 'Unknown Time')
+        
+        # Process SPC reports for key details
+        damage_indicators = []
+        max_wind = 0
+        max_hail = 0
+        report_count = len(spc_reports)
+        
+        for report in spc_reports:
+            report_type = report.get('report_type', '').lower()
+            comments = report.get('comments', '')
+            magnitude = report.get('magnitude', {})
+            
+            if report_type == 'wind':
+                wind_speed = magnitude.get('wind_mph', 0) if magnitude else 0
+                max_wind = max(max_wind, wind_speed)
+                if wind_speed > 0:
+                    damage_indicators.append(f"{wind_speed} mph winds")
+                        
+            elif report_type == 'hail':
+                hail_size = magnitude.get('hail_inches', 0) if magnitude else 0
+                if magnitude and 'size_inches' in magnitude:
+                    hail_size = magnitude['size_inches']
+                max_hail = max(max_hail, hail_size)
+                if hail_size > 0:
+                    damage_indicators.append(f"{hail_size}\" hail")
+        
+        # Build summary
+        summary_parts = [
+            f"**VERIFIED STORM EVENT**: {event} in {area}",
+            f"**Event Time**: {effective_time}",
+            f"**SPC Verification**: {report_count} storm report(s) confirm this warning"
+        ]
+        
+        if damage_indicators:
+            summary_parts.append(f"**Damage Indicators**: {', '.join(damage_indicators)}")
+        
+        # Add damage assessment context
+        if max_hail >= 1.0:
+            summary_parts.append("**Property Impact**: Hail of this size typically causes roof damage, vehicle dents, and gutter damage. Homeowners should inspect for roof granule loss and document any visible damage.")
+        
+        if max_wind >= 58:
+            summary_parts.append("**Structural Impact**: Severe wind speeds can cause tree damage, roof material loss, and siding damage. Check for loose shingles, damaged gutters, and debris impact.")
+        
+        summary_parts.append("**Insurance Documentation**: This verified severe weather event provides supporting evidence for property damage claims in the affected area during the specified time period.")
+        
+        return "\n\n".join(summary_parts)
     
     def _prepare_context(self, alert: Dict, spc_reports: List[Dict]) -> Dict:
         """Prepare structured context data for AI processing"""

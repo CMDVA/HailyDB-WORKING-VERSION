@@ -1,5 +1,5 @@
 """
-Fixed SPC-NWS Alert Matching Service
+SPC-NWS Alert Matching Service
 Cross-references SPC storm reports with NWS alerts for verification
 """
 
@@ -40,12 +40,12 @@ class SPCMatchingService:
         Match a batch of unverified alerts with SPC reports
         Returns statistics about matching process
         """
-        # Get unverified alerts from last 48 hours for broader matching
-        cutoff_time = datetime.utcnow() - timedelta(hours=48)
+        # Get unverified alerts from last 6 hours for real-time matching
+        cutoff_time = datetime.utcnow() - timedelta(hours=6)
         
         unverified_alerts = Alert.query.filter(
             and_(
-                or_(Alert.spc_verified == False, Alert.spc_verified.is_(None)),
+                Alert.spc_verified == False,
                 Alert.effective >= cutoff_time
             )
         ).limit(limit).all()
@@ -60,17 +60,14 @@ class SPCMatchingService:
                 match_result = self.match_alert_with_spc(alert)
                 if match_result['matched']:
                     matched_count += 1
-                if match_result['updated']:
-                    updated_count += 1
+                    if match_result['updated']:
+                        updated_count += 1
+                        
             except Exception as e:
                 logger.error(f"Error matching alert {alert.id}: {e}")
+                continue
         
-        # Commit all changes at once
-        try:
-            self.db.commit()
-        except Exception as e:
-            logger.error(f"Error committing batch SPC matches: {e}")
-            self.db.rollback()
+        self.db.commit()
         
         return {
             'processed': len(unverified_alerts),
@@ -87,7 +84,7 @@ class SPCMatchingService:
             return {'matched': False, 'updated': False, 'reason': 'No effective time'}
         
         # Determine eligible SPC report types based on alert event
-        eligible_types = self._get_eligible_spc_types(alert.event or '')
+        eligible_types = self._get_eligible_spc_types(alert.event)
         if not eligible_types:
             return {'matched': False, 'updated': False, 'reason': 'No eligible SPC types'}
         
@@ -109,57 +106,41 @@ class SPCMatchingService:
             match_method = 'latlon'
             confidence = 0.7
         
-        # No matches found
         if not matches:
-            return {'matched': False, 'updated': False, 'reason': 'No matches found'}
+            # Update alert to mark as checked but unverified
+            alert.spc_verified = False
+            alert.spc_match_method = 'none'
+            alert.spc_confidence_score = 0.0
+            alert.spc_report_count = 0
+            return {'matched': False, 'updated': True, 'reason': 'No matches found'}
         
         # Update alert with match results
+        alert.spc_verified = True
+        alert.spc_reports = [match.to_dict() for match in matches]
+        alert.spc_match_method = match_method
+        alert.spc_confidence_score = confidence
+        alert.spc_report_count = len(matches)
+        
+        # Generate AI summary for verified matches
         try:
-            alert.spc_verified = True
-            alert.spc_reports = [self._spc_report_to_dict(match) for match in matches]
-            alert.spc_match_method = match_method
-            alert.spc_confidence_score = confidence
-            alert.spc_report_count = len(matches)
-            
-            # Generate AI summary for verified matches
-            try:
-                ai_summary = self.summarizer.generate_match_summary(
-                    alert=alert.to_dict(),
-                    spc_reports=alert.spc_reports
-                )
-                if ai_summary:
-                    alert.spc_ai_summary = ai_summary
-                    logger.info(f"Generated AI summary for alert {alert.id}")
-            except Exception as e:
-                logger.warning(f"Failed to generate AI summary for alert {alert.id}: {e}")
-            
-            logger.info(f"Matched alert {alert.id} with {len(matches)} SPC reports via {match_method}")
-            
-            return {
-                'matched': True,
-                'updated': True,
-                'match_count': len(matches),
-                'method': match_method,
-                'confidence': confidence
-            }
+            ai_summary = self.summarizer.generate_match_summary(
+                alert=alert.to_dict(),
+                spc_reports=alert.spc_reports
+            )
+            if ai_summary:
+                alert.spc_ai_summary = ai_summary
+                logger.info(f"Generated AI summary for alert {alert.id}")
         except Exception as e:
-            logger.error(f"Error updating alert {alert.id} with SPC matches: {e}")
-            return {'matched': False, 'updated': False, 'reason': f'Database error: {e}'}
-            
-    def _spc_report_to_dict(self, spc_report: SPCReport) -> Dict:
-        """Convert SPC report to dictionary for JSON storage"""
+            logger.warning(f"Failed to generate AI summary for alert {alert.id}: {e}")
+        
+        logger.info(f"Matched alert {alert.id} with {len(matches)} SPC reports via {match_method}")
+        
         return {
-            'id': spc_report.id,
-            'report_date': spc_report.report_date.isoformat(),
-            'report_type': spc_report.report_type,
-            'time_utc': spc_report.time_utc,
-            'location': spc_report.location,
-            'county': spc_report.county,
-            'state': spc_report.state,
-            'latitude': spc_report.latitude,
-            'longitude': spc_report.longitude,
-            'comments': spc_report.comments,
-            'magnitude': spc_report.magnitude
+            'matched': True,
+            'updated': True,
+            'match_count': len(matches),
+            'method': match_method,
+            'confidence': confidence
         }
     
     def _get_eligible_spc_types(self, alert_event: str) -> List[str]:
@@ -188,8 +169,8 @@ class SPCMatchingService:
     
     def _find_county_matches(self, alert: Alert, eligible_types: List[str], 
                            report_dates: List, start_time: datetime, end_time: datetime) -> List[SPCReport]:
-        """Find SPC reports matching by county/state"""
-        # Get counties and states from alert
+        """Find SPC reports matching by county FIPS"""
+        # Extract counties from alert area description
         alert_counties = alert.extract_counties()
         alert_states = alert.extract_states()
         
@@ -259,6 +240,7 @@ class SPCMatchingService:
                     return self._calculate_polygon_centroid(coordinates)
         
         # Fallback: estimate from area description (very basic)
+        # This would need enhancement for production use
         return None, None
     
     def _calculate_polygon_centroid(self, coordinates) -> Tuple[Optional[float], Optional[float]]:
