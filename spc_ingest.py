@@ -823,22 +823,25 @@ class SPCIngestService:
                         except (json.JSONDecodeError, TypeError):
                             magnitude_data = {}
                     
-                    # Check for location-based duplicates first
-                    existing_location_duplicate = None
-                    if report_data.get('latitude') and report_data.get('longitude'):
-                        existing_location_duplicate = SPCReport.query.filter(
-                            SPCReport.report_date == report_data['report_date'],
-                            SPCReport.report_type == report_data['report_type'],
-                            SPCReport.latitude == report_data['latitude'],
-                            SPCReport.longitude == report_data['longitude'],
-                            SPCReport.location == report_data['location']
-                        ).first()
-                    
-                    if existing_location_duplicate:
-                        # True location-based duplicate - skip
-                        duplicates_skipped += 1
-                        logger.debug(f"Location duplicate skipped: {report_data['location']} at {report_data['latitude']}, {report_data['longitude']}")
-                        continue
+                    # Skip location-based duplicate checking during reimport to prevent false positives
+                    # During reimport, data is freshly cleared so no duplicates should exist
+                    if not is_reimport:
+                        # Check for location-based duplicates only during normal ingestion
+                        existing_location_duplicate = None
+                        if report_data.get('latitude') and report_data.get('longitude'):
+                            existing_location_duplicate = SPCReport.query.filter(
+                                SPCReport.report_date == report_data['report_date'],
+                                SPCReport.report_type == report_data['report_type'],
+                                SPCReport.latitude == report_data['latitude'],
+                                SPCReport.longitude == report_data['longitude'],
+                                SPCReport.location == report_data['location']
+                            ).first()
+                        
+                        if existing_location_duplicate:
+                            # True location-based duplicate - skip
+                            duplicates_skipped += 1
+                            logger.debug(f"Location duplicate skipped: {report_data['location']} at {report_data['latitude']}, {report_data['longitude']}")
+                            continue
                     
                     # Create SPCReport object
                     report = SPCReport()
@@ -868,23 +871,32 @@ class SPCIngestService:
                     counts[report_data['report_type']] += 1
                     
                 except IntegrityError as ie:
-                    # Check if this is a hash constraint violation for the same date
+                    # Handle database constraint violations
                     self.db.rollback()
                     if 'uq_spc_report_hash' in str(ie) or 'duplicate key value violates unique constraint' in str(ie):
-                        # Check if duplicate exists for the same date
-                        existing_same_date = SPCReport.query.filter_by(
-                            row_hash=report_data['row_hash'],
-                            report_date=report_data['report_date']
-                        ).first()
-                        
-                        if existing_same_date:
-                            # True duplicate for same date - skip
-                            duplicates_skipped += 1
-                            logger.debug(f"Duplicate skipped (same date): {report_data['row_hash'][:16]}...")
-                        else:
-                            # Hash collision with different date - allow insertion by updating hash
+                        if is_reimport:
+                            # During reimport, data should be cleared so constraint violations indicate a bug
+                            # Force insertion with unique hash to prevent data loss
                             import time
-                            report_data['row_hash'] = report_data['row_hash'] + f"_{int(time.time())}"
+                            original_hash = report_data['row_hash'] 
+                            report_data['row_hash'] = report_data['row_hash'] + f"_reimport_{int(time.time())}"
+                            logger.warning(f"Reimport constraint violation - forced unique hash: {original_hash[:16]}... -> {report_data['row_hash'][:16]}...")
+                        else:
+                            # Normal ingestion - check if duplicate exists for the same date
+                            existing_same_date = SPCReport.query.filter_by(
+                                row_hash=report_data['row_hash'],
+                                report_date=report_data['report_date']
+                            ).first()
+                            
+                            if existing_same_date:
+                                # True duplicate for same date - skip
+                                duplicates_skipped += 1
+                                logger.debug(f"Duplicate skipped (same date): {report_data['row_hash'][:16]}...")
+                                continue
+                            else:
+                                # Hash collision with different date - allow insertion by updating hash
+                                import time
+                                report_data['row_hash'] = report_data['row_hash'] + f"_{int(time.time())}"
                             
                             # Retry with modified hash
                             report = SPCReport()
