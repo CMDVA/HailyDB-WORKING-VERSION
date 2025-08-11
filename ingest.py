@@ -170,6 +170,12 @@ class IngestService:
         try:
             properties = feature.get('properties', {})
             alert_id = properties.get('id')
+            event_type = properties.get('event', '')
+            
+            # CRITICAL: Filter out test messages to prevent database pollution
+            if event_type == 'Test Message':
+                logger.debug(f"Skipping test message alert: {alert_id}")
+                return 'skipped'
             
             if not alert_id:
                 logger.warning("Alert feature missing ID, skipping")
