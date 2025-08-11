@@ -859,21 +859,9 @@ class SPCIngestService:
                     self.db.add(report)
                     self.db.flush()
                     
-                    # Auto-trigger enrichment for newly stored SPC report
-                    try:
-                        # Step 1: Location Enrichment
-                        from spc_enrichment import enrich_single_spc_report
-                        enrich_result = enrich_single_spc_report(report.id)
-                        if enrich_result.get('successful_enrichments', 0) > 0:
-                            logger.debug(f"Auto-enriched SPC report {report.id} with location data")
-                        
-                        # Step 2: Enhanced Context Summary (disabled - causing import errors)  
-                        # Enhanced context generation is handled separately via dashboard
-                        logger.debug(f"Location enrichment completed for SPC report {report.id}")
-                            
-                    except Exception as enrich_error:
-                        logger.warning(f"Failed to auto-enrich SPC report {report.id}: {enrich_error}")
-                        # Continue processing - enrichment failure shouldn't stop ingestion
+                    # Auto-enrichment disabled during batch processing to prevent database connection crashes
+                    # Enrichment can be triggered separately via dashboard after successful ingestion
+                    logger.debug(f"Stored SPC report {report.id} without auto-enrichment (prevents connection crashes)")
                     
                     # Success - increment counters
                     successful_in_batch += 1
@@ -917,21 +905,9 @@ class SPCIngestService:
                                 self.db.add(report)
                                 self.db.flush()
                                 
-                                # Auto-trigger enrichment for newly stored SPC report (retry case)
-                                try:
-                                    # Step 1: Location Enrichment
-                                    from spc_enrichment import enrich_single_spc_report
-                                    enrich_result = enrich_single_spc_report(report.id)
-                                    if enrich_result.get('successful_enrichments', 0) > 0:
-                                        logger.debug(f"Auto-enriched SPC report {report.id} with location data (retry)")
-                                    
-                                    # Step 2: Enhanced Context Summary (disabled - causing import errors)
-                                    # Enhanced context generation is handled separately via dashboard  
-                                    logger.debug(f"Location enrichment completed for SPC report {report.id} (retry)")
-                                        
-                                except Exception as enrich_error:
-                                    logger.warning(f"Failed to auto-enrich SPC report {report.id} (retry): {enrich_error}")
-                                    # Continue processing - enrichment failure shouldn't stop ingestion
+                                # Auto-enrichment disabled during batch processing to prevent database connection crashes  
+                                # Enrichment can be triggered separately via dashboard after successful ingestion
+                                logger.debug(f"Stored SPC report {report.id} without auto-enrichment (retry - prevents crashes)")
                                 
                                 successful_in_batch += 1
                                 counts[report_data['report_type']] += 1
