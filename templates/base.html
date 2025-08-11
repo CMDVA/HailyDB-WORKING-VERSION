@@ -67,17 +67,7 @@
                             <i class="fas fa-check-circle me-1"></i>Confirmed
                         </a>
                     </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {% if request.endpoint == 'get_alerts_summary' %}active{% endif %}" 
-                           href="#" id="summariesDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-brain me-1"></i>AI Summaries
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('get_alerts_summary') }}">
-                                <i class="fas fa-list me-2"></i>Alert Summaries
-                            </a></li>
-                        </ul>
-                    </li>
+                    <!-- Removed redundant AI Summaries dropdown - functionality consolidated in Confirmed Warnings -->
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'get_alerts' %}active{% endif %}" 
                            href="{{ url_for('get_alerts') }}">

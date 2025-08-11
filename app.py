@@ -462,52 +462,7 @@ def get_alert(alert_id):
     
     return render_template('alert_detail.html', alert=alert)
 
-@app.route('/alerts/summary')
-def get_alerts_summary():
-    """Get recent alert summaries with AI-generated content and verification summaries"""
-    # Get alerts with either AI summaries or SPC verification summaries
-    alerts = Alert.query.filter(
-        (Alert.ai_summary.isnot(None)) | (Alert.spc_ai_summary.isnot(None))
-    ).order_by(Alert.ingested_at.desc()).limit(20).all()
-    
-    summaries = []
-    for alert in alerts:
-        summary_data = {
-            'id': alert.id,
-            'event': alert.event,
-            'severity': alert.severity,
-            'area_desc': alert.area_desc,
-            'effective': alert.effective.isoformat() if alert.effective else None,
-            'expires': alert.expires.isoformat() if alert.expires else None,
-            'ai_summary': alert.ai_summary,
-            'ai_tags': alert.ai_tags,
-            'spc_verified': alert.spc_verified,
-            'spc_verification_summary': alert.spc_ai_summary,
-            'spc_confidence_score': alert.spc_confidence_score,
-            'spc_report_count': alert.spc_report_count
-        }
-        
-        # Add verification status for quick filtering
-        if alert.spc_verified and alert.spc_ai_summary:
-            summary_data['verification_status'] = 'verified_with_ai_summary'
-        elif alert.spc_verified:
-            summary_data['verification_status'] = 'verified'
-        elif alert.ai_summary:
-            summary_data['verification_status'] = 'ai_summary_only'
-        else:
-            summary_data['verification_status'] = 'basic'
-            
-        summaries.append(summary_data)
-    
-    if request.args.get('format') == 'json':
-        return jsonify({
-            'summaries': summaries,
-            'total_count': len(summaries),
-            'verified_count': len([s for s in summaries if s['spc_verified']]),
-            'ai_summary_count': len([s for s in summaries if s['spc_verification_summary']])
-        })
-    
-    return render_template('summaries.html', summaries=summaries)
+# Removed /alerts/summary route - redundant with existing verified matches page
 
 @app.route('/api/alerts/by-state/<state>')
 def get_alerts_by_state(state):
@@ -2922,8 +2877,11 @@ def spc_matches_data():
                 )
             )
         
-        # Filter by time
-        since = datetime.utcnow() - timedelta(hours=hours)
+        # Filter by time - for verified alerts, use much longer timeframe to not exclude historical matches
+        if hours <= 168:  # If default 7-day filter, extend to 30 days for verified alerts
+            since = datetime.utcnow() - timedelta(hours=720)  # 30 days for verified matches
+        else:
+            since = datetime.utcnow() - timedelta(hours=hours)
         query = query.filter(Alert.effective >= since)
         
         # Filter by event type
