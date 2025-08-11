@@ -535,6 +535,7 @@ class LiveRadarAlertService:
         alerts = []
         current_time = datetime.now(timezone.utc)
         
+        # Get alerts from in-memory store first
         for alert in self.alerts_store.values():
             # Determine if alert is active or expired
             is_expired = False
@@ -568,6 +569,69 @@ class LiveRadarAlertService:
                 'status': status,
                 'is_expired': is_expired
             })
+        
+        # CRITICAL FIX: Also get alerts from database that might not be in memory store
+        if self.db:
+            try:
+                result = self.db.execute(text("""
+                    SELECT id, event, max_wind_gust, max_hail_size, area_desc,
+                           affected_states, county_names, certainty, urgency, severity,
+                           radar_indicated_event, event_certainty, event_urgency,
+                           alert_message_template, effective_time, expires_time,
+                           geometry, created_at
+                    FROM live_radar_alerts 
+                    WHERE expires_time > NOW() 
+                       OR (expires_time IS NULL AND created_at > NOW() - INTERVAL '3 hours')
+                    ORDER BY created_at DESC
+                """))
+                
+                db_alert_ids = {alert['id'] for alert in alerts}  # Track in-memory alert IDs
+                
+                for row in result:
+                    # Skip if already in memory store
+                    if row.id in db_alert_ids:
+                        continue
+                        
+                    # Parse JSON fields safely
+                    import json
+                    affected_states = row.affected_states if isinstance(row.affected_states, list) else (json.loads(row.affected_states) if row.affected_states else [])
+                    county_names = row.county_names if isinstance(row.county_names, list) else (json.loads(row.county_names) if row.county_names else [])
+                    geometry = row.geometry if isinstance(row.geometry, dict) else (json.loads(row.geometry) if row.geometry else None)
+                    
+                    # Determine status (handle timezone-aware/naive datetime comparison)
+                    is_expired = False
+                    if row.expires_time:
+                        expires_time = row.expires_time
+                        # Ensure both timestamps are timezone-aware for comparison
+                        if expires_time.tzinfo is None:
+                            expires_time = expires_time.replace(tzinfo=timezone.utc)
+                        is_expired = current_time > expires_time
+                    status = "Expired" if is_expired else "Active"
+                    
+                    alerts.append({
+                        'id': row.id,
+                        'event': row.event,
+                        'maxHailSize': row.max_hail_size,
+                        'maxWindGust': row.max_wind_gust,
+                        'area_desc': row.area_desc,
+                        'affected_states': affected_states,
+                        'county_names': county_names,
+                        'certainty': row.certainty,
+                        'urgency': row.urgency,
+                        'severity': row.severity,
+                        'radar_indicated_event': row.radar_indicated_event,
+                        'event_certainty': row.event_certainty,
+                        'event_urgency': row.event_urgency,
+                        'alert_message_template': row.alert_message_template,
+                        'effective_time': row.effective_time.isoformat() if row.effective_time else None,
+                        'expires_time': row.expires_time.isoformat() if row.expires_time else None,
+                        'geometry': geometry,
+                        'status': status,
+                        'is_expired': is_expired
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error retrieving alerts from database: {e}")
             
         # Sort by created time (newest first)
         alerts.sort(key=lambda x: x['id'], reverse=True)
