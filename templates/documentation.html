@@ -20,8 +20,8 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
             line-height: 1.6;
-            color: #2c3e50;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #3730a3 100%);
             min-height: 100vh;
         }
         
@@ -33,9 +33,9 @@
         
         /* Header styling matching hailyai.com */
         .header {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(30, 58, 138, 0.95);
             backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding: 1rem 0;
             position: sticky;
             top: 0;
@@ -57,7 +57,7 @@
         .logo-icon {
             width: 40px;
             height: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
             border-radius: 8px;
             display: flex;
             align-items: center;
@@ -70,7 +70,7 @@
         .logo-text {
             font-size: 24px;
             font-weight: 700;
-            color: #2c3e50;
+            color: #ffffff;
             letter-spacing: -0.02em;
         }
         
@@ -95,37 +95,39 @@
         }
         
         .badge-version {
-            background: rgba(103, 126, 234, 0.1);
-            color: #667eea;
-            border: 1px solid rgba(103, 126, 234, 0.2);
+            background: rgba(96, 165, 250, 0.2);
+            color: #60a5fa;
+            border: 1px solid rgba(96, 165, 250, 0.3);
         }
         
         /* Main content */
         .main-content {
-            background: white;
+            background: rgba(30, 41, 59, 0.95);
             margin: 2rem 0;
             border-radius: 16px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
             overflow: hidden;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         
         .content-wrapper {
             display: grid;
-            grid-template-columns: 280px 1fr;
+            grid-template-columns: 300px 1fr;
             min-height: 600px;
         }
         
         /* Sidebar styling */
         .sidebar {
-            background: #f8fafc;
-            border-right: 1px solid #e2e8f0;
+            background: rgba(15, 23, 42, 0.6);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
             padding: 2rem 1.5rem;
         }
         
         .sidebar-title {
             font-size: 14px;
             font-weight: 700;
-            color: #64748b;
+            color: #94a3b8;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 1rem;
@@ -137,138 +139,162 @@
         
         .toc a {
             display: block;
-            padding: 8px 12px;
-            color: #64748b;
+            padding: 10px 14px;
+            color: #cbd5e1;
             text-decoration: none;
-            border-radius: 6px;
-            margin-bottom: 4px;
+            border-radius: 8px;
+            margin-bottom: 6px;
             font-size: 14px;
+            font-weight: 500;
             transition: all 0.2s ease;
+            border-left: 3px solid transparent;
         }
         
         .toc a:hover,
         .toc a.active {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
             transform: translateX(4px);
+            border-left-color: #60a5fa;
         }
         
         /* Documentation content */
         .documentation-content {
             padding: 3rem;
-            line-height: 1.7;
+            line-height: 1.8;
+            color: #e2e8f0;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         
         .documentation-content h1 {
-            font-size: 2.5rem;
+            font-size: 2.75rem;
             font-weight: 700;
-            color: #1a202c;
-            margin-bottom: 1.5rem;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #ffffff;
+            margin-bottom: 2rem;
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            line-height: 1.2;
+            word-wrap: break-word;
         }
         
         .documentation-content h2 {
-            font-size: 2rem;
+            font-size: 2.25rem;
             font-weight: 600;
-            color: #2d3748;
-            margin: 3rem 0 1.5rem 0;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid #e2e8f0;
+            color: #f1f5f9;
+            margin: 3.5rem 0 1.5rem 0;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid rgba(96, 165, 250, 0.3);
+            line-height: 1.3;
         }
         
         .documentation-content h3 {
-            font-size: 1.5rem;
+            font-size: 1.75rem;
             font-weight: 600;
-            color: #2d3748;
-            margin: 2rem 0 1rem 0;
+            color: #cbd5e1;
+            margin: 2.5rem 0 1.25rem 0;
+            line-height: 1.4;
         }
         
         .documentation-content h4 {
-            font-size: 1.25rem;
+            font-size: 1.375rem;
             font-weight: 600;
-            color: #4a5568;
-            margin: 1.5rem 0 0.75rem 0;
+            color: #94a3b8;
+            margin: 2rem 0 1rem 0;
+            line-height: 1.4;
         }
         
         .documentation-content p {
-            color: #4a5568;
-            margin-bottom: 1rem;
+            color: #cbd5e1;
+            margin-bottom: 1.25rem;
+            font-size: 1rem;
+            line-height: 1.7;
         }
         
         .documentation-content ul,
         .documentation-content ol {
-            color: #4a5568;
-            margin-bottom: 1rem;
-            padding-left: 1.5rem;
+            color: #cbd5e1;
+            margin-bottom: 1.25rem;
+            padding-left: 1.75rem;
+            font-size: 1rem;
         }
         
         .documentation-content li {
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            line-height: 1.6;
         }
         
         .documentation-content a {
-            color: #667eea;
+            color: #60a5fa;
             text-decoration: none;
             border-bottom: 1px solid transparent;
-            transition: border-color 0.2s ease;
+            transition: all 0.2s ease;
         }
         
         .documentation-content a:hover {
-            border-bottom-color: #667eea;
+            border-bottom-color: #60a5fa;
+            color: #93c5fd;
         }
         
         .documentation-content blockquote {
-            border-left: 4px solid #667eea;
-            padding-left: 1rem;
-            margin: 1.5rem 0;
+            border-left: 4px solid #60a5fa;
+            padding: 1.5rem;
+            margin: 2rem 0;
             font-style: italic;
-            color: #64748b;
-            background: #f8fafc;
-            padding: 1rem;
+            color: #94a3b8;
+            background: rgba(15, 23, 42, 0.6);
             border-radius: 0 8px 8px 0;
+            font-size: 1rem;
         }
         
         .documentation-content table {
             width: 100%;
             border-collapse: collapse;
-            margin: 1.5rem 0;
+            margin: 2rem 0;
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            background: rgba(15, 23, 42, 0.8);
         }
         
         .documentation-content th,
         .documentation-content td {
-            padding: 12px 16px;
+            padding: 14px 18px;
             text-align: left;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.95rem;
         }
         
         .documentation-content th {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, #1e40af, #3730a3);
             color: white;
             font-weight: 600;
         }
         
+        .documentation-content td {
+            color: #cbd5e1;
+        }
+        
         .documentation-content pre {
-            background: #1a202c;
+            background: #0f172a;
             border-radius: 8px;
-            padding: 1.5rem;
+            padding: 1.75rem;
             overflow-x: auto;
-            margin: 1.5rem 0;
+            margin: 2rem 0;
             position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         
         .documentation-content code:not([class*="language-"]) {
-            background: #f1f5f9;
-            color: #e53e3e;
-            padding: 2px 6px;
+            background: rgba(15, 23, 42, 0.8);
+            color: #fbbf24;
+            padding: 3px 8px;
             border-radius: 4px;
-            font-size: 0.875rem;
+            font-size: 0.9rem;
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         
         /* Endpoint styling */
@@ -290,9 +316,9 @@
         
         /* Footer */
         .footer {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(30, 58, 138, 0.95);
             backdrop-filter: blur(10px);
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
             padding: 2rem 0;
             margin-top: 3rem;
         }
@@ -301,7 +327,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            color: #64748b;
+            color: #94a3b8;
             font-size: 14px;
         }
         
@@ -311,16 +337,34 @@
         }
         
         .footer-links a {
-            color: #64748b;
+            color: #cbd5e1;
             text-decoration: none;
             transition: color 0.2s ease;
         }
         
         .footer-links a:hover {
-            color: #667eea;
+            color: #60a5fa;
         }
         
         /* Responsive design */
+        @media (max-width: 1024px) {
+            .content-wrapper {
+                grid-template-columns: 250px 1fr;
+            }
+            
+            .documentation-content {
+                padding: 2.5rem 2rem;
+            }
+            
+            .documentation-content h1 {
+                font-size: 2.25rem;
+            }
+            
+            .documentation-content h2 {
+                font-size: 1.875rem;
+            }
+        }
+        
         @media (max-width: 768px) {
             .content-wrapper {
                 grid-template-columns: 1fr;
@@ -328,16 +372,49 @@
             
             .sidebar {
                 border-right: none;
-                border-bottom: 1px solid #e2e8f0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                padding: 1.5rem;
             }
             
             .documentation-content {
                 padding: 2rem 1.5rem;
             }
             
+            .documentation-content h1 {
+                font-size: 2rem;
+                line-height: 1.2;
+            }
+            
+            .documentation-content h2 {
+                font-size: 1.5rem;
+            }
+            
             .header-content {
                 flex-direction: column;
                 gap: 1rem;
+                text-align: center;
+            }
+            
+            .container {
+                padding: 0 15px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .documentation-content {
+                padding: 1.5rem 1rem;
+            }
+            
+            .documentation-content h1 {
+                font-size: 1.75rem;
+            }
+            
+            .documentation-content h2 {
+                font-size: 1.375rem;
+            }
+            
+            .documentation-content h3 {
+                font-size: 1.25rem;
             }
         }
     </style>
