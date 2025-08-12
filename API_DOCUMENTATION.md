@@ -35,6 +35,41 @@ All endpoints return JSON responses with consistent error handling:
 
 ---
 
+## System Endpoints
+
+### Health Check
+```http
+GET /api/health
+```
+
+Returns system status, version information, and database statistics for monitoring and integration testing.
+
+**Example Request:**
+```bash
+curl "https://your-hailydb-instance.replit.app/api/health"
+```
+
+**Example Response:**
+```json
+{
+  "status": "healthy",
+  "service": "HailyDB API v2.0", 
+  "timestamp": "2025-08-12T04:25:11.160168Z",
+  "database": {
+    "alerts": 6056,
+    "spc_reports": 45225
+  },
+  "version": "2.0.0",
+  "documentation": "/documentation"
+}
+```
+
+**Status Codes:**
+- `200` - System healthy and operational
+- `500` - System experiencing issues (includes error details)
+
+---
+
 ## Core Alert Endpoints
 
 ### Get Alerts with Filtering

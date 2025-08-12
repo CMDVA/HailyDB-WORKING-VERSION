@@ -54,6 +54,13 @@ HailyDB is a comprehensive weather intelligence platform designed to ingest, pro
 
 ## Quick Start
 
+### System Health Check
+
+```bash
+# Check API status and database statistics
+curl "https://api.hailydb.com/api/health"
+```
+
 ### Basic Alert Search
 
 ```bash
@@ -225,6 +232,33 @@ All API responses follow consistent JSON structure:
   "pagination": {...},     // Pagination metadata  
   "filters": {...},        // Applied filter parameters
   "metadata": {...}        // Additional response metadata
+}
+```
+
+### System Endpoints
+
+#### Health Check
+**`GET /api/health`**
+
+System status and database statistics endpoint for monitoring and integration testing.
+
+**Example Request:**
+```bash
+curl "https://api.hailydb.com/api/health"
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "HailyDB API v2.0",
+  "timestamp": "2025-08-12T04:25:11.160168Z",
+  "database": {
+    "alerts": 6056,
+    "spc_reports": 45225
+  },
+  "version": "2.0.0",
+  "documentation": "/documentation"
 }
 ```
 
@@ -3402,20 +3436,20 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Planned Pricing (HailyDB + HailyAI Assistant Access)
-Tier	Price / Month	Key Limits & Features
-Free	$0	- Limited daily API calls
+Tier    Price / Month   Key Limits & Features
+Free    $0      - Limited daily API calls
 - Basic storm event search (last 7 days)
 - Public event map access
 - No CSV export
 - No HailyAI Assistant access
-Basic	$19	- Up to 10k API calls/month
+Basic   $19     - Up to 10k API calls/month
 - 6-month historical data access
 - CSV export
 - Advanced event filtering
 - Basic rate-limited API keys
 - Email support
 - No HailyAI Assistant access
-Plus	$49	- Up to 50k API calls/month
+Plus    $49     - Up to 50k API calls/month
 - 1-year historical data access
 - Advanced filtering and geospatial search
 - CSV and JSON export
@@ -3423,7 +3457,7 @@ Plus	$49	- Up to 50k API calls/month
 - HailyAI Assistant access (up to 25 queries/day)
 - Saved searches & alerts
 - Early access to beta features
-Premium	Enterprise-Based Pricing	- Custom API call quotas
+Premium Enterprise-Based Pricing        - Custom API call quotas
 - Full historical database access
 - Real-time alert feed with webhooks
 - Unlimited HailyAI Assistant usage for teams
