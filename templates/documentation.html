@@ -114,7 +114,8 @@
         .content-wrapper {
             display: grid;
             grid-template-columns: 300px 1fr;
-            min-height: 600px;
+            min-height: calc(100vh - 200px);
+            max-height: calc(100vh - 200px);
         }
         
         /* Sidebar styling */
@@ -122,6 +123,10 @@
             background: rgba(15, 23, 42, 0.6);
             border-right: 1px solid rgba(255, 255, 255, 0.1);
             padding: 2rem 1.5rem;
+            position: sticky;
+            top: 0;
+            height: calc(100vh - 200px);
+            overflow-y: auto;
         }
         
         .sidebar-title {
@@ -165,6 +170,9 @@
             color: #e2e8f0;
             word-wrap: break-word;
             overflow-wrap: break-word;
+            height: calc(100vh - 200px);
+            overflow-y: auto;
+            scroll-behavior: smooth;
         }
         
         .documentation-content h1 {
@@ -178,6 +186,8 @@
             background-clip: text;
             line-height: 1.2;
             word-wrap: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
         }
         
         .documentation-content h2 {
@@ -211,6 +221,9 @@
             margin-bottom: 1.25rem;
             font-size: 1rem;
             line-height: 1.7;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
         }
         
         .documentation-content ul,
@@ -257,6 +270,7 @@
             overflow: hidden;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
             background: rgba(15, 23, 42, 0.8);
+            table-layout: auto;
         }
         
         .documentation-content th,
@@ -265,6 +279,9 @@
             text-align: left;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             font-size: 0.95rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 200px;
         }
         
         .documentation-content th {
@@ -285,6 +302,9 @@
             margin: 2rem 0;
             position: relative;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-width: 100%;
         }
         
         .documentation-content code:not([class*="language-"]) {
@@ -346,14 +366,42 @@
             color: #60a5fa;
         }
         
+        /* Custom scrollbar styling */
+        .documentation-content::-webkit-scrollbar,
+        .sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .documentation-content::-webkit-scrollbar-track,
+        .sidebar::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 4px;
+        }
+        
+        .documentation-content::-webkit-scrollbar-thumb,
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(96, 165, 250, 0.4);
+            border-radius: 4px;
+        }
+        
+        .documentation-content::-webkit-scrollbar-thumb:hover,
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(96, 165, 250, 0.6);
+        }
+        
         /* Responsive design */
         @media (max-width: 1024px) {
             .content-wrapper {
                 grid-template-columns: 250px 1fr;
             }
             
+            .sidebar {
+                height: calc(100vh - 180px);
+            }
+            
             .documentation-content {
                 padding: 2.5rem 2rem;
+                height: calc(100vh - 180px);
             }
             
             .documentation-content h1 {
@@ -368,16 +416,23 @@
         @media (max-width: 768px) {
             .content-wrapper {
                 grid-template-columns: 1fr;
+                min-height: auto;
+                max-height: none;
             }
             
             .sidebar {
                 border-right: none;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                 padding: 1.5rem;
+                position: static;
+                height: auto;
+                overflow-y: visible;
             }
             
             .documentation-content {
                 padding: 2rem 1.5rem;
+                height: auto;
+                overflow-y: visible;
             }
             
             .documentation-content h1 {
@@ -415,6 +470,13 @@
             
             .documentation-content h3 {
                 font-size: 1.25rem;
+            }
+            
+            .documentation-content th,
+            .documentation-content td {
+                padding: 8px 12px;
+                font-size: 0.85rem;
+                max-width: 150px;
             }
         }
     </style>
@@ -565,9 +627,13 @@
                     const targetElement = document.querySelector(targetId);
                     
                     if (targetElement) {
-                        targetElement.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'start'
+                        // Scroll within the documentation content container
+                        const docContent = document.querySelector('.documentation-content');
+                        const targetOffset = targetElement.offsetTop - docContent.offsetTop - 20;
+                        
+                        docContent.scrollTo({
+                            top: targetOffset,
+                            behavior: 'smooth'
                         });
                         
                         // Update active state
