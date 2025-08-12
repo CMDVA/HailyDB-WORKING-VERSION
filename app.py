@@ -96,7 +96,8 @@ def require_admin_or_redirect():
     """Decorator/function to check admin access or redirect to documentation"""
     if not is_admin_access():
         # External users get redirected to the documentation page
-        return redirect('https://api.hailyai.com/documentation')
+        # Use the current domain with /documentation route for external access
+        return redirect(url_for('documentation'))
     return None
 
 @app.template_filter()
@@ -2500,7 +2501,7 @@ def index():
 
 @app.route('/documentation')
 def documentation():
-    """Standalone documentation page"""
+    """Standalone documentation page - PUBLIC ACCESS"""
     try:
         import markdown
         from markdown.extensions import codehilite, tables, toc
@@ -2528,8 +2529,8 @@ def documentation():
         # Convert markdown to HTML
         documentation_html = md.convert(markdown_content)
         
-        # Check if user is admin for template rendering
-        is_admin = is_admin_access()
+        # Documentation is public - no admin check needed
+        is_admin = False  # External users viewing documentation
         
         return render_template('documentation.html', 
                              documentation_html=documentation_html,
