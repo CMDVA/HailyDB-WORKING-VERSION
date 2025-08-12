@@ -1,0 +1,52 @@
+{
+    "sample_parsed_alerts": [
+        {
+            "area": "Pueblo, CO",
+            "effective": "2025-08-10T05:38:00",
+            "id": "urn:oid:2.49.0.1.840.0.7e3a70c33afc26a125d73c915b61f351e81ddb9e.001.1",
+            "radar_indicated": {
+                "hail_inches": 1.0,
+                "wind_mph": 60
+            }
+        },
+        {
+            "area": "Pueblo, CO",
+            "effective": "2025-08-10T05:37:00",
+            "id": "urn:oid:2.49.0.1.840.0.5039ebb3f7b0d13989166879edf939ccfd7defd7.001.1",
+            "radar_indicated": {
+                "hail_inches": 1.0,
+                "wind_mph": 60
+            }
+        },
+        {
+            "area": "Ellis, KS",
+            "effective": "2025-08-10T09:36:00",
+            "id": "urn:oid:2.49.0.1.840.0.38a158755e6474ed61b29d90f27ccb88868e4d43.001.1",
+            "radar_indicated": null
+        },
+        {
+            "area": "Bent, CO; Kiowa, CO",
+            "effective": "2025-08-10T05:36:00",
+            "id": "urn:oid:2.49.0.1.840.0.4c5612a5dc811d625fb7f2b32c2d6b13cd0424f6.002.1",
+            "radar_indicated": {
+                "hail_inches": 1.5,
+                "wind_mph": 60
+            }
+        },
+        {
+            "area": "Clay, NE; Fillmore, NE; Hamilton, NE; Nuckolls, NE; Thayer, NE; York, NE",
+            "effective": "2025-08-09T08:34:00",
+            "id": "urn:oid:2.49.0.1.840.0.a84102e0f523ec6b1bfabc6432848a923b687e43.001.1",
+            "radar_indicated": {
+                "hail_inches": 1.75,
+                "wind_mph": 60
+            }
+        }
+    ],
+    "status": "success",
+    "summary": {
+        "parsed_with_radar_data": 1461,
+        "parsing_success_rate": "100.0%",
+        "total_severe_thunderstorm_warnings": 1461
+    }
+}

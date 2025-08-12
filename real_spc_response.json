@@ -1,0 +1,32 @@
+{
+  "filters": {
+    "county": null,
+    "date": null,
+    "state": null,
+    "type": null
+  },
+  "pagination": {
+    "has_more": true,
+    "limit": 1,
+    "offset": 0,
+    "total": 45219
+  },
+  "reports": [
+    {
+      "comments": "Corrects previous non-tstm wnd gst report from 3 SSE Mahnomen. Mesonet station MN044 Mahnomen MN DOT. (FGF)",
+      "county": "Mahnomen",
+      "id": 48924,
+      "ingested_at": "2025-08-12T00:58:27.487366",
+      "latitude": 47.27,
+      "location": "3 SSE Mahnomen",
+      "longitude": -95.93,
+      "magnitude": {
+        "speed": 58
+      },
+      "report_date": "2025-08-11",
+      "report_type": "wind",
+      "state": "MN",
+      "time_utc": "2355"
+    }
+  ]
+}

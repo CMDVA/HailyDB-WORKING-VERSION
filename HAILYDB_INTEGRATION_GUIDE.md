@@ -70,20 +70,43 @@ curl "https://api.hailydb.com/api/alerts/active"
   "total_active": 206,
   "alerts": [
     {
-      "id": "alert_12345",
-      "event": "Severe Thunderstorm Warning",
-      "severity": "Severe",
-      "area_desc": "Harris County, TX",
-      "effective": "2025-08-12T02:00:00Z",
-      "expires": "2025-08-12T03:00:00Z",
+      "id": "urn:oid:2.49.0.1.840.0.4f244d96dba7dadd5eb93ff516df448bf7f8be25.001.1",
+      "event": "Special Weather Statement",
+      "severity": "Moderate",
+      "area_desc": "Pushmataha; Pittsburg; Latimer",
+      "effective": "2025-08-12T02:24:00",
+      "expires": "2025-08-12T03:00:00",
+      "sent": "2025-08-12T02:24:00",
+      "affected_states": ["OK"],
       "radar_indicated": {
-        "hail_inches": 1.25,
-        "wind_mph": 60,
-        "hail_detected": true,
-        "wind_detected": true
+        "hail_inches": 0.0,
+        "wind_mph": 50
       },
-      "affected_states": ["TX"],
-      "spc_verified": false
+      "enhanced_geometry": {
+        "affected_states": ["OK"],
+        "coordinate_count": 10,
+        "geometry_bounds": {
+          "max_lat": 34.76,
+          "max_lon": -95.29,
+          "min_lat": 34.39,
+          "min_lon": -95.85000000000001
+        },
+        "geometry_type": "Polygon",
+        "has_detailed_geometry": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-95.78, 34.5], [-95.77, 34.51], ...]]
+      },
+      "spc_verified": false,
+      "spc_confidence_score": null,
+      "spc_match_method": null,
+      "spc_report_count": 0,
+      "is_active": true,
+      "duration_minutes": 36,
+      "coordinate_count": 10,
+      "ingested_at": "2025-08-12T02:25:03.012945",
+      "updated_at": "2025-08-12T02:25:03.012945"
     }
   ]
 }
@@ -110,13 +133,51 @@ Most powerful endpoint for filtering alerts with multiple criteria.
 curl "https://api.hailydb.com/api/alerts/search?state=TX&event_type=Severe%20Thunderstorm&active_only=true&limit=25"
 ```
 
+**Response Format:**
+```json
+{
+  "alerts": [
+    {
+      "id": "urn:oid:...",
+      "event": "Severe Thunderstorm Warning",
+      "severity": "Severe",
+      "area_desc": "County Names",
+      "effective": "2025-08-12T02:00:00",
+      "expires": "2025-08-12T03:00:00",
+      "radar_indicated": {...},
+      "enhanced_geometry": {...},
+      "spc_verified": false
+    }
+  ],
+  "filters": {
+    "active_only": true,
+    "state": "TX",
+    "event_type": "Severe Thunderstorm",
+    "search_query": "",
+    "severity": null,
+    "area": null,
+    "county": null
+  },
+  "limit": 25,
+  "page": 1,
+  "pages": 150,
+  "total": 3745
+}
+```
+
 ### Get Single Alert
 **Endpoint:** `GET /api/alerts/{alert_id}`
 
 Retrieve complete details for a specific alert including AI summaries and SPC verification.
 
 ```bash
-curl "https://api.hailydb.com/api/alerts/NWS-IDP-PROD-1234567"
+curl "https://api.hailydb.com/api/alerts/urn:oid:2.49.0.1.840.0.4f244d96dba7dadd5eb93ff516df448bf7f8be25.001.1"
+```
+
+**Note:** Alert IDs use URN format for NWS alerts. For JSON response, add `?format=json`
+
+```bash
+curl "https://api.hailydb.com/api/alerts/urn:oid:2.49.0.1.840.0.4f244d96dba7dadd5eb93ff516df448bf7f8be25.001.1?format=json"
 ```
 
 ### Alerts by Geographic Region
@@ -156,16 +217,21 @@ curl "https://api.hailydb.com/api/spc/reports?report_type=hail&state=TX&min_magn
 **Response:**
 ```json
 {
-  "status": "success",
+  "filters": {
+    "county": null,
+    "date": null,
+    "state": "TX",
+    "type": "hail"
+  },
   "pagination": {
-    "page": 1,
-    "per_page": 50,
-    "total": 156,
-    "pages": 4
+    "has_more": true,
+    "limit": 50,
+    "offset": 0,
+    "total": 45219
   },
   "reports": [
     {
-      "id": 12345,
+      "id": 48924,
       "report_date": "2025-08-11",
       "report_type": "hail",
       "time_utc": "2130",
@@ -175,17 +241,10 @@ curl "https://api.hailydb.com/api/spc/reports?report_type=hail&state=TX&min_magn
       "latitude": 35.2500,
       "longitude": -101.9167,
       "magnitude": {
-        "hail_inches": 2.0,
-        "size_hundredths": 200,
-        "display": "2.00\""
+        "size_hundredths": 200
       },
       "comments": "TRAINED SPOTTER REPORTED GOLF BALL SIZE HAIL",
-      "enhanced_context": {
-        "version": "v4.0",
-        "summary": "Professional meteorological location analysis",
-        "nearby_places": ["Amarillo", "Canyon"],
-        "generated_at": "2025-08-12T01:00:00Z"
-      }
+      "ingested_at": "2025-08-12T00:58:27.487366"
     }
   ]
 }
@@ -360,92 +419,123 @@ curl "https://api.hailydb.com/api/alerts/multi-state?states=TX,OK,AR&event_type=
 
 ## Data Models
 
-### Alert Object
+### Complete Alert Object Schema
 ```json
 {
-  "id": "string",
-  "event": "string",
+  "id": "urn:oid:2.49.0.1.840.0.{hash}.{sequence}.{version}",
+  "event": "Severe Thunderstorm Warning|Tornado Warning|Special Weather Statement|...",
   "severity": "Minor|Moderate|Severe|Extreme",
-  "area_desc": "string",
-  "effective": "ISO 8601 datetime",
-  "expires": "ISO 8601 datetime",
-  "sent": "ISO 8601 datetime",
-  "headline": "string",
-  "description": "string",
-  "instruction": "string",
+  "area_desc": "County; County; County",
+  "effective": "2025-08-12T02:24:00",
+  "expires": "2025-08-12T03:00:00", 
+  "sent": "2025-08-12T02:24:00",
+  "affected_states": ["TX", "OK"],
+  "ai_summary": "string|null",
+  "ai_tags": "string|null",
+  "city_names": "string|null",
+  "coordinate_count": 10,
+  "county_names": {},
+  "duration_minutes": 36,
+  "enhanced_geometry": {
+    "affected_states": ["OK"],
+    "coordinate_count": 10,
+    "county_state_mapping": [],
+    "coverage_area_sq_degrees": 0.2072,
+    "fips_codes": [],
+    "geometry_bounds": {
+      "max_lat": 34.76,
+      "max_lon": -95.29,
+      "min_lat": 34.39,
+      "min_lon": -95.85000000000001
+    },
+    "geometry_type": "Polygon",
+    "has_detailed_geometry": true
+  },
+  "fips_codes": [],
+  "geocode": {
+    "SAME": ["040127", "040121", "040077"],
+    "UGC": ["OKZ049", "OKZ073", "OKZ075"]
+  },
   "geometry": {
-    "type": "Polygon|Point|MultiPolygon",
-    "coordinates": []
+    "type": "Polygon",
+    "coordinates": [[[-95.78, 34.5], [-95.77, 34.51], ...]]
+  },
+  "geometry_bounds": {
+    "max_lat": 34.76,
+    "max_lon": -95.29,
+    "min_lat": 34.39,
+    "min_lon": -95.85000000000001
+  },
+  "geometry_type": "Polygon",
+  "ingested_at": "2025-08-12T02:25:03.012945",
+  "is_active": true,
+  "location_info": {
+    "affected_zones": ["https://api.weather.gov/zones/forecast/OKZ049"],
+    "area_description": "Pushmataha; Pittsburg; Latimer",
+    "coordinate_count": 10,
+    "counties": [],
+    "fips_codes": [],
+    "geocodes": {
+      "SAME": ["040127", "040121", "040077"],
+      "UGC": ["OKZ049", "OKZ073", "OKZ075"]
+    },
+    "geometry_bounds": {...},
+    "geometry_type": "Polygon",
+    "states": []
+  },
+  "properties": {
+    "@id": "https://api.weather.gov/alerts/urn:oid:...",
+    "@type": "wx:Alert",
+    "affectedZones": ["https://api.weather.gov/zones/forecast/OKZ049"],
+    "areaDesc": "Pushmataha; Pittsburg; Latimer",
+    "category": "Met",
+    "certainty": "Observed",
+    "description": "Full NWS alert description text...",
+    "effective": "2025-08-11T21:24:00-05:00",
+    "event": "Special Weather Statement",
+    "expires": "2025-08-11T22:00:00-05:00",
+    "headline": "Special Weather Statement issued August 11 at 9:24PM CDT",
+    "instruction": "If outdoors, consider seeking shelter inside a building.",
+    "parameters": {
+      "maxHailSize": ["0.00"],
+      "maxWindGust": ["50 MPH"],
+      "eventMotionDescription": ["2025-08-12T02:24:00-00:00...storm...345DEG...3KT..."]
+    },
+    "severity": "Moderate",
+    "urgency": "Expected"
   },
   "radar_indicated": {
-    "hail_inches": "number|null",
-    "wind_mph": "number|null",
-    "hail_detected": "boolean",
-    "wind_detected": "boolean",
-    "tornado_detected": "boolean"
+    "hail_inches": 0.0,
+    "wind_mph": 50
   },
-  "affected_states": ["string"],
-  "fips_codes": ["string"],
-  "county_names": ["string"],
-  "city_names": ["string"],
-  "spc_verified": "boolean",
-  "spc_confidence_score": "number|null",
-  "spc_reports": [
-    {
-      "report_id": "integer",
-      "report_type": "hail|wind|tornado",
-      "magnitude": "object",
-      "confidence": "number"
-    }
-  ],
-  "ai_summary": "string|null",
   "spc_ai_summary": "string|null",
-  "enhanced_geometry": {
-    "coordinate_count": "integer",
-    "affected_states": ["string"],
-    "county_state_mapping": []
-  },
-  "ingested_at": "ISO 8601 datetime",
-  "updated_at": "ISO 8601 datetime"
+  "spc_confidence_score": "number|null",
+  "spc_match_method": "string|null",
+  "spc_report_count": 0,
+  "spc_reports": "array|null",
+  "spc_verified": false,
+  "updated_at": "2025-08-12T02:25:03.012945"
 }
 ```
 
-### SPC Report Object
+### SPC Report Object Schema
 ```json
 {
-  "id": "integer",
-  "report_date": "YYYY-MM-DD",
+  "id": 48924,
+  "report_date": "2025-08-11",
   "report_type": "hail|wind|tornado",
-  "time_utc": "string",
-  "location": "string",
-  "county": "string",
-  "state": "string",
-  "latitude": "number",
-  "longitude": "number",
+  "time_utc": "2355",
+  "location": "3 SSE Mahnomen",
+  "county": "Mahnomen", 
+  "state": "MN",
+  "latitude": 47.27,
+  "longitude": -95.93,
   "magnitude": {
-    "hail_inches": "number|null",
-    "size_hundredths": "integer|null",
-    "wind_mph": "number|null",
-    "speed": "integer|null",
-    "tornado_fscale": "string|null",
-    "display": "string"
+    "speed": 58,
+    "size_hundredths": 175
   },
-  "comments": "string",
-  "enhanced_context": {
-    "version": "string",
-    "summary": "string",
-    "nearby_places": ["string"],
-    "major_cities": ["string"],
-    "geographic_context": "string",
-    "generated_at": "ISO 8601 datetime"
-  },
-  "spc_enrichment": {
-    "damage_potential": "string",
-    "impact_assessment": "string",
-    "economic_impact": "string"
-  },
-  "row_hash": "string",
-  "ingested_at": "ISO 8601 datetime"
+  "comments": "Corrects previous non-tstm wnd gst report from 3 SSE Mahnomen. Mesonet station MN044 Mahnomen MN DOT. (FGF)",
+  "ingested_at": "2025-08-12T00:58:27.487366"
 }
 ```
 
@@ -870,12 +960,12 @@ client.liveRadar.subscribe({
 
 ---
 
-## Testing Endpoints
+## Testing & Validation Endpoints
 
-### Validate Radar Parsing
+### Radar Parsing Test
 **Endpoint:** `POST /api/test/radar-parsing`
 
-Test radar-indicated data extraction.
+Test the radar-indicated data extraction from alert text.
 
 ```bash
 curl -X POST "https://api.hailydb.com/api/test/radar-parsing" \
@@ -889,6 +979,113 @@ curl -X POST "https://api.hailydb.com/api/test/radar-parsing" \
   }'
 ```
 
+**Response:**
+```json
+{
+  "status": "success",
+  "test_results": [
+    {
+      "test_case": 1,
+      "input": {
+        "event": "Severe Thunderstorm Warning",
+        "headline": "Golf ball hail and 80 mph winds"
+      },
+      "radar_indicated": {
+        "hail_inches": 1.75,
+        "wind_mph": 80
+      }
+    }
+  ]
+}
+```
+
+### Radar Parsing Statistics
+**Endpoint:** `GET /api/test/radar-summary`
+
+Get comprehensive radar parsing performance metrics.
+
+```bash
+curl "https://api.hailydb.com/api/test/radar-summary"
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "summary": {
+    "total_severe_thunderstorm_warnings": 1456,
+    "parsed_with_radar_data": 1456,
+    "parsing_success_rate": "100.0%"
+  },
+  "sample_parsed_alerts": [
+    {
+      "id": "urn:oid:...",
+      "area": "Harris County, TX",
+      "radar_indicated": {
+        "hail_inches": 1.0,
+        "wind_mph": 60
+      },
+      "effective": "2025-08-12T01:30:00"
+    }
+  ]
+}
+```
+
+### Manual NWS Poll Trigger
+**Endpoint:** `POST /api/test/nws-poll`
+
+Manually trigger NWS alert ingestion for testing.
+
+```bash
+curl -X POST "https://api.hailydb.com/api/test/nws-poll"
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "new_alerts": 4,
+  "message": "Polling completed. 4 new alerts ingested."
+}
+```
+
+---
+
+## Additional Missing Endpoints
+
+### Geographic Radius Search
+**Endpoint:** `GET /api/alerts/radius`
+
+Find alerts within a specified radius of coordinates.
+
+**Parameters:**
+- `lat` (float, required): Latitude
+- `lon` (float, required): Longitude  
+- `radius` (float, required): Radius in miles
+- `active_only` (boolean): Only active alerts
+
+```bash
+curl "https://api.hailydb.com/api/alerts/radius?lat=29.7604&lon=-95.3698&radius=50&active_only=true"
+```
+
+### FIPS Code Search
+**Endpoint:** `GET /api/alerts/fips/{fips_code}`
+
+Search alerts by Federal Information Processing Standards county codes.
+
+```bash
+curl "https://api.hailydb.com/api/alerts/fips/48201"  # Harris County, TX
+```
+
+### Alert Enrichment Trigger
+**Endpoint:** `POST /alerts/enrich/{alert_id}`
+
+Manually trigger AI enrichment for a specific alert.
+
+```bash
+curl -X POST "https://api.hailydb.com/alerts/enrich/urn:oid:2.49.0.1.840.0.{hash}.001.1"
+```
+
 ### System Health Check
 **Endpoint:** `GET /api/health`
 
@@ -896,6 +1093,25 @@ Validate system status and data freshness.
 
 ```bash
 curl "https://api.hailydb.com/api/health"
+```
+
+### State Enrichment APIs
+**Endpoint:** `POST /api/state-enrichment/enrich`
+
+Batch enrich alerts with missing state information.
+
+```bash
+curl -X POST "https://api.hailydb.com/api/state-enrichment/enrich" \
+  -H "Content-Type: application/json" \
+  -d '{"batch_size": 100}'
+```
+
+**Endpoint:** `GET /api/state-enrichment/stats`
+
+Get state enrichment statistics.
+
+```bash
+curl "https://api.hailydb.com/api/state-enrichment/stats"
 ```
 
 ---

@@ -1,0 +1,245 @@
+{
+    "alerts": [
+        {
+            "affected_states": [
+                "OK"
+            ],
+            "ai_summary": null,
+            "ai_tags": null,
+            "area_desc": "Pushmataha; Pittsburg; Latimer",
+            "city_names": null,
+            "coordinate_count": 10,
+            "county_names": {},
+            "duration_minutes": 36,
+            "effective": "2025-08-12T02:24:00",
+            "enhanced_geometry": {
+                "affected_states": [
+                    "OK"
+                ],
+                "coordinate_count": 10,
+                "county_state_mapping": [],
+                "coverage_area_sq_degrees": 0.2072,
+                "fips_codes": [],
+                "geometry_bounds": {
+                    "max_lat": 34.76,
+                    "max_lon": -95.29,
+                    "min_lat": 34.39,
+                    "min_lon": -95.85000000000001
+                },
+                "geometry_type": "Polygon",
+                "has_detailed_geometry": true
+            },
+            "event": "Special Weather Statement",
+            "expires": "2025-08-12T03:00:00",
+            "fips_codes": [],
+            "geocode": {
+                "SAME": [
+                    "040127",
+                    "040121",
+                    "040077"
+                ],
+                "UGC": [
+                    "OKZ049",
+                    "OKZ073",
+                    "OKZ075"
+                ]
+            },
+            "geometry": {
+                "coordinates": [
+                    [
+                        [
+                            -95.78,
+                            34.5
+                        ],
+                        [
+                            -95.77,
+                            34.51
+                        ],
+                        [
+                            -95.67,
+                            34.51
+                        ],
+                        [
+                            -95.67,
+                            34.589999999999996
+                        ],
+                        [
+                            -95.85000000000001,
+                            34.589999999999996
+                        ],
+                        [
+                            -95.85000000000001,
+                            34.62
+                        ],
+                        [
+                            -95.34,
+                            34.76
+                        ],
+                        [
+                            -95.29,
+                            34.53
+                        ],
+                        [
+                            -95.78,
+                            34.39
+                        ],
+                        [
+                            -95.78,
+                            34.5
+                        ]
+                    ]
+                ],
+                "type": "Polygon"
+            },
+            "geometry_bounds": {
+                "max_lat": 34.76,
+                "max_lon": -95.29,
+                "min_lat": 34.39,
+                "min_lon": -95.85000000000001
+            },
+            "geometry_type": "Polygon",
+            "id": "urn:oid:2.49.0.1.840.0.4f244d96dba7dadd5eb93ff516df448bf7f8be25.001.1",
+            "ingested_at": "2025-08-12T02:25:03.012945",
+            "is_active": true,
+            "location_info": {
+                "affected_zones": [
+                    "https://api.weather.gov/zones/forecast/OKZ049",
+                    "https://api.weather.gov/zones/forecast/OKZ073",
+                    "https://api.weather.gov/zones/forecast/OKZ075"
+                ],
+                "area_description": "Pushmataha; Pittsburg; Latimer",
+                "coordinate_count": 10,
+                "counties": [],
+                "fips_codes": [],
+                "geocodes": {
+                    "SAME": [
+                        "040127",
+                        "040121",
+                        "040077"
+                    ],
+                    "UGC": [
+                        "OKZ049",
+                        "OKZ073",
+                        "OKZ075"
+                    ]
+                },
+                "geometry_bounds": {
+                    "max_lat": 34.76,
+                    "max_lon": -95.29,
+                    "min_lat": 34.39,
+                    "min_lon": -95.85000000000001
+                },
+                "geometry_type": "Polygon",
+                "states": []
+            },
+            "properties": {
+                "@id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.4f244d96dba7dadd5eb93ff516df448bf7f8be25.001.1",
+                "@type": "wx:Alert",
+                "affectedZones": [
+                    "https://api.weather.gov/zones/forecast/OKZ049",
+                    "https://api.weather.gov/zones/forecast/OKZ073",
+                    "https://api.weather.gov/zones/forecast/OKZ075"
+                ],
+                "areaDesc": "Pushmataha; Pittsburg; Latimer",
+                "category": "Met",
+                "certainty": "Observed",
+                "code": "IPAWSv1.0",
+                "description": "At 924 PM CDT, Doppler radar indicated strong thunderstorms along a\nline extending from near Daisy to 2 miles southwest of Yanush. These\nstorms were nearly stationary.\n\nHAZARD...Wind gusts up to 50 mph.\n\nSOURCE...Radar indicated.\n\nIMPACT...Gusty winds could knock down small tree limbs and blow\naround unsecured objects.\n\nLocations in or near the path include...\nClayton Lake State Park...        Dunbar...\nStanley...                        Sardis...\nClayton...",
+                "effective": "2025-08-11T21:24:00-05:00",
+                "ends": null,
+                "event": "Special Weather Statement",
+                "eventCode": {
+                    "NationalWeatherService": [
+                        "SPS"
+                    ],
+                    "SAME": [
+                        "SPS"
+                    ]
+                },
+                "expires": "2025-08-11T22:00:00-05:00",
+                "geocode": {
+                    "SAME": [
+                        "040127",
+                        "040121",
+                        "040077"
+                    ],
+                    "UGC": [
+                        "OKZ049",
+                        "OKZ073",
+                        "OKZ075"
+                    ]
+                },
+                "headline": "Special Weather Statement issued August 11 at 9:24PM CDT by NWS Tulsa OK",
+                "id": "urn:oid:2.49.0.1.840.0.4f244d96dba7dadd5eb93ff516df448bf7f8be25.001.1",
+                "instruction": "If outdoors, consider seeking shelter inside a building.",
+                "language": "en-US",
+                "messageType": "Alert",
+                "onset": "2025-08-11T21:24:00-05:00",
+                "parameters": {
+                    "AWIPSidentifier": [
+                        "SPSTSA"
+                    ],
+                    "BLOCKCHANNEL": [
+                        "EAS",
+                        "NWEM",
+                        "CMAS"
+                    ],
+                    "EAS-ORG": [
+                        "WXR"
+                    ],
+                    "NWSheadline": [
+                        "STRONG THUNDERSTORMS WILL IMPACT NORTHWESTERN PUSHMATAHA... SOUTHWESTERN LATIMER AND SOUTH CENTRAL PITTSBURG COUNTIES THROUGH 1000 PM CDT"
+                    ],
+                    "WMOidentifier": [
+                        "WWUS84 KTSA 120224"
+                    ],
+                    "eventMotionDescription": [
+                        "2025-08-12T02:24:00-00:00...storm...345DEG...3KT...34.54,-95.72 34.7,-95.34"
+                    ],
+                    "maxHailSize": [
+                        "0.00"
+                    ],
+                    "maxWindGust": [
+                        "50 MPH"
+                    ]
+                },
+                "references": [],
+                "response": "Execute",
+                "scope": "Public",
+                "sender": "w-nws.webmaster@noaa.gov",
+                "senderName": "NWS Tulsa OK",
+                "sent": "2025-08-11T21:24:00-05:00",
+                "severity": "Moderate",
+                "status": "Actual",
+                "urgency": "Expected",
+                "web": "http://www.weather.gov"
+            },
+            "radar_indicated": {
+                "hail_inches": 0.0,
+                "wind_mph": 50
+            },
+            "sent": "2025-08-12T02:24:00",
+            "severity": "Moderate",
+            "spc_ai_summary": null,
+            "spc_confidence_score": null,
+            "spc_match_method": null,
+            "spc_report_count": 0,
+            "spc_reports": null,
+            "spc_verified": false,
+            "updated_at": "2025-08-12T02:25:03.012945"
+        }
+    ],
+    "filters": {
+        "active_only": false,
+        "area": null,
+        "county": null,
+        "event_type": null,
+        "search_query": "",
+        "severity": null,
+        "state": null
+    },
+    "limit": 1,
+    "page": 1,
+    "pages": 5939,
+    "total": 5939
+}
