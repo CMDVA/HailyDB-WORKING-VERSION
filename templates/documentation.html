@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HailyDB API Documentation</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
@@ -12,108 +11,365 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Header styling matching hailyai.com */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .logo-text {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2c3e50;
+            letter-spacing: -0.02em;
+        }
+        
+        .header-badges {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .badge-success {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+        }
+        
+        .badge-version {
+            background: rgba(103, 126, 234, 0.1);
+            color: #667eea;
+            border: 1px solid rgba(103, 126, 234, 0.2);
+        }
+        
+        /* Main content */
+        .main-content {
+            background: white;
+            margin: 2rem 0;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .content-wrapper {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: 600px;
+        }
+        
+        /* Sidebar styling */
+        .sidebar {
+            background: #f8fafc;
+            border-right: 1px solid #e2e8f0;
+            padding: 2rem 1.5rem;
+        }
+        
+        .sidebar-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 1rem;
+        }
+        
+        .toc {
+            list-style: none;
+        }
+        
+        .toc a {
+            display: block;
+            padding: 8px 12px;
+            color: #64748b;
+            text-decoration: none;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        
+        .toc a:hover,
+        .toc a.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            transform: translateX(4px);
+        }
+        
+        /* Documentation content */
         .documentation-content {
+            padding: 3rem;
             line-height: 1.7;
         }
+        
         .documentation-content h1 {
-            @apply text-4xl font-bold text-gray-900 mb-6 pb-3 border-b-2 border-blue-600;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1a202c;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
+        
         .documentation-content h2 {
-            @apply text-3xl font-semibold text-gray-800 mt-12 mb-6 pb-2 border-b border-gray-300;
+            font-size: 2rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin: 3rem 0 1.5rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e2e8f0;
         }
+        
         .documentation-content h3 {
-            @apply text-2xl font-semibold text-gray-800 mt-8 mb-4;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin: 2rem 0 1rem 0;
         }
+        
         .documentation-content h4 {
-            @apply text-xl font-semibold text-gray-700 mt-6 mb-3;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #4a5568;
+            margin: 1.5rem 0 0.75rem 0;
         }
+        
         .documentation-content p {
-            @apply text-gray-600 mb-4;
+            color: #4a5568;
+            margin-bottom: 1rem;
         }
-        .documentation-content ul, .documentation-content ol {
-            @apply text-gray-600 mb-4 pl-6;
+        
+        .documentation-content ul,
+        .documentation-content ol {
+            color: #4a5568;
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
         }
+        
         .documentation-content li {
-            @apply mb-2;
+            margin-bottom: 0.5rem;
         }
-        .documentation-content ul li {
-            @apply list-disc;
-        }
-        .documentation-content ol li {
-            @apply list-decimal;
-        }
+        
         .documentation-content a {
-            @apply text-blue-600 hover:text-blue-800 underline;
+            color: #667eea;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s ease;
         }
+        
+        .documentation-content a:hover {
+            border-bottom-color: #667eea;
+        }
+        
         .documentation-content blockquote {
-            @apply border-l-4 border-blue-500 pl-4 italic text-gray-700 my-4;
+            border-left: 4px solid #667eea;
+            padding-left: 1rem;
+            margin: 1.5rem 0;
+            font-style: italic;
+            color: #64748b;
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 0 8px 8px 0;
         }
+        
         .documentation-content table {
-            @apply w-full border-collapse border border-gray-300 my-4;
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         }
-        .documentation-content th, .documentation-content td {
-            @apply border border-gray-300 px-4 py-2 text-left;
+        
+        .documentation-content th,
+        .documentation-content td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
         }
+        
         .documentation-content th {
-            @apply bg-gray-100 font-semibold;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-weight: 600;
         }
+        
         .documentation-content pre {
-            @apply rounded-lg overflow-x-auto my-4;
+            background: #1a202c;
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            position: relative;
         }
+        
         .documentation-content code:not([class*="language-"]) {
-            @apply bg-gray-100 text-red-600 px-1 py-0.5 rounded text-sm font-mono;
+            background: #f1f5f9;
+            color: #e53e3e;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
         }
-        .toc {
-            position: sticky;
-            top: 2rem;
-            max-height: calc(100vh - 4rem);
-            overflow-y: auto;
-        }
-        .toc a {
-            @apply block py-1 px-3 text-sm text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded;
-        }
-        .toc a.active {
-            @apply text-blue-600 bg-blue-50 font-medium;
-        }
-        .feature-badge {
-            @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800;
-        }
+        
+        /* Endpoint styling */
         .endpoint-method {
-            @apply inline-block px-2 py-1 text-xs font-mono font-bold rounded mr-2;
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-right: 8px;
+            font-family: monospace;
         }
-        .method-get { @apply bg-green-100 text-green-800; }
-        .method-post { @apply bg-blue-100 text-blue-800; }
-        .method-put { @apply bg-yellow-100 text-yellow-800; }
-        .method-delete { @apply bg-red-100 text-red-800; }
+        
+        .method-get { background: #dcfce7; color: #166534; }
+        .method-post { background: #dbeafe; color: #1e40af; }
+        .method-put { background: #fef3c7; color: #92400e; }
+        .method-delete { background: #fee2e2; color: #dc2626; }
+        
+        /* Footer */
+        .footer {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 2rem 0;
+            margin-top: 3rem;
+        }
+        
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #64748b;
+            font-size: 14px;
+        }
+        
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .footer-links a {
+            color: #64748b;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        
+        .footer-links a:hover {
+            color: #667eea;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .content-wrapper {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                border-right: none;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            
+            .documentation-content {
+                padding: 2rem 1.5rem;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
     </style>
 </head>
-<body class="bg-gray-50">
+<body>
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center py-4">
-                <div class="flex items-center">
-                    <img src="{{ url_for('static', filename='images/generated-icon.png') }}" alt="HailyDB" class="h-8 w-8 mr-3" onerror="this.style.display='none'">
-                    <h1 class="text-2xl font-bold text-gray-900">HailyDB API Documentation</h1>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-icon">H</div>
+                    <div class="logo-text">HailyDB API</div>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <span class="feature-badge">Production Ready</span>
-                    <span class="text-sm text-gray-500">v2.0.0</span>
+                <div class="header-badges">
+                    <span class="badge badge-success">Production Ready</span>
+                    <span class="badge badge-version">v2.0.0</span>
                     {% if is_admin %}
-                    <a href="/" class="text-blue-600 hover:text-blue-800 text-sm font-medium">← Back to Dashboard</a>
+                    <a href="/" style="color: #667eea; text-decoration: none; font-weight: 500;">← Dashboard</a>
                     {% endif %}
                 </div>
             </div>
         </div>
     </header>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="flex gap-8">
-            <!-- Table of Contents -->
-            <aside class="w-64 flex-shrink-0">
-                <nav class="toc bg-white rounded-lg shadow-sm p-4">
-                    <h3 class="text-sm font-semibold text-gray-900 mb-3">Table of Contents</h3>
-                    <div class="space-y-1">
+    <!-- Main Content -->
+    <div class="container">
+        <div class="main-content">
+            <div class="content-wrapper">
+                <!-- Sidebar Navigation -->
+                <aside class="sidebar">
+                    <h3 class="sidebar-title">Table of Contents</h3>
+                    <nav class="toc">
                         <a href="#overview">Overview</a>
                         <a href="#quick-start">Quick Start</a>
                         <a href="#system-architecture">System Architecture</a>
@@ -129,32 +385,29 @@
                         <a href="#production-deployment">Production Deployment</a>
                         <a href="#development-setup">Development Setup</a>
                         <a href="#contributing">Contributing</a>
-                    </div>
-                </nav>
-            </aside>
+                    </nav>
+                </aside>
 
-            <!-- Main Content -->
-            <main class="flex-1 max-w-none">
-                <div class="bg-white rounded-lg shadow-sm p-8">
-                    <div class="documentation-content">
-                        {{ documentation_html|safe }}
-                    </div>
-                </div>
-            </main>
+                <!-- Documentation Content -->
+                <main class="documentation-content">
+                    {{ documentation_html|safe }}
+                </main>
+            </div>
         </div>
     </div>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200 mt-16">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="flex justify-between items-center">
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
                 <div>
-                    <p class="text-gray-600 text-sm">© 2025 HailyDB Team. All rights reserved.</p>
-                    <p class="text-gray-500 text-xs mt-1">Last updated: August 12, 2025</p>
+                    <p>© 2025 HailyDB Team. All rights reserved.</p>
+                    <p style="font-size: 12px; margin-top: 4px; opacity: 0.7;">Last updated: August 12, 2025</p>
                 </div>
-                <div class="flex space-x-6">
-                    <a href="https://api.hailydb.com/api/health" class="text-gray-500 hover:text-gray-700 text-sm">API Status</a>
-                    <a href="mailto:support@hailydb.com" class="text-gray-500 hover:text-gray-700 text-sm">Support</a>
+                <div class="footer-links">
+                    <a href="https://api.hailydb.com/api/health">API Status</a>
+                    <a href="mailto:support@hailydb.com">Support</a>
+                    <a href="https://www.hailyai.com">HailyAI</a>
                 </div>
             </div>
         </div>
@@ -219,6 +472,64 @@
                     button.textContent = 'Copy';
                 }, 2000);
             });
+        });
+    </script>
+
+    <!-- Enhanced Navigation JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Smooth scrolling for navigation links
+            const tocLinks = document.querySelectorAll('.toc a');
+            
+            tocLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href');
+                    const targetElement = document.querySelector(targetId);
+                    
+                    if (targetElement) {
+                        targetElement.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                        
+                        // Update active state
+                        tocLinks.forEach(l => l.classList.remove('active'));
+                        this.classList.add('active');
+                    }
+                });
+            });
+            
+            // Highlight current section on scroll
+            const observerOptions = {
+                root: null,
+                rootMargin: '-20% 0px -70% 0px',
+                threshold: 0
+            };
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.id;
+                        const correspondingLink = document.querySelector(`.toc a[href="#${id}"]`);
+                        
+                        if (correspondingLink) {
+                            tocLinks.forEach(l => l.classList.remove('active'));
+                            correspondingLink.classList.add('active');
+                        }
+                    }
+                });
+            }, observerOptions);
+            
+            // Observe all headings
+            document.querySelectorAll('h1[id], h2[id], h3[id], h4[id]').forEach(heading => {
+                observer.observe(heading);
+            });
+            
+            // Initialize first link as active
+            if (tocLinks.length > 0) {
+                tocLinks[0].classList.add('active');
+            }
         });
     </script>
 </body>
