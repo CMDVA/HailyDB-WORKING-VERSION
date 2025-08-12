@@ -555,13 +555,14 @@ function proceedWithDisplay(tbody, alerts) {
         
         return `
             <tr ${rowClass}>
+                <td><small>${effective}</small></td>
                 <td><span class="badge bg-primary">${event}</span></td>
                 <td title="${location}">${location.length > 40 ? location.substring(0, 37) + '...' : location}</td>
+                <td><span class="badge bg-secondary">${state}</span></td>
                 <td>${hailDisplay}</td>
                 <td>${windDisplay}</td>
                 <td>${severityDisplay}</td>
-                <td><small>${effective}</small></td>
-                <td><small>${expires}</small></td>
+                <td>${statusBadge}</td>
                 <td>
                     <button class="btn btn-outline-primary btn-sm btn-view" onclick="viewRadarAlert('${alert.id}', '${event}', '${location}', ${hailSize}, ${windSpeed}, '${effective}', '${expires}')">
                         <i class="fas fa-eye me-1"></i>View
@@ -573,11 +574,11 @@ function proceedWithDisplay(tbody, alerts) {
 }
 
 function getHailSizeClass(size) {
-    if (size >= 2.0) return 'hail-large';
-    if (size >= 1.0) return 'hail-quarter';
-    if (size >= 0.75) return 'hail-penny';
-    if (size >= 0.5) return 'hail-marble';
-    return 'hail-pea';
+    if (size >= 2.0) return 'bg-danger text-white';
+    if (size >= 1.0) return 'bg-warning text-dark';
+    if (size >= 0.75) return 'bg-info text-white';
+    if (size >= 0.5) return 'bg-primary text-white';
+    return 'bg-secondary text-white';
 }
 
 function getHailSizeName(size) {
@@ -596,9 +597,9 @@ function getHailSizeName(size) {
 }
 
 function getWindSpeedClass(speed) {
-    if (speed >= 80) return 'wind-severe';
-    if (speed >= 65) return 'wind-significant';
-    return 'wind-moderate';
+    if (speed >= 80) return 'bg-danger text-white';
+    if (speed >= 65) return 'bg-warning text-dark';
+    return 'bg-info text-white';
 }
 
 function getWindSeverity(speed) {
@@ -611,13 +612,13 @@ function getWindSeverity(speed) {
 
 function getSeverityBadge(hailSize, windSpeed) {
     if (hailSize >= 2.0 || windSpeed >= 80) {
-        return '<span class="badge severity-severe">Severe</span>';
+        return '<span class="badge bg-danger">Severe</span>';
     } else if (hailSize >= 1.0 || windSpeed >= 65) {
-        return '<span class="badge severity-significant">Significant</span>';
+        return '<span class="badge bg-warning text-dark">Significant</span>';
     } else if (hailSize >= 0.5 || windSpeed >= 50) {
-        return '<span class="badge severity-moderate">Moderate</span>';
+        return '<span class="badge bg-info">Moderate</span>';
     }
-    return '<span class="badge severity-minor">Minor</span>';
+    return '<span class="badge bg-secondary">Minor</span>';
 }
 
 function extractState(areaDesc) {
