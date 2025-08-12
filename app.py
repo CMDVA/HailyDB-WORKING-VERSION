@@ -491,6 +491,36 @@ def get_alert(alert_id):
 
 # Removed /alerts/summary route - redundant with existing verified matches page
 
+@app.route('/api/health')
+def api_health():
+    """
+    Health check endpoint - PUBLIC ACCESS
+    Returns system status and basic statistics
+    """
+    try:
+        # Get basic counts for health check
+        alert_count = Alert.query.count()
+        spc_count = SPCReport.query.count()
+        
+        return jsonify({
+            'status': 'healthy',
+            'service': 'HailyDB API v2.0',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'database': {
+                'alerts': alert_count,
+                'spc_reports': spc_count
+            },
+            'version': '2.0.0',
+            'documentation': '/documentation'
+        })
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }), 500
+
 @app.route('/api/alerts/by-state/<state>')
 def get_alerts_by_state(state):
     """Get alerts for a specific state"""
