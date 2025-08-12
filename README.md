@@ -466,6 +466,282 @@ Search alerts by Federal Information Processing Standards county codes.
 curl "https://api.hailydb.com/api/alerts/fips/48201"  # Harris County, TX
 ```
 
+## Direct Database Access
+
+For enterprise clients requiring zero-latency access and maximum query flexibility, HailyDB offers direct PostgreSQL database connections with read-only access to real-time weather intelligence data.
+
+### Benefits of Direct Database Access
+
+🔧 **Zero API Latency** - Query data directly without REST API overhead  
+📊 **Custom Analytics** - Write complex SQL queries for advanced data analysis  
+⚡ **Real-time Performance** - Access data as fast as our ingestion pipeline updates it  
+🎯 **Unlimited Flexibility** - Join tables, create custom aggregations, and build tailored reports  
+📈 **Enterprise Scale** - Handle high-frequency queries without rate limits  
+
+### Database Connection Setup
+
+#### Step 1: Request Database Credentials
+Contact support to request read-only database credentials for your organization. You will receive:
+
+- **Database Host**: Your dedicated read-only endpoint
+- **Database Name**: `hailydb_production`
+- **Username**: `readonly_[your_org]`
+- **Password**: Secure generated password
+- **Port**: `5432` (standard PostgreSQL)
+- **SSL Mode**: `require`
+
+#### Step 2: Connection String Format
+```
+postgresql://readonly_[your_org]:[password]@[host]:5432/hailydb_production?sslmode=require
+```
+
+#### Step 3: Test Connection
+```bash
+# Using psql command line
+psql "postgresql://readonly_yourorg:password@host:5432/hailydb_production?sslmode=require"
+
+# Test query
+SELECT COUNT(*) FROM alerts WHERE is_active = true;
+```
+
+### Database Schema Overview
+
+#### Core Tables
+
+**`alerts`** - National Weather Service alerts with enhanced processing
+```sql
+-- Key columns for client queries
+SELECT 
+    id,                    -- Unique alert identifier
+    event,                 -- Alert type (Severe Thunderstorm Warning, etc.)
+    severity,              -- Minor, Moderate, Severe, Extreme
+    area_desc,             -- Geographic area description
+    effective,             -- Alert start time (UTC)
+    expires,               -- Alert end time (UTC)
+    sent,                  -- Alert issued time (UTC)
+    affected_states,       -- Array of state abbreviations
+    radar_indicated,       -- JSONB: hail_inches, wind_mph, detected flags
+    enhanced_geometry,     -- JSONB: polygon data and coverage statistics
+    spc_verified,          -- Boolean: verified by Storm Prediction Center
+    spc_confidence_score,  -- Float: verification confidence (0.0-1.0)
+    spc_report_count,      -- Integer: number of associated SPC reports
+    is_active,             -- Boolean: currently active (effective ≤ now < expires)
+    duration_minutes,      -- Integer: alert duration
+    ingested_at           -- Timestamp: when added to database
+FROM alerts
+WHERE is_active = true;
+```
+
+**`spc_reports`** - Storm Prediction Center verified reports
+```sql
+-- Key columns for storm verification
+SELECT 
+    id,                    -- Unique report identifier
+    report_date,           -- Report date (YYYY-MM-DD)
+    report_type,           -- tornado, wind, hail
+    time_utc,              -- Time in UTC (HHMM format)
+    location,              -- Location description (e.g., "5 WNW AMARILLO")
+    county,                -- County name
+    state,                 -- State abbreviation
+    latitude,              -- Decimal degrees
+    longitude,             -- Decimal degrees
+    magnitude,             -- JSONB: size_hundredths for hail, speed for wind
+    comments,              -- Additional details and damage reports
+    enhanced_context,      -- JSONB: AI-generated location analysis
+    enhanced_context_version, -- String: context generation version
+    ingested_at           -- Timestamp: when added to database
+FROM spc_reports
+WHERE report_date >= CURRENT_DATE - INTERVAL '7 days';
+```
+
+#### Optimized Indexes
+
+All tables include strategic indexes for high-performance queries:
+- **Geographic indexes**: Fast radius and boundary searches
+- **Time-based indexes**: Efficient date/time range filtering  
+- **JSONB indexes**: Quick searches within radar_indicated and enhanced_geometry
+- **Composite indexes**: Optimized for common query patterns
+
+### Common Query Patterns
+
+#### Active Severe Weather Alerts
+```sql
+-- Get all currently active alerts with radar data
+SELECT 
+    event,
+    area_desc,
+    affected_states,
+    (radar_indicated->>'hail_inches')::float as hail_size,
+    (radar_indicated->>'wind_mph')::int as wind_speed,
+    effective,
+    expires
+FROM alerts 
+WHERE is_active = true 
+    AND radar_indicated IS NOT NULL
+    AND (
+        (radar_indicated->>'hail_inches')::float > 0 
+        OR (radar_indicated->>'wind_mph')::int >= 50
+    )
+ORDER BY effective DESC;
+```
+
+#### SPC Verified Storm Reports by Region
+```sql
+-- Get verified hail reports for Texas in the last 24 hours
+SELECT 
+    location,
+    county,
+    (magnitude->>'size_hundredths')::int / 100.0 as hail_inches,
+    time_utc,
+    comments,
+    latitude,
+    longitude
+FROM spc_reports 
+WHERE state = 'TX' 
+    AND report_type = 'hail'
+    AND report_date >= CURRENT_DATE - INTERVAL '1 day'
+    AND (magnitude->>'size_hundredths')::int >= 100  -- 1 inch or larger
+ORDER BY time_utc DESC;
+```
+
+#### Geographic Radius Search
+```sql
+-- Find alerts within 50 miles of Houston, TX
+SELECT 
+    id,
+    event,
+    area_desc,
+    effective,
+    expires,
+    ST_Distance_Sphere(
+        ST_MakePoint(-95.3698, 29.7604),  -- Houston coordinates
+        ST_MakePoint(
+            (enhanced_geometry->'geometry_bounds'->>'min_lon')::float,
+            (enhanced_geometry->'geometry_bounds'->>'min_lat')::float
+        )
+    ) / 1609.34 as distance_miles
+FROM alerts 
+WHERE is_active = true
+    AND enhanced_geometry IS NOT NULL
+    AND ST_DWithin(
+        ST_MakePoint(-95.3698, 29.7604)::geography,
+        ST_MakePoint(
+            (enhanced_geometry->'geometry_bounds'->>'min_lon')::float,
+            (enhanced_geometry->'geometry_bounds'->>'min_lat')::float
+        )::geography,
+        80467  -- 50 miles in meters
+    )
+ORDER BY distance_miles;
+```
+
+#### Alert-to-SPC Correlation Analysis
+```sql
+-- Cross-reference alerts with SPC verification
+SELECT 
+    a.id as alert_id,
+    a.event,
+    a.area_desc,
+    a.spc_verified,
+    a.spc_confidence_score,
+    COUNT(s.id) as verified_reports,
+    ARRAY_AGG(s.report_type) as report_types,
+    ARRAY_AGG(s.magnitude) as magnitudes
+FROM alerts a
+LEFT JOIN spc_reports s ON (
+    a.affected_states && ARRAY[s.state]
+    AND DATE(a.effective) = s.report_date
+    AND ABS(EXTRACT(EPOCH FROM a.effective) - 
+            (EXTRACT(HOUR FROM s.time_utc::time) * 3600 + 
+             EXTRACT(MINUTE FROM s.time_utc::time) * 60)) < 7200  -- Within 2 hours
+)
+WHERE a.effective >= CURRENT_DATE - INTERVAL '7 days'
+    AND a.radar_indicated IS NOT NULL
+GROUP BY a.id, a.event, a.area_desc, a.spc_verified, a.spc_confidence_score
+HAVING COUNT(s.id) > 0
+ORDER BY a.effective DESC;
+```
+
+### Performance Best Practices
+
+#### Query Optimization
+1. **Always use time-based filters** - Include date ranges to leverage time indexes
+2. **Filter early** - Apply WHERE clauses before JOINs when possible
+3. **Use JSONB operators efficiently** - Leverage `->` and `->>` for nested data
+4. **Limit result sets** - Use LIMIT for large datasets and implement pagination
+
+#### Connection Management
+```python
+# Python example with connection pooling
+import psycopg2.pool
+
+# Create connection pool (recommended for production)
+connection_pool = psycopg2.pool.ThreadedConnectionPool(
+    minconn=1,
+    maxconn=10,
+    host="your-readonly-host",
+    database="hailydb_production", 
+    user="readonly_yourorg",
+    password="your-password",
+    sslmode="require"
+)
+
+# Get connection from pool
+conn = connection_pool.getconn()
+cursor = conn.cursor()
+
+# Execute query
+cursor.execute("""
+    SELECT event, area_desc, effective 
+    FROM alerts 
+    WHERE is_active = true 
+    LIMIT 100
+""")
+
+results = cursor.fetchall()
+
+# Return connection to pool
+connection_pool.putconn(conn)
+```
+
+### Real-time Data Streaming (Advanced)
+
+For applications requiring instant notifications of new data, PostgreSQL LISTEN/NOTIFY can provide real-time updates:
+
+```sql
+-- Listen for new alert notifications
+LISTEN new_alert_notification;
+LISTEN new_spc_report_notification;
+
+-- Your application will receive instant notifications when new data arrives
+```
+
+### Security & Access Control
+
+- **Read-only access** - No INSERT, UPDATE, or DELETE permissions
+- **Table-level permissions** - Access only to alerts and spc_reports tables
+- **Row-level security** - Available for multi-tenant scenarios
+- **SSL/TLS encryption** - All connections encrypted in transit
+- **IP allowlisting** - Optional restriction to specific IP ranges
+- **Connection monitoring** - Real-time tracking of database usage
+
+### Support & Monitoring
+
+**Database Performance Monitoring**
+- Query performance analytics available via client portal
+- Real-time connection count and usage statistics
+- Slow query identification and optimization recommendations
+
+**Technical Support**
+- Dedicated database specialist for enterprise clients
+- Schema change notifications and migration assistance
+- Custom view creation for specific use cases
+- Performance tuning consultation
+
+---
+
+**Ready to get started with direct database access?**
+Contact our enterprise team for immediate setup of your dedicated read-only database credentials.
+
 ### SPC Report Endpoints
 
 #### Get SPC Reports
