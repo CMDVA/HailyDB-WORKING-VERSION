@@ -2637,6 +2637,72 @@ def hurricane_tracks():
 @app.route('/alerts')
 def get_alerts():
     """View enhanced alerts interface with immediate visual understanding of hail/wind data"""
+    if request.args.get('format') == 'json':
+        # Handle JSON API requests from dashboard JavaScript
+        try:
+            from models import Alert
+            from datetime import datetime, timedelta
+            from sqlalchemy import and_, or_
+            
+            # Get query parameters
+            per_page = int(request.args.get('per_page', 50))
+            page = int(request.args.get('page', 1))
+            ingested_date = request.args.get('ingested_date')
+            effective_start = request.args.get('effective_start')
+            effective_end = request.args.get('effective_end')
+            
+            # Build query
+            query = Alert.query
+            
+            # Apply filters
+            if ingested_date:
+                # Filter by ingestion date (UTC mode)
+                ingested_start = datetime.fromisoformat(f"{ingested_date}T00:00:00")
+                ingested_end = datetime.fromisoformat(f"{ingested_date}T23:59:59")
+                query = query.filter(
+                    and_(
+                        Alert.ingested >= ingested_start,
+                        Alert.ingested <= ingested_end
+                    )
+                )
+            
+            if effective_start and effective_end:
+                # Filter by effective time range (SPC mode)
+                start_time = datetime.fromisoformat(effective_start.replace('Z', '+00:00'))
+                end_time = datetime.fromisoformat(effective_end.replace('Z', '+00:00'))
+                query = query.filter(
+                    and_(
+                        Alert.effective >= start_time,
+                        Alert.effective <= end_time
+                    )
+                )
+            
+            # Get total count for pagination
+            total_count = query.count()
+            
+            # Apply pagination
+            alerts = query.order_by(Alert.effective.desc()).offset((page - 1) * per_page).limit(per_page).all()
+            
+            # Convert to JSON-serializable format
+            alerts_data = []
+            for alert in alerts:
+                alert_dict = alert.to_dict()
+                alerts_data.append(alert_dict)
+            
+            return jsonify({
+                'alerts': alerts_data,
+                'pagination': {
+                    'page': page,
+                    'per_page': per_page,
+                    'total': total_count,
+                    'pages': (total_count + per_page - 1) // per_page
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Error in alerts API: {e}")
+            return jsonify({'error': str(e)}), 500
+    
     return render_template('radar_alerts.html')
 
 @app.route('/radar-alerts')
