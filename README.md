@@ -3389,23 +3389,47 @@ MIT License
 
 Copyright (c) 2025 HailyDB Team
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to use and interact with the HailyDB API and associated tools without restriction, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Limited-Time Free Access – For a limited and undefined period, the HailyDB API is freely accessible for public use.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Future Premium Model – The HailyDB API will transition to a tokenized access model with monthly subscription tiers. Access will require an API token purchased through our subscription service.
+
+Support via Donations – While the API is free during this period, users are encouraged to support ongoing development via voluntary donations.
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Planned Pricing (HailyDB + HailyAI Assistant Access)
+Tier	Price / Month	Key Limits & Features
+Free	$0	- Limited daily API calls
+- Basic storm event search (last 7 days)
+- Public event map access
+- No CSV export
+- No HailyAI Assistant access
+Basic	$19	- Up to 10k API calls/month
+- 6-month historical data access
+- CSV export
+- Advanced event filtering
+- Basic rate-limited API keys
+- Email support
+- No HailyAI Assistant access
+Plus	$49	- Up to 50k API calls/month
+- 1-year historical data access
+- Advanced filtering and geospatial search
+- CSV and JSON export
+- Priority API processing
+- HailyAI Assistant access (up to 25 queries/day)
+- Saved searches & alerts
+- Early access to beta features
+Premium	Enterprise-Based Pricing	- Custom API call quotas
+- Full historical database access
+- Real-time alert feed with webhooks
+- Unlimited HailyAI Assistant usage for teams
+- Bulk data exports
+- Dedicated account manager
+- Custom integrations & SLAs
 
 ---
 

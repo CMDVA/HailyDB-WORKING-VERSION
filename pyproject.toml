@@ -11,6 +11,7 @@ dependencies = [
     "flask-sqlalchemy>=3.1.1",
     "geopy>=2.4.1",
     "gunicorn>=23.0.0",
+    "markdown>=3.8.2",
     "openai>=1.83.0",
     "psycopg2-binary>=2.9.10",
     "requests>=2.32.3",

@@ -73,6 +73,32 @@ def number_format(value):
     except (ValueError, TypeError):
         return value
 
+# Access Control Helper Functions
+def is_admin_access():
+    """Check if the current request is from admin (localhost or specific patterns)"""
+    # Check if request is from localhost/development
+    if request.remote_addr in ['127.0.0.1', '::1'] or request.host.startswith('localhost'):
+        return True
+    
+    # Check for Replit internal URLs (admin access)
+    if '.replit.dev' in request.host or '.replit.app' in request.host:
+        return True
+    
+    # Add other admin identification logic here (e.g., API keys, session tokens)
+    # For now, we'll use a simple header-based check
+    admin_key = request.headers.get('X-Admin-Key')
+    if admin_key == os.environ.get('ADMIN_ACCESS_KEY', 'dev-admin-key'):
+        return True
+    
+    return False
+
+def require_admin_or_redirect():
+    """Decorator/function to check admin access or redirect to documentation"""
+    if not is_admin_access():
+        # External users get redirected to the documentation page
+        return redirect('https://api.hailyai.com/documentation')
+    return None
+
 @app.template_filter()
 def hail_display_name(size_inches):
     """Get display name for hail size using centralized configuration"""
@@ -1168,6 +1194,9 @@ def get_spc_reports():
 @app.route('/spc/reports')
 def view_spc_reports():
     """View SPC reports in web interface with search functionality"""
+    redirect_response = require_admin_or_redirect()
+    if redirect_response:
+        return redirect_response
     try:
         # Get search parameters
         search_query = request.args.get('search', '').strip()
@@ -1584,6 +1613,9 @@ def api_radar_alerts_backfill():
 @app.route('/internal/dashboard')
 def internal_dashboard():
     """Admin dashboard"""
+    redirect_response = require_admin_or_redirect()
+    if redirect_response:
+        return redirect_response
     try:
         # Get comprehensive stats
         total_alerts = Alert.query.count()
@@ -2460,11 +2492,59 @@ def spc_calendar_verification():
 # Home route
 @app.route('/')
 def index():
+    """Dashboard index - check admin access or redirect to documentation"""
+    redirect_response = require_admin_or_redirect()
+    if redirect_response:
+        return redirect_response
     return redirect(url_for('internal_dashboard'))
+
+@app.route('/documentation')
+def documentation():
+    """Standalone documentation page"""
+    try:
+        import markdown
+        from markdown.extensions import codehilite, tables, toc
+        
+        # Read README.md content
+        with open('README.md', 'r', encoding='utf-8') as f:
+            markdown_content = f.read()
+        
+        # Configure markdown with extensions
+        md = markdown.Markdown(extensions=[
+            'markdown.extensions.codehilite',
+            'markdown.extensions.tables', 
+            'markdown.extensions.toc',
+            'markdown.extensions.fenced_code'
+        ], extension_configs={
+            'codehilite': {
+                'css_class': 'highlight',
+                'use_pygments': True
+            },
+            'toc': {
+                'anchorlink': True
+            }
+        })
+        
+        # Convert markdown to HTML
+        documentation_html = md.convert(markdown_content)
+        
+        # Check if user is admin for template rendering
+        is_admin = is_admin_access()
+        
+        return render_template('documentation.html', 
+                             documentation_html=documentation_html,
+                             is_admin=is_admin)
+        
+    except Exception as e:
+        logger.error(f"Error loading documentation: {e}")
+        return f"<h1>Documentation Error</h1><p>Error loading documentation: {str(e)}</p>", 500
 
 @app.route('/ingestion-logs')
 def ingestion_logs():
     """View ingestion logs page"""
+    redirect_response = require_admin_or_redirect()
+    if redirect_response:
+        return redirect_response
     return render_template('ingestion_logs.html')
 
 @app.route('/ingestion-logs/data')
@@ -2626,11 +2706,17 @@ def ingestion_logs_data():
 @app.route('/spc-matches')
 def spc_matches():
     """View SPC verified matches page"""
+    redirect_response = require_admin_or_redirect()
+    if redirect_response:
+        return redirect_response
     return render_template('spc_matches.html')
 
 @app.route('/hurricane-tracks')
 def hurricane_tracks():
     """View hurricane tracks page"""
+    redirect_response = require_admin_or_redirect()
+    if redirect_response:
+        return redirect_response
     return render_template('hurricane_tracks.html')
 
 # NEW: Consolidated alerts interface with radar-style visual presentation
@@ -2703,6 +2789,9 @@ def get_alerts():
             logger.error(f"Error in alerts API: {e}")
             return jsonify({'error': str(e)}), 500
     
+    redirect_response = require_admin_or_redirect()
+    if redirect_response:
+        return redirect_response
     return render_template('radar_alerts.html')
 
 @app.route('/radar-alerts')
@@ -2798,17 +2887,26 @@ def trigger_complete_state_enrichment():
 @app.route('/address-targeting')
 def address_targeting():
     """Address-specific weather event targeting interface"""
+    redirect_response = require_admin_or_redirect()
+    if redirect_response:
+        return redirect_response
     return render_template('address_targeting.html')
 
 @app.route('/webhook-management')
 def webhook_management():
     """View webhook management interface"""
+    redirect_response = require_admin_or_redirect()
+    if redirect_response:
+        return redirect_response
     return render_template('webhook_management.html')
 
 @app.route('/live-radar')
 @app.route('/live-radar-dashboard')
 def live_radar_dashboard():
     """Live Radar Alerts Dashboard"""
+    redirect_response = require_admin_or_redirect()
+    if redirect_response:
+        return redirect_response
     return render_template('live_radar_dashboard.html')
 
 @app.route('/api/live-radar-alerts')
@@ -4192,6 +4290,9 @@ def api_get_spc_report_enrichment(report_id):
 @app.route('/spc/enrichment-dashboard')
 def spc_enrichment_dashboard():
     """SPC Report Enrichment Dashboard"""
+    redirect_response = require_admin_or_redirect()
+    if redirect_response:
+        return redirect_response
     return render_template('spc_enrichment_dashboard.html')
 
 @app.route('/api/spc-reports/enrichment-stats')
