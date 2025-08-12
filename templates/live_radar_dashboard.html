@@ -520,57 +520,65 @@ function proceedWithDisplay(tbody, alerts) {
     
     console.log('Building table rows for', filteredAlerts.length, 'alerts...');
     
-    tbody.innerHTML = filteredAlerts.map(alert => {
-        // Use database structure with hail/wind focus
-        const effective = alert.effective ? new Date(alert.effective).toLocaleString() : 'Unknown';
-        const expires = alert.expires ? new Date(alert.expires).toLocaleString() : 'Unknown';
-        const location = alert.area_desc || 'Unknown';
-        const event = alert.event || 'Weather Alert';
-        const severity = alert.severity || 'Unknown';
-        const state = alert.state || 'N/A';
+    // Build table rows with explicit column mapping
+    let tableRows = '';
+    for (let i = 0; i < filteredAlerts.length; i++) {
+        const alert = filteredAlerts[i];
         
-        // Hail size display
-        const hailSize = alert.hail_size || 0;
-        const hailDisplay = hailSize > 0 ? 
-            `<span class="badge ${getHailSizeClass(hailSize)}">${hailSize}"</span><br><small class="text-muted">${getHailSizeName(hailSize)}</small>` : 
+        // Extract data with debugging
+        const timeVal = alert.effective ? new Date(alert.effective).toLocaleString() : 'Unknown';
+        const eventVal = alert.event || 'Weather Alert';
+        const locationVal = alert.area_desc || 'Unknown';
+        const stateVal = alert.state || 'N/A';
+        const hailVal = alert.hail_size || 0;
+        const windVal = alert.wind_speed || 0;
+        
+        // Log first alert for debugging
+        if (i === 0) {
+            console.log('=== FIRST ALERT DEBUG ===');
+            console.log('Time:', timeVal);
+            console.log('Event:', eventVal);
+            console.log('Location:', locationVal);
+            console.log('State:', stateVal);
+            console.log('Hail:', hailVal);
+            console.log('Wind:', windVal);
+        }
+        
+        // Format displays
+        const hailDisplay = hailVal > 0 ? 
+            `<span class="badge bg-primary">${hailVal}"</span><br><small>${getHailSizeName(hailVal)}</small>` : 
             '<span class="text-muted">None</span>';
         
-        // Wind speed display    
-        const windSpeed = alert.wind_speed || 0;
-        const windDisplay = windSpeed > 0 ? 
-            `<span class="badge ${getWindSpeedClass(windSpeed)}">${windSpeed} mph</span><br><small class="text-muted">${getWindSeverity(windSpeed)}</small>` : 
+        const windDisplay = windVal > 0 ? 
+            `<span class="badge bg-info">${windVal} mph</span><br><small>${getWindSeverity(windVal)}</small>` : 
             '<span class="text-muted">None</span>';
         
-        // Status badge based on expiration
-        const isExpired = alert.is_expired || false;
-        const statusBadge = isExpired ? 
+        const severityDisplay = getSeverityBadge(hailVal, windVal);
+        const statusDisplay = alert.is_expired ? 
             '<span class="badge bg-secondary">Expired</span>' : 
             '<span class="badge bg-success">Active</span>';
         
-        // Row styling for expired alerts
-        const rowClass = isExpired ? 'class="table-secondary opacity-75"' : '';
-        
-        // Severity display
-        const severityDisplay = getSeverityBadge(hailSize, windSpeed);
-        
-        return `
-            <tr ${rowClass}>
-                <td><small>${effective}</small></td>
-                <td><span class="badge bg-primary">${event}</span></td>
-                <td title="${location}">${location.length > 40 ? location.substring(0, 37) + '...' : location}</td>
-                <td><span class="badge bg-secondary">${state}</span></td>
+        // Build row with explicit column order
+        tableRows += `
+            <tr>
+                <td><small>${timeVal}</small></td>
+                <td><span class="badge bg-primary">${eventVal}</span></td>
+                <td title="${locationVal}">${locationVal.length > 40 ? locationVal.substring(0, 37) + '...' : locationVal}</td>
+                <td><span class="badge bg-secondary">${stateVal}</span></td>
                 <td>${hailDisplay}</td>
                 <td>${windDisplay}</td>
                 <td>${severityDisplay}</td>
-                <td>${statusBadge}</td>
+                <td>${statusDisplay}</td>
                 <td>
-                    <button class="btn btn-outline-primary btn-sm btn-view" onclick="viewRadarAlert('${alert.id}', '${event}', '${location}', ${hailSize}, ${windSpeed}, '${effective}', '${expires}')">
+                    <button class="btn btn-outline-primary btn-sm" onclick="viewRadarAlert('${alert.id}', '${eventVal}', '${locationVal}', ${hailVal}, ${windVal})">
                         <i class="fas fa-eye me-1"></i>View
                     </button>
                 </td>
             </tr>
         `;
-    }).join('');
+    }
+    
+    tbody.innerHTML = tableRows;
 }
 
 function getHailSizeClass(size) {
@@ -666,7 +674,7 @@ function displayError(message) {
     const tbody = document.getElementById('liveRadarTableBody');
     tbody.innerHTML = `
         <tr>
-            <td colspan="8" class="text-center py-4">
+            <td colspan="9" class="text-center py-4">
                 <div class="alert alert-danger" role="alert">
                     <i class="fas fa-exclamation-triangle me-2"></i>
                     ${message}
