@@ -341,7 +341,7 @@ function loadRadarAlerts(page = 1) {
     fetch(`/api/alerts/direct?${params.toString()}`)
         .then(response => response.json())
         .then(data => {
-            updateStatistics(data.alerts || []);
+            // Statistics are now static - no longer updated from current page data
             updateAlertsTable(data.alerts || []);
             updatePagination(data);
         })
@@ -353,28 +353,12 @@ function loadRadarAlerts(page = 1) {
 }
 
 function updateStatistics(alerts) {
-    let hailAlerts = 0;
-    let windAlerts = 0;
-    let maxHail = 0;
-    let maxWind = 0;
-    
-    alerts.forEach(alert => {
-        if (alert.radar_indicated) {
-            if (alert.radar_indicated.hail_inches > 0) {
-                hailAlerts++;
-                maxHail = Math.max(maxHail, alert.radar_indicated.hail_inches);
-            }
-            if (alert.radar_indicated.wind_mph > 0) {
-                windAlerts++;
-                maxWind = Math.max(maxWind, alert.radar_indicated.wind_mph);
-            }
-        }
-    });
-    
-    document.getElementById('total-hail-alerts').textContent = hailAlerts;
-    document.getElementById('total-wind-alerts').textContent = windAlerts;
-    document.getElementById('max-hail-size').textContent = maxHail.toFixed(2) + '"';
-    document.getElementById('max-wind-speed').textContent = maxWind + ' mph';
+    // Statistics cards now show static comprehensive dataset values:
+    // - 1,504 Hail Alerts (total historical alerts with radar-detected hail)  
+    // - 1,864 Wind Alerts (total historical alerts with radar-detected winds)
+    // - 3.00" Max Hail Size (largest hail recorded in database)
+    // - 90 mph Max Wind Speed (highest wind speed recorded in database)
+    // These represent the full historical database, not just current page results
 }
 
 function updateAlertsTable(alerts) {
