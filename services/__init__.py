@@ -1,1 +1,1 @@
-# Services package initialization
+# Services package for HailyDB

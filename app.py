@@ -64,51 +64,19 @@ with app.app_context():
     except Exception as e:
         logger.error(f"Error initializing services: {e}")
 
-# Add custom Jinja2 filters
-@app.template_filter('number_format')
-def number_format(value):
-    """Format numbers with commas for thousands"""
-    try:
-        return "{:,}".format(int(value))
-    except (ValueError, TypeError):
-        return value
+# Import utilities
+from utils.access_control import is_admin_access, require_admin_or_redirect
+from utils.template_filters import (number_format, hail_display_name, hail_severity, 
+                                   determine_enhanced_status)
 
-# Access Control Helper Functions
-def is_admin_access():
-    """Check if the current request is from admin (localhost or specific patterns)"""
-    # Check if request is from localhost/development
-    if request.remote_addr in ['127.0.0.1', '::1'] or request.host.startswith('localhost'):
-        return True
-    
-    # Check for Replit internal URLs (admin access)
-    if '.replit.dev' in request.host or '.replit.app' in request.host:
-        return True
-    
-    # Add other admin identification logic here (e.g., API keys, session tokens)
-    # For now, we'll use a simple header-based check
-    admin_key = request.headers.get('X-Admin-Key')
-    if admin_key == os.environ.get('ADMIN_ACCESS_KEY', 'dev-admin-key'):
-        return True
-    
-    return False
+# Register template filters
+app.template_filter('number_format')(number_format)
+app.template_filter('hail_display_name')(hail_display_name)
+app.template_filter('hail_severity')(hail_severity)
 
-def require_admin_or_redirect():
-    """Decorator/function to check admin access or redirect to documentation"""
-    if not is_admin_access():
-        # External users get redirected to the documentation page
-        # Use the current domain with /documentation route for external access
-        return redirect(url_for('documentation'))
-    return None
-
-@app.template_filter()
-def hail_display_name(size_inches):
-    """Get display name for hail size using centralized configuration"""
-    return Config.get_hail_display_name(size_inches)
-
-@app.template_filter()
-def hail_severity(size_inches):
-    """Get severity category for hail size using centralized configuration"""
-    return Config.get_hail_severity(size_inches)
+# Register blueprints
+from routes.api_routes import api_bp
+app.register_blueprint(api_bp)
 
 def determine_enhanced_status(log_row):
     """Determine enhanced status display and color coding for operation logs"""
@@ -491,59 +459,9 @@ def get_alert(alert_id):
 
 # Removed /alerts/summary route - redundant with existing verified matches page
 
-@app.route('/api/health')
-def api_health():
-    """
-    Health check endpoint - PUBLIC ACCESS
-    Returns system status and basic statistics
-    """
-    try:
-        # Get basic counts for health check
-        alert_count = Alert.query.count()
-        spc_count = SPCReport.query.count()
-        
-        return jsonify({
-            'status': 'healthy',
-            'service': 'HailyDB API v2.0',
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
-            'database': {
-                'alerts': alert_count,
-                'spc_reports': spc_count
-            },
-            'version': '2.0.0',
-            'documentation': '/documentation'
-        })
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }), 500
+# Legacy health endpoint removed - now handled by API blueprint at /api/health
 
-@app.route('/api/alerts/by-state/<state>')
-def get_alerts_by_state(state):
-    """Get alerts for a specific state"""
-    query = Alert.query.filter(
-        Alert.area_desc.ilike(f'%{state}%')
-    ).order_by(Alert.ingested_at.desc())
-    
-    active_only = request.args.get('active_only', 'false').lower() == 'true'
-    if active_only:
-        from datetime import datetime
-        now = datetime.utcnow()
-        query = query.filter(
-            Alert.effective <= now,
-            Alert.expires > now
-        )
-    
-    alerts = query.all()
-    
-    return jsonify({
-        'state': state,
-        'total_alerts': len(alerts),
-        'alerts': [alert.to_dict() for alert in alerts]
-    })
+# Legacy state alerts endpoint removed - now handled by API blueprint at /api/alerts/by-state/<state>
 
 @app.route('/api/alerts/by-county/<state>/<county>')
 def get_alerts_by_county(state, county):
