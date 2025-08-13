@@ -244,6 +244,83 @@
     </div>
 </div>
 
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title" id="total-hail-alerts">0</h4>
+                        <p class="card-text">Hail Alerts</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-snowflake fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title" id="total-wind-alerts">0</h4>
+                        <p class="card-text">Wind Alerts</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-wind fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title" id="max-hail-size">0.0"</h4>
+                        <p class="card-text">Max Hail Size</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-circle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title" id="max-wind-speed">0 mph</h4>
+                        <p class="card-text">Max Wind Speed</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-tachometer-alt fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Radar-Detected Severe Weather Events Section Header -->
+<div class="row mb-3">
+    <div class="col-12">
+        <h3 class="h4 mb-3">
+            <i class="fas fa-satellite-dish me-2"></i>
+            Radar-Detected Severe Weather Events
+        </h3>
+        <p class="text-muted mb-0">
+            Real-time alerts with radar-detected hail (any size) or winds 50+ mph
+        </p>
+    </div>
+</div>
+
 <!-- Progress Indicator -->
 <div id="enrichmentProgress" class="alert alert-info" style="display: none;">
     <div class="d-flex align-items-center">
@@ -425,6 +502,52 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+// Update statistics based on current live radar alerts
+function updateLiveRadarStatistics() {
+    fetch('/api/live-radar-alerts?format=json')
+        .then(response => response.json())
+        .then(data => {
+            const alerts = data.alerts || [];
+            let hailAlerts = 0;
+            let windAlerts = 0;
+            let maxHail = 0;
+            let maxWind = 0;
+            
+            alerts.forEach(alert => {
+                const hailSize = alert.hail_size || 0;
+                const windSpeed = alert.wind_speed || 0;
+                
+                if (hailSize > 0) {
+                    hailAlerts++;
+                    maxHail = Math.max(maxHail, hailSize);
+                }
+                
+                if (windSpeed > 0) {
+                    windAlerts++;
+                    maxWind = Math.max(maxWind, windSpeed);
+                }
+            });
+            
+            // Update stat cards
+            document.getElementById('total-hail-alerts').textContent = hailAlerts;
+            document.getElementById('total-wind-alerts').textContent = windAlerts;
+            document.getElementById('max-hail-size').textContent = maxHail.toFixed(2) + '"';
+            document.getElementById('max-wind-speed').textContent = maxWind + ' mph';
+        })
+        .catch(error => {
+            console.error('Error updating statistics:', error);
+        });
+}
+
+// Initialize statistics on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateLiveRadarStatistics();
+    
+    // Refresh statistics every 30 seconds
+    setInterval(updateLiveRadarStatistics, 30000);
+});
+</script>
 <script>
 function refreshAlerts() {
     window.location.reload();
