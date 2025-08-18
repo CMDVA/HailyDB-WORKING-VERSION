@@ -2346,10 +2346,16 @@ def spc_verify_today():
                 response = requests.get(url, timeout=10)
                 response.raise_for_status()
                 
-                # Count total data rows (subtract 3 for headers)
-                lines = response.text.strip().split('\n')
-                total_lines = len(lines)
-                spc_live_count = max(0, total_lines - 3)
+                # Use perfect parsing logic to count actual data rows
+                csv_content = response.text.strip()
+                lines = csv_content.split('\n')
+                
+                spc_live_count = 0
+                for line in lines:
+                    line = line.strip()
+                    # Count lines that start with 4 digits and aren't headers
+                    if line and len(line) >= 4 and line[:4].isdigit() and not line.startswith('Time,'):
+                        spc_live_count += 1
                 
                 match_status = 'MATCH' if hailydb_count == spc_live_count else 'MISMATCH'
                 
@@ -2360,13 +2366,23 @@ def spc_verify_today():
                     'match_status': match_status
                 })
                 
-            except requests.RequestException:
-                # SPC file not available for this date - always show for reference
+            except requests.RequestException as e:
+                # SPC file not available for this date - log and continue
+                logger.debug(f"SPC file not available for {check_date}: {e}")
                 verification_results.append({
                     'date': check_date.strftime('%Y-%m-%d'),
                     'hailydb_count': hailydb_count,
                     'spc_live_count': None,
-                    'match_status': 'PENDING' if check_date == today else 'UNKNOWN'
+                    'match_status': 'PENDING' if check_date == today else 'UNAVAILABLE'
+                })
+            except Exception as e:
+                # Network or parsing error - log and continue
+                logger.warning(f"Error checking SPC data for {check_date}: {e}")
+                verification_results.append({
+                    'date': check_date.strftime('%Y-%m-%d'),
+                    'hailydb_count': hailydb_count,
+                    'spc_live_count': None,
+                    'match_status': 'ERROR'
                 })
         
         return jsonify({
