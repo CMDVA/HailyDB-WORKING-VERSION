@@ -863,6 +863,92 @@ def get_enrichment_stats():
             'error': str(e)
         }), 500
 
+@app.route('/admin/spc-sync', methods=['POST'])
+def admin_spc_sync():
+    """Admin endpoint to sync SPC data and fix mismatches"""
+    try:
+        from datetime import date
+        from spc_verification import SPCVerificationService
+        from spc_ingest import SPCIngestService
+        from sqlalchemy.orm import sessionmaker
+        
+        Session = sessionmaker(bind=db.engine)
+        session = Session()
+        
+        try:
+            verifier = SPCVerificationService(session)
+            ingest_service = SPCIngestService(session)
+            
+            # Check for mismatches in recent dates
+            results = []
+            mismatched_dates = []
+            
+            for day in range(12, 19):  # Aug 12-18
+                test_date = date(2025, 8, day)
+                result = verifier.verify_single_date(test_date)
+                results.append(result)
+                
+                if result['match_status'] == 'MISMATCH':
+                    mismatched_dates.append(test_date)
+            
+            if not mismatched_dates:
+                return jsonify({
+                    'status': 'success',
+                    'message': 'All dates are synchronized - no action needed!',
+                    'verification_results': results
+                })
+            
+            # Fix mismatches by clearing and re-ingesting
+            sync_results = []
+            for target_date in mismatched_dates:
+                # Delete existing records for this date
+                deleted_count = session.query(SPCReport).filter(
+                    SPCReport.report_date == target_date
+                ).delete()
+                session.commit()
+                
+                # Re-ingest fresh data using the correct method
+                try:
+                    ingest_result = ingest_service.force_poll_for_backfill(target_date, "sync_fix")
+                    sync_results.append({
+                        'date': target_date.strftime('%Y-%m-%d'),
+                        'deleted': deleted_count,
+                        'reingested': ingest_result.get('total_reports', 0),
+                        'status': 'success'
+                    })
+                except Exception as e:
+                    session.rollback()
+                    sync_results.append({
+                        'date': target_date.strftime('%Y-%m-%d'),
+                        'deleted': deleted_count,
+                        'status': 'failed',
+                        'error': str(e)
+                    })
+            
+            # Final verification
+            final_results = []
+            for day in range(12, 19):
+                test_date = date(2025, 8, day)
+                result = verifier.verify_single_date(test_date)
+                final_results.append(result)
+            
+            return jsonify({
+                'status': 'success',
+                'message': f'Synchronized {len([r for r in sync_results if r["status"] == "success"])} dates',
+                'sync_results': sync_results,
+                'final_verification': final_results
+            })
+        
+        finally:
+            session.close()
+            
+    except Exception as e:
+        logger.error(f"Error during SPC sync: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 @app.route('/api/alerts/unenriched-counts')
 def get_unenriched_counts():
     """Get counts of unenriched alerts by category"""
