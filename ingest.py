@@ -184,12 +184,12 @@ class IngestService:
             is_test_message = (
                 event_type == 'Test Message' or
                 status == 'Test' or
-                'monitoring message only' in description.lower() or
-                'monitoring message only' in instruction.lower() or
-                'please disregard' in description.lower() or
-                'please disregard' in instruction.lower() or
-                'test message' in headline.lower() or
-                'KEEPALIVE' in alert_id
+                'monitoring message only' in (description or '').lower() or
+                'monitoring message only' in (instruction or '').lower() or
+                'please disregard' in (description or '').lower() or
+                'please disregard' in (instruction or '').lower() or
+                'test message' in (headline or '').lower() or
+                'KEEPALIVE' in (alert_id or '')
             )
             
             if is_test_message:
@@ -419,6 +419,9 @@ class IngestService:
         try:
             # CRITICAL: Skip extraction for flood warnings and advisories
             # These often contain "inches of rain" which should never be parsed as hail
+            if not text or not isinstance(text, str):
+                return None
+                
             flood_keywords = ['flood warning', 'flood advisory', 'flash flood', 'inches of rain', 'rainfall']
             text_lower = text.lower()
             for keyword in flood_keywords:
