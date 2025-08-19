@@ -532,6 +532,251 @@ def get_active_alerts():
         'alerts': [alert.to_dict() for alert in alerts]
     })
 
+@app.route('/api/alerts/radar_detected')
+def get_radar_detected_alerts():
+    """
+    Pre-filtered endpoint for radar-detected damage events
+    Returns alerts with 50+ mph winds OR any size hail detected by radar
+    Optimized for insurance and restoration industry clients
+    """
+    from datetime import datetime
+    
+    # Query for radar-detected events meeting damage criteria
+    query = Alert.query.filter(
+        Alert.radar_indicated.isnot(None),
+        db.or_(
+            Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50,
+            Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0
+        )
+    )
+    
+    # Geographic filters
+    state = request.args.get('state')
+    if state:
+        query = query.filter(Alert.affected_states.contains([state.upper()]))
+    
+    county = request.args.get('county')
+    if county:
+        query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
+    
+    # Status filter (active vs expired)
+    status = request.args.get('status', 'all').lower()
+    now = datetime.utcnow()
+    if status == 'active':
+        query = query.filter(Alert.expires > now)
+    elif status == 'expired':
+        query = query.filter(Alert.expires <= now)
+    
+    # Date range
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            query = query.filter(Alert.effective >= start_dt)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            from datetime import timedelta
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Alert.effective < end_dt)
+        except ValueError:
+            pass
+    
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    limit = min(request.args.get('limit', 1000, type=int), 5000)
+    
+    # Execute query
+    total = query.count()
+    alerts = query.order_by(Alert.effective.desc()).offset((page - 1) * limit).limit(limit).all()
+    
+    # Format as GeoJSON FeatureCollection
+    features = []
+    for alert in alerts:
+        feature = {
+            'id': alert.id,
+            'type': 'Feature',
+            'properties': alert.to_dict(),
+            'geometry': alert.geometry
+        }
+        features.append(feature)
+    
+    return jsonify({
+        'type': 'FeatureCollection',
+        'features': features,
+        'title': f'Radar-Detected Weather Damage Events - {total} alerts with 50+ mph winds or hail',
+        'updated': datetime.utcnow().isoformat(),
+        'metadata': {
+            'total_results': total,
+            'page': page,
+            'per_page': limit,
+            'criteria': '50+ mph winds OR any hail size detected by radar',
+            'data_source': 'National Weather Service alerts with radar parameters'
+        }
+    })
+
+@app.route('/api/alerts/radar_detected/wind')
+def get_radar_detected_wind():
+    """
+    Pre-filtered endpoint for radar-detected wind events (50+ mph)
+    Optimized for wind damage assessment
+    """
+    from datetime import datetime
+    
+    # Query for radar-detected wind events
+    query = Alert.query.filter(
+        Alert.radar_indicated.isnot(None),
+        Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50
+    )
+    
+    # Apply same filters as main endpoint
+    state = request.args.get('state')
+    if state:
+        query = query.filter(Alert.affected_states.contains([state.upper()]))
+    
+    county = request.args.get('county') 
+    if county:
+        query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
+    
+    status = request.args.get('status', 'all').lower()
+    now = datetime.utcnow()
+    if status == 'active':
+        query = query.filter(Alert.expires > now)
+    elif status == 'expired':
+        query = query.filter(Alert.expires <= now)
+    
+    # Date range
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            query = query.filter(Alert.effective >= start_dt)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            from datetime import timedelta
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Alert.effective < end_dt)
+        except ValueError:
+            pass
+    
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    limit = min(request.args.get('limit', 1000, type=int), 5000)
+    
+    # Execute query
+    total = query.count()
+    alerts = query.order_by(Alert.effective.desc()).offset((page - 1) * limit).limit(limit).all()
+    
+    # Format as GeoJSON FeatureCollection
+    features = []
+    for alert in alerts:
+        feature = {
+            'id': alert.id,
+            'type': 'Feature', 
+            'properties': alert.to_dict(),
+            'geometry': alert.geometry
+        }
+        features.append(feature)
+    
+    return jsonify({
+        'type': 'FeatureCollection',
+        'features': features,
+        'title': f'Radar-Detected Wind Events - {total} alerts with 50+ mph winds',
+        'updated': datetime.utcnow().isoformat(),
+        'metadata': {
+            'total_results': total,
+            'page': page,
+            'per_page': limit,
+            'criteria': '50+ mph winds detected by radar',
+            'data_source': 'National Weather Service alerts with radar wind parameters'
+        }
+    })
+
+@app.route('/api/alerts/radar_detected/hail')
+def get_radar_detected_hail():
+    """
+    Pre-filtered endpoint for radar-detected hail events (any size)
+    Optimized for hail damage assessment
+    """
+    from datetime import datetime
+    
+    # Query for radar-detected hail events
+    query = Alert.query.filter(
+        Alert.radar_indicated.isnot(None),
+        Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0
+    )
+    
+    # Apply same filters as main endpoint
+    state = request.args.get('state')
+    if state:
+        query = query.filter(Alert.affected_states.contains([state.upper()]))
+    
+    county = request.args.get('county')
+    if county:
+        query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
+    
+    status = request.args.get('status', 'all').lower()
+    now = datetime.utcnow()
+    if status == 'active':
+        query = query.filter(Alert.expires > now)
+    elif status == 'expired':
+        query = query.filter(Alert.expires <= now)
+    
+    # Date range
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            query = query.filter(Alert.effective >= start_dt)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            from datetime import timedelta
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Alert.effective < end_dt)
+        except ValueError:
+            pass
+    
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    limit = min(request.args.get('limit', 1000, type=int), 5000)
+    
+    # Execute query
+    total = query.count()
+    alerts = query.order_by(Alert.effective.desc()).offset((page - 1) * limit).limit(limit).all()
+    
+    # Format as GeoJSON FeatureCollection
+    features = []
+    for alert in alerts:
+        feature = {
+            'id': alert.id,
+            'type': 'Feature',
+            'properties': alert.to_dict(),
+            'geometry': alert.geometry
+        }
+        features.append(feature)
+    
+    return jsonify({
+        'type': 'FeatureCollection',
+        'features': features,
+        'title': f'Radar-Detected Hail Events - {total} alerts with hail of any size',
+        'updated': datetime.utcnow().isoformat(),
+        'metadata': {
+            'total_results': total,
+            'page': page,
+            'per_page': limit,
+            'criteria': 'Any hail size detected by radar',
+            'data_source': 'National Weather Service alerts with radar hail parameters'
+        }
+    })
+
 @app.route('/api/test/radar-parsing', methods=['POST'])
 def test_radar_parsing():
     """Test endpoint for radar-indicated parsing"""
@@ -658,25 +903,30 @@ def get_expired_alerts():
     min_hail = request.args.get('min_hail', 0, type=float)  # Any hail by default
     min_wind = request.args.get('min_wind', 50, type=int)   # 50+ mph winds
     
-    # Date range for historical analysis (default: last 30 days)
+    # Date range for historical analysis (default: ALL historical data)
     from datetime import datetime, timedelta
-    default_start = datetime.utcnow() - timedelta(days=30)
-    start_date = request.args.get('start_date', default_start.strftime('%Y-%m-%d'))
+    start_date = request.args.get('start_date')  # No default - access all historical data
     end_date = request.args.get('end_date')
     
     # Pagination
     page = request.args.get('page', 1, type=int)
-    limit = min(request.args.get('limit', 100, type=int), 500)  # Higher limit for damage events
+    limit = min(request.args.get('limit', 1000, type=int), 10000)  # High limit for historical repository access
     
-    # Base query: EXPIRED alerts with radar-indicated parameters
+    # Base query: EXPIRED alerts only (radar filtering handled by has_radar parameter)
     query = Alert.query.filter(
-        Alert.expires < datetime.utcnow(),  # Historical alerts only
-        Alert.radar_indicated.isnot(None),
-        db.or_(
-            Alert.radar_indicated['hail_inches'].astext.cast(db.Float) >= min_hail,
-            Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= min_wind
-        )
+        Alert.expires < datetime.utcnow()  # Historical alerts only
     )
+    
+    # Apply radar filtering based on has_radar parameter
+    has_radar = request.args.get('has_radar', '').lower() == 'true'
+    if has_radar:
+        query = query.filter(
+            Alert.radar_indicated.isnot(None),
+            db.or_(
+                Alert.radar_indicated['hail_inches'].astext.cast(db.Float) >= min_hail,
+                Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= min_wind
+            )
+        )
     
     # Geographic filters
     if state:

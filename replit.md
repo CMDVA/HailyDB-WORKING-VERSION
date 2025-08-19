@@ -11,17 +11,19 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimized for Replit deployment.
 
-### Recent Achievements (August 19, 2025) - v2.1.2 Release
+### Recent Achievements (August 19, 2025) - v2.1.3 Release
+- **Pre-filtered API Endpoints**: Added `/api/alerts/radar_detected` family for easy client integration
+- **Radar-Detected Wind Events**: Dedicated `/api/alerts/radar_detected/wind` for 50+ mph wind damage
+- **Radar-Detected Hail Events**: Dedicated `/api/alerts/radar_detected/hail` for any size hail damage
+- **Historical Repository Access**: Unlocked full 7,500+ alert repository with 10K limit support
 - **Critical Bug Fixed**: Resolved `'NoneType' object has no attribute 'lower'` errors in state enrichment
 - **Complete API Coverage**: Fixed missing `/api/alerts/{alert_id}` endpoint for individual alert details
 - **State Enrichment Hardened**: Added comprehensive error handling for None/invalid UGC codes
 - **Perfect SPC Synchronization**: Achieved 100% data capture with zero variance tolerance
 - **Core Business Value Defined**: Repositioned as historical damage intelligence platform
 - **NWS API Compliance**: Complete adherence to official NWS OpenAPI specification for data formats
-- **Historical Alert Repository**: `/api/alerts/expired` endpoint returns GeoJSON FeatureCollection format
 - **Individual Alert Access**: Full JSON API for complete alert details with enrichments
 - **Code Cleanup**: Deprecated unused parsers and moved legacy components to `/deprecated` folder
-- **Historical Data Stats**: 2,085 expired radar-detected damage events (27.6% of all alerts)
 - **Production Ready**: Clean architecture with NWS-standard field naming and response structures
 
 ### Backend Architecture
