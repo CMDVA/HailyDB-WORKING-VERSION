@@ -11,8 +11,10 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimized for Replit deployment.
 
-### Recent Achievements (August 19, 2025) - v2.1.1 Release
+### Recent Achievements (August 19, 2025) - v2.1.2 Release
+- **Critical Bug Fixed**: Resolved `'NoneType' object has no attribute 'lower'` errors in state enrichment
 - **Complete API Coverage**: Fixed missing `/api/alerts/{alert_id}` endpoint for individual alert details
+- **State Enrichment Hardened**: Added comprehensive error handling for None/invalid UGC codes
 - **Perfect SPC Synchronization**: Achieved 100% data capture with zero variance tolerance
 - **Core Business Value Defined**: Repositioned as historical damage intelligence platform
 - **NWS API Compliance**: Complete adherence to official NWS OpenAPI specification for data formats

@@ -65,15 +65,20 @@ class StateEnrichmentService:
             return states
             
         for ugc in ugc_codes:
-            if not isinstance(ugc, str) or len(ugc) < 2:
+            # Safety check for None or invalid UGC codes
+            if ugc is None or not isinstance(ugc, str) or len(ugc) < 2:
                 continue
                 
-            # Extract state prefix from UGC code
-            # Examples: MIZ024 -> MI, PZZ530 -> PZ (marine CA), CAZ123 -> CA
-            state_prefix = ugc[:2].upper()
-            
-            if state_prefix in self.ugc_state_mapping:
-                states.add(self.ugc_state_mapping[state_prefix])
+            try:
+                # Extract state prefix from UGC code
+                # Examples: MIZ024 -> MI, PZZ530 -> PZ (marine CA), CAZ123 -> CA
+                state_prefix = ugc[:2].upper()
+                
+                if state_prefix and state_prefix in self.ugc_state_mapping:
+                    states.add(self.ugc_state_mapping[state_prefix])
+            except (AttributeError, IndexError, TypeError) as e:
+                logger.warning(f"Failed to process UGC code '{ugc}': {e}")
+                continue
                 
         return states
     
@@ -85,15 +90,20 @@ class StateEnrichmentService:
             return states
             
         for same in same_codes:
-            if not isinstance(same, str) or len(same) < 3:
+            # Safety check for None or invalid SAME codes
+            if same is None or not isinstance(same, str) or len(same) < 3:
                 continue
                 
-            # Extract state code from first 3 digits of SAME code
-            # Example: 026007 -> 026 -> MI
-            state_code = same[:3]
-            
-            if state_code in self.same_state_mapping:
-                states.add(self.same_state_mapping[state_code])
+            try:
+                # Extract state code from first 3 digits of SAME code
+                # Example: 026007 -> 026 -> MI
+                state_code = same[:3]
+                
+                if state_code and state_code in self.same_state_mapping:
+                    states.add(self.same_state_mapping[state_code])
+            except (AttributeError, IndexError, TypeError) as e:
+                logger.warning(f"Failed to process SAME code '{same}': {e}")
+                continue
                 
         return states
     
@@ -101,47 +111,52 @@ class StateEnrichmentService:
         """Extract state codes from area description text"""
         states = set()
         
-        if not area_desc:
+        # Safety check for None or invalid area description
+        if not area_desc or not isinstance(area_desc, str):
             return states
             
-        # Method 1: Look for standard state abbreviations
-        state_pattern = r'\b([A-Z]{2})\b'
-        potential_states = re.findall(state_pattern, area_desc)
-        
-        # Validate against known state codes
-        valid_state_codes = {
-            'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID',
-            'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS',
-            'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK',
-            'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV',
-            'WI', 'WY', 'DC'
-        }
-        
-        for state in potential_states:
-            if state in valid_state_codes:
-                states.add(state)
-        
-        # Method 2: Look for state names in area description
-        state_name_mapping = {
-            'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR',
-            'california': 'CA', 'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE',
-            'florida': 'FL', 'georgia': 'GA', 'hawaii': 'HI', 'idaho': 'ID',
-            'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA', 'kansas': 'KS',
-            'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
-            'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS',
-            'missouri': 'MO', 'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV',
-            'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY',
-            'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH', 'oklahoma': 'OK',
-            'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
-            'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT',
-            'vermont': 'VT', 'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV',
-            'wisconsin': 'WI', 'wyoming': 'WY'
-        }
-        
-        area_lower = area_desc.lower()
-        for state_name, state_code in state_name_mapping.items():
-            if state_name in area_lower:
-                states.add(state_code)
+        try:
+            # Method 1: Look for standard state abbreviations
+            state_pattern = r'\b([A-Z]{2})\b'
+            potential_states = re.findall(state_pattern, area_desc)
+            
+            # Validate against known state codes
+            valid_state_codes = {
+                'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID',
+                'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS',
+                'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK',
+                'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV',
+                'WI', 'WY', 'DC'
+            }
+            
+            for state in potential_states:
+                if state in valid_state_codes:
+                    states.add(state)
+            
+            # Method 2: Look for state names in area description
+            state_name_mapping = {
+                'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR',
+                'california': 'CA', 'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE',
+                'florida': 'FL', 'georgia': 'GA', 'hawaii': 'HI', 'idaho': 'ID',
+                'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA', 'kansas': 'KS',
+                'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+                'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS',
+                'missouri': 'MO', 'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV',
+                'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY',
+                'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH', 'oklahoma': 'OK',
+                'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+                'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT',
+                'vermont': 'VT', 'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV',
+                'wisconsin': 'WI', 'wyoming': 'WY'
+            }
+            
+            area_lower = area_desc.lower()
+            for state_name, state_code in state_name_mapping.items():
+                if state_name in area_lower:
+                    states.add(state_code)
+                    
+        except (AttributeError, TypeError) as e:
+            logger.warning(f"Failed to process area description '{area_desc}': {e}")
         
         return states
     
