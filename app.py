@@ -614,6 +614,104 @@ def get_radar_parsing_summary():
             'message': str(e)
         }), 500
 
+@app.route('/api/damage-events')
+def get_damage_events():
+    """
+    PRIMARY BUSINESS VALUE ENDPOINT: Historical radar-detected damage events
+    Optimized for insurance claims, damage assessment, and restoration contractors
+    
+    Returns expired NWS alerts with radar-detected hail and/or high winds (50+ mph)
+    Default behavior focuses on historical damage events, not active weather
+    """
+    # Location parameters for damage assessment
+    state = request.args.get('state')
+    county = request.args.get('county')
+    lat = request.args.get('lat', type=float)
+    lon = request.args.get('lon', type=float)
+    radius_miles = request.args.get('radius_miles', 25, type=int)
+    
+    # Damage parameters
+    min_hail = request.args.get('min_hail', 0, type=float)  # Any hail by default
+    min_wind = request.args.get('min_wind', 50, type=int)   # 50+ mph winds
+    
+    # Date range for historical analysis (default: last 30 days)
+    from datetime import datetime, timedelta
+    default_start = datetime.utcnow() - timedelta(days=30)
+    start_date = request.args.get('start_date', default_start.strftime('%Y-%m-%d'))
+    end_date = request.args.get('end_date')
+    
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    limit = min(request.args.get('limit', 100, type=int), 500)  # Higher limit for damage events
+    
+    # Base query: EXPIRED alerts with radar-detected damage
+    query = Alert.query.filter(
+        Alert.expires < datetime.utcnow(),  # Historical events only
+        Alert.radar_indicated.isnot(None),
+        db.or_(
+            Alert.radar_indicated['hail_inches'].astext.cast(db.Float) >= min_hail,
+            Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= min_wind
+        )
+    )
+    
+    # Geographic filters
+    if state:
+        query = query.filter(Alert.affected_states.contains([state]))
+    if county:
+        query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
+    
+    # Date range
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            query = query.filter(Alert.effective >= start_dt)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Alert.effective < end_dt)
+        except ValueError:
+            pass
+    
+    # Execute query with pagination
+    total = query.count()
+    events = query.order_by(Alert.effective.desc()).offset((page - 1) * limit).limit(limit).all()
+    
+    # Format response for damage assessment use cases
+    damage_events = []
+    for event in events:
+        damage_events.append({
+            'id': event.id,
+            'event_type': event.event,
+            'location': event.area_desc,
+            'states': event.affected_states,
+            'damage_occurred': event.effective.isoformat() if event.effective else None,
+            'expired': event.expires.isoformat() if event.expires else None,
+            'radar_parameters': event.radar_indicated,
+            'coordinates': event.geometry_bounds,
+            'duration_minutes': event.duration_minutes,
+            'severity': event.severity,
+            'spc_verified': event.spc_verified,
+            'spc_reports': event.spc_report_count or 0
+        })
+    
+    return jsonify({
+        'total_damage_events': total,
+        'page': page,
+        'limit': limit,
+        'pages': (total + limit - 1) // limit,
+        'filters': {
+            'state': state,
+            'county': county,
+            'min_hail_inches': min_hail,
+            'min_wind_mph': min_wind,
+            'date_range': f"{start_date} to {end_date or 'today'}"
+        },
+        'damage_events': damage_events,
+        'usage_note': 'This endpoint returns EXPIRED alerts with radar-detected damage for insurance and restoration use cases'
+    })
+
 @app.route('/api/alerts/search')
 def search_alerts():
     """Advanced search endpoint for external applications"""
@@ -693,8 +791,8 @@ def search_alerts():
     min_wind = request.args.get('min_wind', type=int)
     
     if has_radar_data:
-        # Only show events with legitimate radar-detected data
-        # Must have "radar indicated" in description AND qualifying hail/wind data
+        # CORE BUSINESS VALUE: Historical damage events with radar-detected hail/wind
+        # These are the events our clients need for damage assessment and insurance claims
         hail_condition = Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0
         wind_condition = Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50
         radar_source_condition = Alert.properties['description'].astext.ilike('%radar indicated%')

@@ -1,7 +1,9 @@
 # HailyDB v2.0 - National Weather Service Alert Intelligence Platform
 
 ## Overview
-HailyDB is a comprehensive weather intelligence platform designed to ingest, process, and enrich National Weather Service (NWS) alerts using AI-powered analysis and Storm Prediction Center (SPC) verification. Its primary purpose is to provide real-time weather data processing capabilities for enterprise applications, insurance claims processing, and emergency management systems, offering significant business value in weather intelligence and risk assessment.
+HailyDB is a **historical weather damage intelligence platform** designed to capture and analyze expired NWS alerts containing radar-detected hail and high winds. Unlike active weather platforms, HailyDB's core value proposition is providing comprehensive historical data on **where likely weather damage WAS**, making it essential for insurance claims processing, damage assessment, restoration contractors, and forensic weather analysis.
+
+**Core Business Value**: Historical radar-detected severe weather events (expired alerts with hail/wind data) for damage assessment and insurance claims.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -9,11 +11,12 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimized for Replit deployment.
 
-### Recent Achievements (August 18, 2025)
+### Recent Achievements (August 19, 2025)
 - **Perfect SPC Synchronization**: Achieved 100% data capture with zero variance tolerance
-- **Bulletproof CSV Parser**: Created perfect parser guaranteeing capture of every SPC data row
-- **Data Recovery**: Successfully restored 345 missing records from Aug 12-15 data loss incident
-- **Zero Tolerance Compliance**: All 521 SPC records now perfectly synchronized with NWS source
+- **Core Business Value Defined**: Repositioned as historical damage intelligence platform
+- **Damage Event API**: Created dedicated `/api/damage-events` endpoint for core business value
+- **Historical Data Stats**: 2,085 expired radar-detected damage events (27.6% of all alerts)
+- **Insurance Industry Focus**: Optimized for "where damage WAS" rather than active weather
 
 ### Backend Architecture
 - **Flask Application**: Core web service utilizing SQLAlchemy ORM.
@@ -45,7 +48,7 @@ HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimiz
 - **Rule-based Evaluation**: Configurable conditions for alert dispatch.
 
 ### UI/UX Decisions
-The system focuses on a consistent, professional layout for displaying weather intelligence, ensuring a unified user experience across all report detail pages, regardless of data availability. This includes consistent presentation of enhanced context and location information, with a modern design using purple-blue gradient backgrounds and a card-based layout. The documentation interface is public, modern, and responsive, featuring professional typography and code highlighting. Front-end management interfaces are restricted to admin access.
+The system prioritizes **historical damage event discovery** with intuitive filtering for expired alerts containing radar-detected hail and wind damage. The interface emphasizes damage assessment workflows rather than active weather monitoring, with clear presentation of radar parameters, expiration timestamps, and geographic coverage. Professional layout optimized for insurance and restoration industry users who need to identify past weather damage locations.
 
 ### Data Flow
 The system involves real-time ingestion of NWS alerts, followed by radar processing, SPC cross-referencing, AI enrichment, and ultimately, webhook dispatch and continuous data verification.
