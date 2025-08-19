@@ -1,0 +1,6564 @@
+weather.gov API
+ 2.6.0 
+OAS3
+https://api.weather.gov/openapi.json
+GET
+/alerts
+
+Returns all alerts
+
+Parameters
+Try it out
+Name	Description
+active
+boolean
+deprecated
+(query)
+List only active alerts (use /alerts/active endpoints instead)
+
+start
+string
+(query)
+Start time
+
+end
+string
+(query)
+End time
+
+status
+array[string]
+(query)
+Status (actual, exercise, system, test, draft)
+
+Available values : actual, exercise, system, test, draft
+
+message_type
+array[string]
+(query)
+Message type (alert, update, cancel)
+
+Available values : alert, update, cancel
+
+event
+array[string]
+(query)
+Event name
+
+code
+array[string]
+(query)
+Event code
+
+area
+array
+(query)
+State/territory code or marine area code This parameter is incompatible with the following parameters: point, region, region_type, zone
+
+point
+string
+(query)
+Point (latitude,longitude) This parameter is incompatible with the following parameters: area, region, region_type, zone
+
+region
+array[string]
+(query)
+Marine region code This parameter is incompatible with the following parameters: area, point, region_type, zone
+
+Available values : AL, AT, GL, GM, PA, PI
+
+region_type
+string
+(query)
+Region type (land or marine) This parameter is incompatible with the following parameters: area, point, region, zone
+
+Available values : land, marine
+
+zone
+array[string]
+(query)
+Zone ID (forecast or county) This parameter is incompatible with the following parameters: area, point, region, region_type
+
+urgency
+array[string]
+(query)
+Urgency (immediate, expected, future, past, unknown)
+
+Available values : Immediate, Expected, Future, Past, Unknown
+
+severity
+array[string]
+(query)
+Severity (extreme, severe, moderate, minor, unknown)
+
+Available values : Extreme, Severe, Moderate, Minor, Unknown
+
+certainty
+array[string]
+(query)
+Certainty (observed, likely, possible, unlikely, unknown)
+
+Available values : Observed, Likely, Possible, Unlikely, Unknown
+
+limit
+integer
+(query)
+Limit
+
+Default value : 500
+
+cursor
+string
+(query)
+Pagination cursor
+
+Responses
+Code	Description	Links
+200	
+A collection of alerts.
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "string",
+      "type": "Feature",
+      "properties": {
+        "id": "string",
+        "areaDesc": "string",
+        "geocode": {
+          "UGC": [
+            "string"
+          ],
+          "SAME": [
+            "string"
+          ]
+        },
+        "affectedZones": [
+          "string"
+        ],
+        "references": [
+          {
+            "@id": "string",
+            "identifier": "string",
+            "sender": "string",
+            "sent": "2025-08-19T15:27:24.115Z"
+          }
+        ],
+        "sent": "2025-08-19T15:27:24.115Z",
+        "effective": "2025-08-19T15:27:24.115Z",
+        "onset": "2025-08-19T15:27:24.115Z",
+        "expires": "2025-08-19T15:27:24.115Z",
+        "ends": "2025-08-19T15:27:24.115Z",
+        "status": "Actual",
+        "messageType": "Alert",
+        "category": "Met",
+        "severity": "Extreme",
+        "certainty": "Observed",
+        "urgency": "Immediate",
+        "event": "string",
+        "sender": "string",
+        "senderName": "string",
+        "headline": "string",
+        "description": "string",
+        "instruction": "string",
+        "response": "Shelter",
+        "parameters": {
+          "additionalProp1": [
+            null
+          ],
+          "additionalProp2": [
+            null
+          ],
+          "additionalProp3": [
+            null
+          ]
+        },
+        "scope": "Public",
+        "code": "string",
+        "language": "string",
+        "web": "string",
+        "eventCode": {
+          "additionalProp1": [
+            null
+          ],
+          "additionalProp2": [
+            null
+          ],
+          "additionalProp3": [
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "title": "string",
+  "updated": "2025-08-19T15:27:24.115Z",
+  "pagination": {
+    "next": "string"
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+301	
+Certain common queries may be redirected to discrete URLs
+
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/alerts/active
+
+Returns all currently active alerts
+
+Parameters
+Try it out
+Name	Description
+status
+array[string]
+(query)
+Status (actual, exercise, system, test, draft)
+
+Available values : actual, exercise, system, test, draft
+
+message_type
+array[string]
+(query)
+Message type (alert, update, cancel)
+
+Available values : alert, update, cancel
+
+event
+array[string]
+(query)
+Event name
+
+code
+array[string]
+(query)
+Event code
+
+area
+array
+(query)
+State/territory code or marine area code This parameter is incompatible with the following parameters: point, region, region_type, zone
+
+point
+string
+(query)
+Point (latitude,longitude) This parameter is incompatible with the following parameters: area, region, region_type, zone
+
+region
+array[string]
+(query)
+Marine region code This parameter is incompatible with the following parameters: area, point, region_type, zone
+
+Available values : AL, AT, GL, GM, PA, PI
+
+region_type
+string
+(query)
+Region type (land or marine) This parameter is incompatible with the following parameters: area, point, region, zone
+
+Available values : land, marine
+
+zone
+array[string]
+(query)
+Zone ID (forecast or county) This parameter is incompatible with the following parameters: area, point, region, region_type
+
+urgency
+array[string]
+(query)
+Urgency (immediate, expected, future, past, unknown)
+
+Available values : Immediate, Expected, Future, Past, Unknown
+
+severity
+array[string]
+(query)
+Severity (extreme, severe, moderate, minor, unknown)
+
+Available values : Extreme, Severe, Moderate, Minor, Unknown
+
+certainty
+array[string]
+(query)
+Certainty (observed, likely, possible, unlikely, unknown)
+
+Available values : Observed, Likely, Possible, Unlikely, Unknown
+
+Responses
+Code	Description	Links
+200	
+A collection of alerts.
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "string",
+      "type": "Feature",
+      "properties": {
+        "id": "string",
+        "areaDesc": "string",
+        "geocode": {
+          "UGC": [
+            "string"
+          ],
+          "SAME": [
+            "string"
+          ]
+        },
+        "affectedZones": [
+          "string"
+        ],
+        "references": [
+          {
+            "@id": "string",
+            "identifier": "string",
+            "sender": "string",
+            "sent": "2025-08-19T15:27:24.118Z"
+          }
+        ],
+        "sent": "2025-08-19T15:27:24.118Z",
+        "effective": "2025-08-19T15:27:24.118Z",
+        "onset": "2025-08-19T15:27:24.118Z",
+        "expires": "2025-08-19T15:27:24.118Z",
+        "ends": "2025-08-19T15:27:24.118Z",
+        "status": "Actual",
+        "messageType": "Alert",
+        "category": "Met",
+        "severity": "Extreme",
+        "certainty": "Observed",
+        "urgency": "Immediate",
+        "event": "string",
+        "sender": "string",
+        "senderName": "string",
+        "headline": "string",
+        "description": "string",
+        "instruction": "string",
+        "response": "Shelter",
+        "parameters": {
+          "additionalProp1": [
+            null
+          ],
+          "additionalProp2": [
+            null
+          ],
+          "additionalProp3": [
+            null
+          ]
+        },
+        "scope": "Public",
+        "code": "string",
+        "language": "string",
+        "web": "string",
+        "eventCode": {
+          "additionalProp1": [
+            null
+          ],
+          "additionalProp2": [
+            null
+          ],
+          "additionalProp3": [
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "title": "string",
+  "updated": "2025-08-19T15:27:24.118Z",
+  "pagination": {
+    "next": "string"
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+301	
+Certain common queries may be redirected to discrete URLs
+
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/alerts/active/count
+
+Returns info on the number of active alerts
+
+Parameters
+Try it out
+No parameters
+
+Responses
+Code	Description	Links
+200	
+A data structure showing the counts of active alerts broken down by various categories
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "total": 0,
+  "land": 0,
+  "marine": 0,
+  "regions": {
+    "additionalProp1": 0,
+    "additionalProp2": 0,
+    "additionalProp3": 0
+  },
+  "areas": {
+    "additionalProp1": 0,
+    "additionalProp2": 0,
+    "additionalProp3": 0
+  },
+  "zones": {
+    "additionalProp1": 0,
+    "additionalProp2": 0,
+    "additionalProp3": 0
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/alerts/active/zone/{zoneId}
+
+Returns active alerts for the given NWS public zone or county
+
+Parameters
+Try it out
+Name	Description
+zoneId *
+string
+(path)
+NWS public zone/county identifier
+
+Responses
+Code	Description	Links
+200	
+A collection of alerts.
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "string",
+      "type": "Feature",
+      "properties": {
+        "id": "string",
+        "areaDesc": "string",
+        "geocode": {
+          "UGC": [
+            "string"
+          ],
+          "SAME": [
+            "string"
+          ]
+        },
+        "affectedZones": [
+          "string"
+        ],
+        "references": [
+          {
+            "@id": "string",
+            "identifier": "string",
+            "sender": "string",
+            "sent": "2025-08-19T15:27:24.120Z"
+          }
+        ],
+        "sent": "2025-08-19T15:27:24.120Z",
+        "effective": "2025-08-19T15:27:24.120Z",
+        "onset": "2025-08-19T15:27:24.120Z",
+        "expires": "2025-08-19T15:27:24.120Z",
+        "ends": "2025-08-19T15:27:24.120Z",
+        "status": "Actual",
+        "messageType": "Alert",
+        "category": "Met",
+        "severity": "Extreme",
+        "certainty": "Observed",
+        "urgency": "Immediate",
+        "event": "string",
+        "sender": "string",
+        "senderName": "string",
+        "headline": "string",
+        "description": "string",
+        "instruction": "string",
+        "response": "Shelter",
+        "parameters": {
+          "additionalProp1": [
+            null
+          ],
+          "additionalProp2": [
+            null
+          ],
+          "additionalProp3": [
+            null
+          ]
+        },
+        "scope": "Public",
+        "code": "string",
+        "language": "string",
+        "web": "string",
+        "eventCode": {
+          "additionalProp1": [
+            null
+          ],
+          "additionalProp2": [
+            null
+          ],
+          "additionalProp3": [
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "title": "string",
+  "updated": "2025-08-19T15:27:24.120Z",
+  "pagination": {
+    "next": "string"
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/alerts/active/area/{area}
+
+Returns active alerts for the given area (state or marine area)
+
+Parameters
+Try it out
+Name	Description
+area *
+(path)
+State/area ID
+
+Responses
+Code	Description	Links
+200	
+A collection of alerts.
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "string",
+      "type": "Feature",
+      "properties": {
+        "id": "string",
+        "areaDesc": "string",
+        "geocode": {
+          "UGC": [
+            "string"
+          ],
+          "SAME": [
+            "string"
+          ]
+        },
+        "affectedZones": [
+          "string"
+        ],
+        "references": [
+          {
+            "@id": "string",
+            "identifier": "string",
+            "sender": "string",
+            "sent": "2025-08-19T15:27:24.121Z"
+          }
+        ],
+        "sent": "2025-08-19T15:27:24.121Z",
+        "effective": "2025-08-19T15:27:24.121Z",
+        "onset": "2025-08-19T15:27:24.121Z",
+        "expires": "2025-08-19T15:27:24.121Z",
+        "ends": "2025-08-19T15:27:24.121Z",
+        "status": "Actual",
+        "messageType": "Alert",
+        "category": "Met",
+        "severity": "Extreme",
+        "certainty": "Observed",
+        "urgency": "Immediate",
+        "event": "string",
+        "sender": "string",
+        "senderName": "string",
+        "headline": "string",
+        "description": "string",
+        "instruction": "string",
+        "response": "Shelter",
+        "parameters": {
+          "additionalProp1": [
+            null
+          ],
+          "additionalProp2": [
+            null
+          ],
+          "additionalProp3": [
+            null
+          ]
+        },
+        "scope": "Public",
+        "code": "string",
+        "language": "string",
+        "web": "string",
+        "eventCode": {
+          "additionalProp1": [
+            null
+          ],
+          "additionalProp2": [
+            null
+          ],
+          "additionalProp3": [
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "title": "string",
+  "updated": "2025-08-19T15:27:24.121Z",
+  "pagination": {
+    "next": "string"
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/alerts/active/region/{region}
+
+Returns active alerts for the given marine region
+
+Parameters
+Try it out
+Name	Description
+region *
+string
+(path)
+Marine region ID
+
+Available values : AL, AT, GL, GM, PA, PI
+
+Responses
+Code	Description	Links
+200	
+A collection of alerts.
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "string",
+      "type": "Feature",
+      "properties": {
+        "id": "string",
+        "areaDesc": "string",
+        "geocode": {
+          "UGC": [
+            "string"
+          ],
+          "SAME": [
+            "string"
+          ]
+        },
+        "affectedZones": [
+          "string"
+        ],
+        "references": [
+          {
+            "@id": "string",
+            "identifier": "string",
+            "sender": "string",
+            "sent": "2025-08-19T15:27:24.122Z"
+          }
+        ],
+        "sent": "2025-08-19T15:27:24.122Z",
+        "effective": "2025-08-19T15:27:24.122Z",
+        "onset": "2025-08-19T15:27:24.122Z",
+        "expires": "2025-08-19T15:27:24.122Z",
+        "ends": "2025-08-19T15:27:24.122Z",
+        "status": "Actual",
+        "messageType": "Alert",
+        "category": "Met",
+        "severity": "Extreme",
+        "certainty": "Observed",
+        "urgency": "Immediate",
+        "event": "string",
+        "sender": "string",
+        "senderName": "string",
+        "headline": "string",
+        "description": "string",
+        "instruction": "string",
+        "response": "Shelter",
+        "parameters": {
+          "additionalProp1": [
+            null
+          ],
+          "additionalProp2": [
+            null
+          ],
+          "additionalProp3": [
+            null
+          ]
+        },
+        "scope": "Public",
+        "code": "string",
+        "language": "string",
+        "web": "string",
+        "eventCode": {
+          "additionalProp1": [
+            null
+          ],
+          "additionalProp2": [
+            null
+          ],
+          "additionalProp3": [
+            null
+          ]
+        }
+      }
+    }
+  ],
+  "title": "string",
+  "updated": "2025-08-19T15:27:24.122Z",
+  "pagination": {
+    "next": "string"
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/alerts/types
+
+Returns a list of alert types
+
+Parameters
+Try it out
+No parameters
+
+Responses
+Code	Description	Links
+200	
+A list of recognized event types
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "eventTypes": [
+    "string"
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/alerts/{id}
+
+Returns a specific alert
+
+Parameters
+Try it out
+Name	Description
+id *
+string
+(path)
+Alert identifier
+
+Responses
+Code	Description	Links
+200	
+An alert record
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "id": "string",
+  "type": "Feature",
+  "properties": {
+    "id": "string",
+    "areaDesc": "string",
+    "geocode": {
+      "UGC": [
+        "string"
+      ],
+      "SAME": [
+        "string"
+      ]
+    },
+    "affectedZones": [
+      "string"
+    ],
+    "references": [
+      {
+        "@id": "string",
+        "identifier": "string",
+        "sender": "string",
+        "sent": "2025-08-19T15:27:24.124Z"
+      }
+    ],
+    "sent": "2025-08-19T15:27:24.124Z",
+    "effective": "2025-08-19T15:27:24.124Z",
+    "onset": "2025-08-19T15:27:24.124Z",
+    "expires": "2025-08-19T15:27:24.124Z",
+    "ends": "2025-08-19T15:27:24.124Z",
+    "status": "Actual",
+    "messageType": "Alert",
+    "category": "Met",
+    "severity": "Extreme",
+    "certainty": "Observed",
+    "urgency": "Immediate",
+    "event": "string",
+    "sender": "string",
+    "senderName": "string",
+    "headline": "string",
+    "description": "string",
+    "instruction": "string",
+    "response": "Shelter",
+    "parameters": {
+      "additionalProp1": [
+        null
+      ],
+      "additionalProp2": [
+        null
+      ],
+      "additionalProp3": [
+        null
+      ]
+    },
+    "scope": "Public",
+    "code": "string",
+    "language": "string",
+    "web": "string",
+    "eventCode": {
+      "additionalProp1": [
+        null
+      ],
+      "additionalProp2": [
+        null
+      ],
+      "additionalProp3": [
+        null
+      ]
+    }
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/aviation/cwsus/{cwsuId}
+
+Returns metadata about a Center Weather Service Unit
+
+Parameters
+Try it out
+Name	Description
+cwsuId *
+string
+(path)
+NWS CWSU ID
+
+Available values : ZAB, ZAN, ZAU, ZBW, ZDC, ZDV, ZFA, ZFW, ZHU, ZID, ZJX, ZKC, ZLA, ZLC, ZMA, ZME, ZMP, ZNY, ZOA, ZOB, ZSE, ZTL
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "@type": "GovernmentOrganization",
+  "@id": "string",
+  "id": "string",
+  "name": "string",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "string",
+    "addressLocality": "string",
+    "addressRegion": "string",
+    "postalCode": "string"
+  },
+  "telephone": "string",
+  "faxNumber": "string",
+  "email": "string",
+  "sameAs": "string",
+  "nwsRegion": "string",
+  "parentOrganization": "string",
+  "responsibleCounties": [
+    "string"
+  ],
+  "responsibleForecastZones": [
+    "string"
+  ],
+  "responsibleFireZones": [
+    "string"
+  ],
+  "approvedObservationStations": [
+    "string"
+  ]
+}
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/aviation/cwsus/{cwsuId}/cwas
+
+GET
+/aviation/cwsus/{cwsuId}/cwas/{date}/{sequence}
+
+GET
+/aviation/sigmets
+
+GET
+/aviation/sigmets/{atsu}
+
+GET
+/aviation/sigmets/{atsu}/{date}
+
+GET
+/aviation/sigmets/{atsu}/{date}/{time}
+
+GET
+/glossary
+
+GET
+/gridpoints/{wfo}/{x},{y}
+
+GET
+/gridpoints/{wfo}/{x},{y}/forecast
+
+GET
+/gridpoints/{wfo}/{x},{y}/forecast/hourly
+
+GET
+/gridpoints/{wfo}/{x},{y}/stations
+
+GET
+/icons/{set}/{timeOfDay}/{first}
+
+GET
+/icons/{set}/{timeOfDay}/{first}/{second}
+
+GET
+/icons
+
+GET
+/thumbnails/satellite/{area}
+
+GET
+/stations/{stationId}/observations
+
+Returns a list of observations for a given station
+
+Parameters
+Try it out
+Name	Description
+start
+string
+(query)
+Start time
+
+end
+string
+(query)
+End time
+
+limit
+integer
+(query)
+Limit
+
+stationId *
+string
+(path)
+Observation station ID
+
+Responses
+Code	Description	Links
+200	
+A collection of observation records.
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "string",
+      "type": "Feature",
+      "properties": {
+        "geometry": "string",
+        "@id": "string",
+        "@type": "wx:ObservationStation",
+        "elevation": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "station": "string",
+        "timestamp": "2025-08-19T15:27:24.213Z",
+        "rawMessage": "string",
+        "textDescription": "string",
+        "presentWeather": [
+          {
+            "intensity": "light",
+            "modifier": "patches",
+            "weather": "fog_mist",
+            "rawString": "string",
+            "inVicinity": true
+          }
+        ],
+        "temperature": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "dewpoint": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "windDirection": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "windSpeed": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "windGust": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "barometricPressure": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "seaLevelPressure": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "visibility": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "maxTemperatureLast24Hours": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "minTemperatureLast24Hours": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "precipitationLastHour": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "precipitationLast3Hours": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "precipitationLast6Hours": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "relativeHumidity": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "windChill": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "heatIndex": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "cloudLayers": [
+          {
+            "base": {
+              "value": 0,
+              "maxValue": 0,
+              "minValue": 0,
+              "unitCode": "string",
+              "qualityControl": "Z"
+            },
+            "amount": "OVC"
+          }
+        ]
+      }
+    }
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/stations/{stationId}/observations/latest
+
+Returns the latest observation for a station
+
+Parameters
+Try it out
+Name	Description
+require_qc
+boolean
+(query)
+Require QC
+
+stationId *
+string
+(path)
+Observation station ID
+
+Responses
+Code	Description	Links
+200	
+An observation record.
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "id": "string",
+  "type": "Feature",
+  "properties": {
+    "geometry": "string",
+    "@id": "string",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "station": "string",
+    "timestamp": "2025-08-19T15:27:24.128Z",
+    "rawMessage": "string",
+    "textDescription": "string",
+    "presentWeather": [
+      {
+        "intensity": "light",
+        "modifier": "patches",
+        "weather": "fog_mist",
+        "rawString": "string",
+        "inVicinity": true
+      }
+    ],
+    "temperature": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "dewpoint": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "windDirection": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "windSpeed": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "windGust": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "barometricPressure": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "seaLevelPressure": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "visibility": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "maxTemperatureLast24Hours": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "minTemperatureLast24Hours": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "precipitationLastHour": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "precipitationLast3Hours": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "precipitationLast6Hours": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "relativeHumidity": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "windChill": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "heatIndex": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "cloudLayers": [
+      {
+        "base": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "amount": "OVC"
+      }
+    ]
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/stations/{stationId}/observations/{time}
+
+Returns a single observation.
+
+Parameters
+Try it out
+Name	Description
+time *
+string
+(path)
+Timestamp of requested observation
+
+stationId *
+string
+(path)
+Observation station ID
+
+Responses
+Code	Description	Links
+200	
+An observation record.
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "id": "string",
+  "type": "Feature",
+  "properties": {
+    "geometry": "string",
+    "@id": "string",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "station": "string",
+    "timestamp": "2025-08-19T15:27:24.132Z",
+    "rawMessage": "string",
+    "textDescription": "string",
+    "presentWeather": [
+      {
+        "intensity": "light",
+        "modifier": "patches",
+        "weather": "fog_mist",
+        "rawString": "string",
+        "inVicinity": true
+      }
+    ],
+    "temperature": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "dewpoint": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "windDirection": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "windSpeed": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "windGust": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "barometricPressure": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "seaLevelPressure": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "visibility": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "maxTemperatureLast24Hours": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "minTemperatureLast24Hours": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "precipitationLastHour": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "precipitationLast3Hours": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "precipitationLast6Hours": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "relativeHumidity": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "windChill": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "heatIndex": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "cloudLayers": [
+      {
+        "base": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "amount": "OVC"
+      }
+    ]
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/stations/{stationId}/tafs
+
+Returns Terminal Aerodrome Forecasts for the specified airport station.
+
+Parameters
+Try it out
+Name	Description
+stationId *
+string
+(path)
+Observation station ID
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/stations/{stationId}/tafs/{date}/{time}
+
+Returns a single Terminal Aerodrome Forecast.
+
+Parameters
+Try it out
+Name	Description
+stationId *
+string
+(path)
+Observation station ID
+
+date *
+string
+(path)
+Date (YYYY-MM-DD format)
+
+time *
+string
+(path)
+Time (HHMM format). This time is always specified in UTC (Zulu) time.
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/vnd.wmo.iwxxm+xml
+Controls Accept header.
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/stations
+
+Returns a list of observation stations.
+
+Parameters
+Try it out
+Name	Description
+id
+array[string]
+(query)
+Filter by observation station ID
+
+state
+array
+(query)
+Filter by state/marine area code
+
+limit
+integer
+(query)
+Limit
+
+Default value : 500
+
+cursor
+string
+(query)
+Pagination cursor
+
+Feature-Flags
+array[string]
+(header)
+Enable future and experimental features (see documentation for more info):
+
+obs_station_provider: Include the data provider in the metadata about observation stations
+Available values : obs_station_provider
+
+Responses
+Code	Description	Links
+200	
+A collection of observation stations.
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "string",
+      "type": "Feature",
+      "properties": {
+        "geometry": "string",
+        "@id": "string",
+        "@type": "wx:ObservationStation",
+        "elevation": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "stationIdentifier": "string",
+        "name": "string",
+        "timeZone": "string",
+        "provider": "string",
+        "subProvider": "string",
+        "forecast": "string",
+        "county": "string",
+        "fireWeatherZone": "string",
+        "distance": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "bearing": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        }
+      }
+    }
+  ],
+  "observationStations": [
+    "string"
+  ],
+  "pagination": {
+    "next": "string"
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/stations/{stationId}
+
+Returns metadata about a given observation station
+
+Parameters
+Try it out
+Name	Description
+Feature-Flags
+array[string]
+(header)
+Enable future and experimental features (see documentation for more info):
+
+obs_station_provider: Include the data provider in the metadata about observation stations
+Available values : obs_station_provider
+
+stationId *
+string
+(path)
+Observation station ID
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "id": "string",
+  "type": "Feature",
+  "properties": {
+    "geometry": "string",
+    "@id": "string",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "stationIdentifier": "string",
+    "name": "string",
+    "timeZone": "string",
+    "provider": "string",
+    "subProvider": "string",
+    "forecast": "string",
+    "county": "string",
+    "fireWeatherZone": "string",
+    "distance": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    },
+    "bearing": {
+      "value": 0,
+      "maxValue": 0,
+      "minValue": 0,
+      "unitCode": "string",
+      "qualityControl": "Z"
+    }
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/offices/{officeId}
+
+Returns metadata about a NWS forecast office
+
+Parameters
+Try it out
+Name	Description
+officeId *
+(path)
+NWS office ID
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "@type": "GovernmentOrganization",
+  "@id": "string",
+  "id": "string",
+  "name": "string",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "string",
+    "addressLocality": "string",
+    "addressRegion": "string",
+    "postalCode": "string"
+  },
+  "telephone": "string",
+  "faxNumber": "string",
+  "email": "string",
+  "sameAs": "string",
+  "nwsRegion": "string",
+  "parentOrganization": "string",
+  "responsibleCounties": [
+    "string"
+  ],
+  "responsibleForecastZones": [
+    "string"
+  ],
+  "responsibleFireZones": [
+    "string"
+  ],
+  "approvedObservationStations": [
+    "string"
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/offices/{officeId}/headlines/{headlineId}
+
+Returns a specific news headline for a given NWS office
+
+Parameters
+Try it out
+Name	Description
+officeId *
+(path)
+NWS office ID
+
+headlineId *
+string
+(path)
+Headline record ID
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "@id": "string",
+  "id": "string",
+  "office": "string",
+  "important": true,
+  "issuanceTime": "2025-08-19T15:27:24.138Z",
+  "link": "string",
+  "name": "string",
+  "title": "string",
+  "summary": "string",
+  "content": "string"
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/offices/{officeId}/headlines
+
+Returns a list of news headlines for a given NWS office
+
+Parameters
+Try it out
+Name	Description
+officeId *
+(path)
+NWS office ID
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "@graph": [
+    {
+      "@id": "string",
+      "id": "string",
+      "office": "string",
+      "important": true,
+      "issuanceTime": "2025-08-19T15:27:24.138Z",
+      "link": "string",
+      "name": "string",
+      "title": "string",
+      "summary": "string",
+      "content": "string"
+    }
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/points/{latitude},{longitude}
+
+Returns metadata about a given latitude/longitude point
+
+Parameters
+Try it out
+Name	Description
+latitude *
+number
+(path)
+Latitude
+
+longitude *
+number
+(path)
+Longitude
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "id": "string",
+  "type": "Feature",
+  "properties": {
+    "geometry": "string",
+    "@id": "string",
+    "@type": "wx:Point",
+    "cwa": "AKQ",
+    "forecastOffice": "string",
+    "gridId": "AKQ",
+    "gridX": 0,
+    "gridY": 0,
+    "forecast": "string",
+    "forecastHourly": "string",
+    "forecastGridData": "string",
+    "observationStations": "string",
+    "forecastZone": "string",
+    "county": "string",
+    "fireWeatherZone": "string",
+    "timeZone": "string",
+    "radarStation": "string"
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/points/{latitude},{longitude}/stations
+
+GET
+/radar/servers
+
+Returns a list of radar servers
+
+Parameters
+Try it out
+Name	Description
+reportingHost
+string
+(query)
+Show records from specific reporting host
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/radar/servers/{id}
+
+Returns metadata about a given radar server
+
+Parameters
+Try it out
+Name	Description
+reportingHost
+string
+(query)
+Show records from specific reporting host
+
+id *
+string
+(path)
+Server ID
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/radar/stations
+
+Returns a list of radar stations
+
+Parameters
+Try it out
+Name	Description
+stationType
+array[string]
+(query)
+Limit results to a specific station type or types
+
+reportingHost
+string
+(query)
+Show RDA and latency info from specific reporting host
+
+host
+string
+(query)
+Show latency info from specific LDM host
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/geo+json
+Controls Accept header.
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/radar/stations/{stationId}
+
+Returns metadata about a given radar station
+
+Parameters
+Try it out
+Name	Description
+reportingHost
+string
+(query)
+Show RDA and latency info from specific reporting host
+
+host
+string
+(query)
+Show latency info from specific LDM host
+
+stationId *
+string
+(path)
+Radar station ID
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/geo+json
+Controls Accept header.
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/radar/stations/{stationId}/alarms
+
+Returns metadata about a given radar station alarms
+
+Parameters
+Try it out
+Name	Description
+stationId *
+string
+(path)
+Radar station ID
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/radar/queues/{host}
+
+Returns metadata about a given radar queue
+
+Parameters
+Try it out
+Name	Description
+limit
+integer
+(query)
+Record limit
+
+arrived
+(query)
+Range for arrival time
+
+created
+(query)
+Range for creation time
+
+published
+(query)
+Range for publish time
+
+station
+string
+(query)
+Station identifier
+
+type
+string
+(query)
+Record type
+
+feed
+string
+(query)
+Originating product feed
+
+resolution
+integer
+(query)
+Resolution version
+
+host *
+string
+(path)
+LDM host
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/radar/profilers/{stationId}
+
+Returns metadata about a given radar wind profiler
+
+Parameters
+Try it out
+Name	Description
+time
+(query)
+Time interval
+
+interval
+string
+(query)
+Averaging interval
+
+stationId *
+string
+(path)
+Profiler station ID
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/products
+
+Returns a list of text products
+
+Parameters
+Try it out
+Name	Description
+location
+array[string]
+(query)
+Location id
+
+start
+string
+(query)
+Start time
+
+end
+string
+(query)
+End time
+
+office
+array[string]
+(query)
+Issuing office
+
+wmoid
+array[string]
+(query)
+WMO id code
+
+type
+array[string]
+(query)
+Product code
+
+limit
+integer
+(query)
+Limit
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "@graph": [
+    {
+      "@id": "string",
+      "id": "string",
+      "wmoCollectiveId": "string",
+      "issuingOffice": "string",
+      "issuanceTime": "2025-08-19T15:27:24.146Z",
+      "productCode": "string",
+      "productName": "string",
+      "productText": "string"
+    }
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/products/locations
+
+Returns a list of valid text product issuance locations
+
+Parameters
+Try it out
+No parameters
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "locations": {
+    "additionalProp1": "string",
+    "additionalProp2": "string",
+    "additionalProp3": "string"
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/products/types
+
+Returns a list of valid text product types and codes
+
+Parameters
+Try it out
+No parameters
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "@graph": [
+    {
+      "productCode": "string",
+      "productName": "string"
+    }
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/products/{productId}
+
+Returns a specific text product
+
+Parameters
+Try it out
+Name	Description
+productId *
+string
+(path)
+.
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "@id": "string",
+  "id": "string",
+  "wmoCollectiveId": "string",
+  "issuingOffice": "string",
+  "issuanceTime": "2025-08-19T15:27:24.147Z",
+  "productCode": "string",
+  "productName": "string",
+  "productText": "string"
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/products/types/{typeId}
+
+Returns a list of text products of a given type
+
+Parameters
+Try it out
+Name	Description
+typeId *
+string
+(path)
+.
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "@graph": [
+    {
+      "@id": "string",
+      "id": "string",
+      "wmoCollectiveId": "string",
+      "issuingOffice": "string",
+      "issuanceTime": "2025-08-19T15:27:24.148Z",
+      "productCode": "string",
+      "productName": "string",
+      "productText": "string"
+    }
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/products/types/{typeId}/locations
+
+Returns a list of valid text product issuance locations for a given product type
+
+Parameters
+Try it out
+Name	Description
+typeId *
+string
+(path)
+.
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "locations": {
+    "additionalProp1": "string",
+    "additionalProp2": "string",
+    "additionalProp3": "string"
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/products/locations/{locationId}/types
+
+Returns a list of valid text product types for a given issuance location
+
+Parameters
+Try it out
+Name	Description
+locationId *
+string
+(path)
+.
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "@graph": [
+    {
+      "productCode": "string",
+      "productName": "string"
+    }
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/products/types/{typeId}/locations/{locationId}
+
+Returns a list of text products of a given type for a given issuance location
+
+Parameters
+Try it out
+Name	Description
+typeId *
+string
+(path)
+.
+
+locationId *
+string
+(path)
+.
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "@graph": [
+    {
+      "@id": "string",
+      "id": "string",
+      "wmoCollectiveId": "string",
+      "issuingOffice": "string",
+      "issuanceTime": "2025-08-19T15:27:24.150Z",
+      "productCode": "string",
+      "productName": "string",
+      "productText": "string"
+    }
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/products/types/{typeId}/locations/{locationId}/latest
+
+Returns latest text products of a given type for a given issuance location with product text
+
+Parameters
+Try it out
+Name	Description
+typeId *
+string
+(path)
+.
+
+locationId *
+string
+(path)
+.
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/ld+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "@graph": [
+    {
+      "@id": "string",
+      "id": "string",
+      "wmoCollectiveId": "string",
+      "issuingOffice": "string",
+      "issuanceTime": "2025-08-19T15:27:24.151Z",
+      "productCode": "string",
+      "productName": "string",
+      "productText": "string"
+    }
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/zones
+
+Returns a list of zones
+
+Parameters
+Try it out
+Name	Description
+id
+array[string]
+(query)
+Zone ID (forecast or county)
+
+area
+array
+(query)
+State/marine area code
+
+region
+array
+(query)
+Region code
+
+type
+array[string]
+(query)
+Zone type
+
+Available values : land, marine, forecast, public, coastal, offshore, fire, county
+
+point
+string
+(query)
+Point (latitude,longitude)
+
+include_geometry
+boolean
+(query)
+Include geometry in results (true/false)
+
+limit
+integer
+(query)
+Limit
+
+effective
+string
+(query)
+Effective date/time
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "string",
+      "type": "Feature",
+      "properties": {
+        "geometry": "string",
+        "@id": "string",
+        "@type": "wx:Zone",
+        "id": "string",
+        "type": "land",
+        "name": "string",
+        "effectiveDate": "2025-08-19T15:27:24.152Z",
+        "expirationDate": "2025-08-19T15:27:24.152Z",
+        "forecastOffice": "string",
+        "gridIdentifier": "string",
+        "awipsLocationIdentifier": "string",
+        "timeZone": [
+          "string"
+        ],
+        "observationStations": [
+          "string"
+        ],
+        "radarStation": "string"
+      }
+    }
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/zones/{type}
+
+Returns a list of zones of a given type
+
+Parameters
+Try it out
+Name	Description
+id
+array[string]
+(query)
+Zone ID (forecast or county)
+
+area
+array
+(query)
+State/marine area code
+
+region
+array
+(query)
+Region code
+
+type
+array[string]
+(query)
+Zone type
+
+Available values : land, marine, forecast, public, coastal, offshore, fire, county
+
+point
+string
+(query)
+Point (latitude,longitude)
+
+include_geometry
+boolean
+(query)
+Include geometry in results (true/false)
+
+limit
+integer
+(query)
+Limit
+
+effective
+string
+(query)
+Effective date/time
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "string",
+      "type": "Feature",
+      "properties": {
+        "geometry": "string",
+        "@id": "string",
+        "@type": "wx:Zone",
+        "id": "string",
+        "type": "land",
+        "name": "string",
+        "effectiveDate": "2025-08-19T15:27:24.153Z",
+        "expirationDate": "2025-08-19T15:27:24.153Z",
+        "forecastOffice": "string",
+        "gridIdentifier": "string",
+        "awipsLocationIdentifier": "string",
+        "timeZone": [
+          "string"
+        ],
+        "observationStations": [
+          "string"
+        ],
+        "radarStation": "string"
+      }
+    }
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/zones/{type}/{zoneId}
+
+Returns metadata about a given zone
+
+Parameters
+Try it out
+Name	Description
+effective
+string
+(query)
+Effective date/time
+
+type *
+string
+(path)
+Zone type
+
+Available values : land, marine, forecast, public, coastal, offshore, fire, county
+
+zoneId *
+string
+(path)
+NWS public zone/county identifier
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "id": "string",
+  "type": "Feature",
+  "properties": {
+    "geometry": "string",
+    "@id": "string",
+    "@type": "wx:Zone",
+    "id": "string",
+    "type": "land",
+    "name": "string",
+    "effectiveDate": "2025-08-19T15:27:24.155Z",
+    "expirationDate": "2025-08-19T15:27:24.155Z",
+    "forecastOffice": "string",
+    "gridIdentifier": "string",
+    "awipsLocationIdentifier": "string",
+    "timeZone": [
+      "string"
+    ],
+    "observationStations": [
+      "string"
+    ],
+    "radarStation": "string"
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/zones/{type}/{zoneId}/forecast
+
+Returns the current zone forecast for a given zone
+
+Parameters
+Try it out
+Name	Description
+type *
+string
+(path)
+Zone type
+
+zoneId *
+string
+(path)
+NWS public zone/county identifier
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "id": "string",
+  "type": "Feature",
+  "properties": {
+    "geometry": "string",
+    "zone": "string",
+    "updated": "2025-08-19T15:27:24.156Z",
+    "periods": [
+      {
+        "number": 0,
+        "name": "This Afternoon",
+        "detailedForecast": "string"
+      }
+    ]
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/zones/forecast/{zoneId}/observations
+
+Returns a list of observations for a given zone
+
+Parameters
+Try it out
+Name	Description
+start
+string
+(query)
+Start date/time
+
+end
+string
+(query)
+End date/time
+
+limit
+integer
+(query)
+Limit
+
+zoneId *
+string
+(path)
+NWS public zone/county identifier
+
+Responses
+Code	Description	Links
+200	
+success
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "string",
+      "type": "Feature",
+      "properties": {
+        "geometry": "string",
+        "@id": "string",
+        "@type": "wx:ObservationStation",
+        "elevation": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "station": "string",
+        "timestamp": "2025-08-19T15:27:24.157Z",
+        "rawMessage": "string",
+        "textDescription": "string",
+        "presentWeather": [
+          {
+            "intensity": "light",
+            "modifier": "patches",
+            "weather": "fog_mist",
+            "rawString": "string",
+            "inVicinity": true
+          }
+        ],
+        "temperature": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "dewpoint": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "windDirection": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "windSpeed": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "windGust": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "barometricPressure": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "seaLevelPressure": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "visibility": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "maxTemperatureLast24Hours": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "minTemperatureLast24Hours": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "precipitationLastHour": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "precipitationLast3Hours": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "precipitationLast6Hours": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "relativeHumidity": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "windChill": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "heatIndex": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "cloudLayers": [
+          {
+            "base": {
+              "value": 0,
+              "maxValue": 0,
+              "minValue": 0,
+              "unitCode": "string",
+              "qualityControl": "Z"
+            },
+            "amount": "OVC"
+          }
+        ]
+      }
+    }
+  ]
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+GET
+/zones/forecast/{zoneId}/stations
+
+Returns a list of observation stations for a given zone
+
+Parameters
+Try it out
+Name	Description
+zoneId *
+string
+(path)
+NWS public zone/county identifier
+
+limit
+integer
+(query)
+Limit
+
+Default value : 500
+
+cursor
+string
+(query)
+Pagination cursor
+
+Feature-Flags
+array[string]
+(header)
+Enable future and experimental features (see documentation for more info):
+
+obs_station_provider: Include the data provider in the metadata about observation stations
+Available values : obs_station_provider
+
+Responses
+Code	Description	Links
+200	
+A collection of observation stations.
+
+
+application/geo+json
+Controls Accept header.
+Example Value
+Schema
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "string",
+      "type": "Feature",
+      "properties": {
+        "geometry": "string",
+        "@id": "string",
+        "@type": "wx:ObservationStation",
+        "elevation": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "stationIdentifier": "string",
+        "name": "string",
+        "timeZone": "string",
+        "provider": "string",
+        "subProvider": "string",
+        "forecast": "string",
+        "county": "string",
+        "fireWeatherZone": "string",
+        "distance": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        },
+        "bearing": {
+          "value": 0,
+          "maxValue": 0,
+          "minValue": 0,
+          "unitCode": "string",
+          "qualityControl": "Z"
+        }
+      }
+    }
+  ],
+  "observationStations": [
+    "string"
+  ],
+  "pagination": {
+    "next": "string"
+  }
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+default	
+An error response.
+
+
+application/problem+json
+Example Value
+Schema
+{
+  "type": "urn:noaa:nws:api:UnexpectedProblem",
+  "title": "Unexpected Problem",
+  "status": 500,
+  "detail": "An unexpected problem has occurred.",
+  "instance": "urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "correlationId": "493c3a1d-f87e-407f-ae2c-24483f5aab63",
+  "additionalProp1": {}
+}
+Headers:
+Name	Description	Type
+X-Correlation-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Request-Id	
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+X-Server-Id	
+The identifier of the server that generated the response, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+string
+No links
+Schemas
+Alert{
+description:	
+An object representing a public alert message. Unless otherwise noted, the fields in this object correspond to the National Weather Service CAP v1.2 specification, which extends the OASIS Common Alerting Protocol (CAP) v1.2 specification and USA Integrated Public Alert and Warning System (IPAWS) Profile v1.0. Refer to this documentation for more complete information. http://docs.oasis-open.org/emergency/cap/v1.2/CAP-v1.2-os.html http://docs.oasis-open.org/emergency/cap/v1.2/ipaws-profile/v1.0/cs01/cap-v1.2-ipaws-profile-cs01.html https://vlab.noaa.gov/web/nws-common-alerting-protocol/cap-documentation
+
+id	AlertIdstring
+The identifier of the alert message.
+
+areaDesc	string
+A textual description of the area affected by the alert.
+
+geocode	{...}
+affectedZones	[...]
+references	[...]
+sent	string($date-time)
+The time of the origination of the alert message.
+
+effective	string($date-time)
+The effective time of the information of the alert message.
+
+onset	string($date-time)
+nullable: true
+The expected time of the beginning of the subject event of the alert message.
+
+expires	string($date-time)
+The expiry time of the information of the alert message.
+
+ends	string($date-time)
+nullable: true
+The expected end time of the subject event of the alert message.
+
+status	AlertStatusstring
+Enum:
+Array [ 5 ]
+messageType	AlertMessageTypestring
+Enum:
+Array [ 5 ]
+category	string
+The code denoting the category of the subject event of the alert message.
+
+Enum:
+Array [ 12 ]
+severity	AlertSeveritystring
+Enum:
+Array [ 5 ]
+certainty	AlertCertaintystring
+Enum:
+Array [ 5 ]
+urgency	AlertUrgencystring
+Enum:
+Array [ 5 ]
+event	string
+The text denoting the type of the subject event of the alert message.
+
+sender	string
+Email address of the NWS webmaster.
+
+senderName	string
+The text naming the originator of the alert message.
+
+headline	string
+nullable: true
+The text headline of the alert message.
+
+description	string
+The text describing the subject event of the alert message.
+
+instruction	string
+nullable: true
+The text describing the recommended action to be taken by recipients of the alert message.
+
+response	string
+The code denoting the type of action recommended for the target audience. This corresponds to responseType in the CAP specification.
+
+Enum:
+Array [ 9 ]
+parameters	{...}
+scope	string
+The code denoting the intended distribution of the alert message.
+
+Enum:
+Array [ 3 ]
+code	string
+The code denoting the special handling of the alert message.
+
+language	string
+The code denoting the language of the info sub-element of the alert message.
+
+web	string
+The identifier of the hyperlink associating additional information within the alert message.
+
+eventCode	{...}
+}
+AlertCollection{
+title	string
+A title describing the alert collection
+
+updated	string($date-time)
+The last time a change occurred to this collection
+
+pagination	PaginationInfo{...}
+}
+AlertCollectionGeoJson{
+description:	
+A GeoJSON feature collection. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+type*	string
+Enum:
+Array [ 1 ]
+features*	[...]
+title	string
+A title describing the alert collection
+
+updated	string($date-time)
+The last time a change occurred to this collection
+
+pagination	PaginationInfo{...}
+}
+AlertCollectionJsonLd{
+title	string
+A title describing the alert collection
+
+updated	string($date-time)
+The last time a change occurred to this collection
+
+pagination	PaginationInfo{...}
+@context	JsonLdContext{...}
+@graph	[...]
+}
+AlertCap{
+}
+AlertGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	Alert{...}
+}
+AlertJsonLd{
+@graph	[...]
+}
+AlertIdstring
+The identifier of the alert message.
+
+AlertCertaintystring
+Enum:
+Array [ 5 ]
+AlertMessageTypestring
+Enum:
+Array [ 5 ]
+AlertSeveritystring
+Enum:
+Array [ 5 ]
+AlertStatusstring
+Enum:
+Array [ 5 ]
+AlertUrgencystring
+Enum:
+Array [ 5 ]
+AlertAtomEntry{
+description:	
+An alert entry in an Atom feed
+
+id	string
+xml: OrderedMap { "namespace": "http://www.w3.org/2005/Atom" }
+xml:
+   namespace: http://www.w3.org/2005/Atom
+updated	string
+xml: OrderedMap { "namespace": "http://www.w3.org/2005/Atom" }
+xml:
+   namespace: http://www.w3.org/2005/Atom
+published	string
+xml: OrderedMap { "namespace": "http://www.w3.org/2005/Atom" }
+xml:
+   namespace: http://www.w3.org/2005/Atom
+author	{...}
+summary	string
+xml: OrderedMap { "namespace": "http://www.w3.org/2005/Atom" }
+xml:
+   namespace: http://www.w3.org/2005/Atom
+event	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+sent	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+effective	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+expires	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+status	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+msgType	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+category	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+urgency	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+severity	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+certainty	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+areaDesc	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+polygon	string
+xml: OrderedMap { "namespace": "urn:oasis:names:tc:emergency:cap:1.2" }
+xml:
+   namespace: urn:oasis:names:tc:emergency:cap:1.2
+geocode	[...]
+parameter	[...]
+}
+AlertXMLParameter{
+valueName	string
+value	string
+}
+AlertAtomFeed{
+description:	
+An alert feed in Atom format
+
+id	string
+xml: OrderedMap { "namespace": "http://www.w3.org/2005/Atom" }
+xml:
+   namespace: http://www.w3.org/2005/Atom
+generator	string
+xml: OrderedMap { "namespace": "http://www.w3.org/2005/Atom" }
+xml:
+   namespace: http://www.w3.org/2005/Atom
+updated	string
+xml: OrderedMap { "namespace": "http://www.w3.org/2005/Atom" }
+xml:
+   namespace: http://www.w3.org/2005/Atom
+author	{...}
+title	string
+xml: OrderedMap { "namespace": "http://www.w3.org/2005/Atom" }
+xml:
+   namespace: http://www.w3.org/2005/Atom
+entry	[...]
+}
+AreaCode{
+description:	
+State/territory codes and marine area codes
+
+oneOf ->	
+StateTerritoryCodestring
+Enum:
+Array [ 59 ]
+MarineAreaCodestring
+Marine area code as defined in NWS Directive 10-302:
+
+AM: Western North Atlantic Ocean and along U.S. East Coast south of Currituck Beach Light NC following the coastline into Gulf of Mexico to Ocean Reef FL including the Caribbean
+AN: Western North Atlantic Ocean and along U.S. East Coast from Canadian border south to Currituck Beach Light NC
+GM: Gulf of Mexico and along the U.S. Gulf Coast from the Mexican border to Ocean Reef FL
+LC: Lake St. Clair
+LE: Lake Erie
+LH: Lake Huron
+LM: Lake Michigan
+LO: Lake Ontario
+LS: Lake Superior
+PH: Central Pacific Ocean including Hawaiian waters
+PK: North Pacific Ocean near Alaska and along Alaska coastline including the Bering Sea and the Gulf of Alaska
+PM: Western Pacific Ocean including Mariana Island waters
+PS: South Central Pacific Ocean including American Samoa waters
+PZ: Eastern North Pacific Ocean and along U.S. West Coast from Canadian border to Mexican border
+SL: St. Lawrence River above St. Regis
+Enum:
+Array [ 15 ]
+}
+ATSUIdentifierstring
+pattern: ^[A-Z]{3,4}$
+ATSU Identifier
+
+BinaryFilestring($binary)
+CenterWeatherAdvisoryCollectionGeoJson{
+description:	
+A GeoJSON feature collection. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+type*	string
+Enum:
+Array [ 1 ]
+features*	[...]
+}
+CenterWeatherAdvisoryGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	CenterWeatherAdvisory{...}
+}
+CenterWeatherAdvisory{
+id	string
+issueTime	string($date-time)
+cwsu	NWSCenterWeatherServiceUnitIdstring
+Three-letter identifier for a Center Weather Service Unit (CWSU).
+
+Enum:
+Array [ 22 ]
+sequence	integer
+minimum: 101
+start	string($date-time)
+end	string($date-time)
+observedProperty	string
+text	string
+}
+CenterWeatherServiceUnitJsonLd{
+@context	JsonLdContext{...}
+@type	string
+Enum:
+Array [ 1 ]
+@id	string($uri)
+id	string
+name	string
+address	{...}
+telephone	string
+faxNumber	string
+email	string
+sameAs	string($uri)
+nwsRegion	string
+parentOrganization	string($uri)
+responsibleCounties	[...]
+responsibleForecastZones	[...]
+responsibleFireZones	[...]
+approvedObservationStations	[...]
+}
+Datestring($date)
+Date (in YYYY-MM-DD format).
+
+GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+GeoJsonBoundingBox[
+minItems: 4
+A GeoJSON bounding box. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+number]
+GeoJsonCoordinate[
+minItems: 2
+A GeoJSON coordinate. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+number]
+GeoJsonGeometry{
+description:	
+A GeoJSON geometry object. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+oneOf ->	
+GeoJSON Point{...}
+GeoJSON LineString{...}
+GeoJSON Polygon{...}
+GeoJSON MultiPoint{...}
+GeoJSON MultiLineString{...}
+GeoJSON MultiPolygon{...}
+}
+GeoJsonFeature{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	{...}
+}
+GeoJsonFeatureCollection{
+description:	
+A GeoJSON feature collection. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+type*	string
+Enum:
+Array [ 1 ]
+features*	[...]
+}
+GeoJsonLineString[
+minItems: 2
+A GeoJSON line string. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+GeoJsonLineString[...]]
+GeoJsonPolygon[
+A GeoJSON polygon. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+GeoJsonPolygon[...]]
+Gridpoint{
+description:	
+Raw forecast data for a 2.5km grid square. This is a list of all potential data layers that may appear. Some layers may not be present in all areas.
+
+temperature
+dewpoint
+maxTemperature
+minTemperature
+relativeHumidity
+apparentTemperature
+heatIndex
+windChill
+wetBulbGlobeTemperature
+skyCover
+windDirection
+windSpeed
+windGust
+weather
+hazards: Watch and advisory products in effect
+probabilityOfPrecipitation
+quantitativePrecipitation
+iceAccumulation
+snowfallAmount
+snowLevel
+ceilingHeight
+visibility
+transportWindSpeed
+transportWindDirection
+mixingHeight
+hainesIndex
+lightningActivityLevel
+twentyFootWindSpeed
+twentyFootWindDirection
+waveHeight
+wavePeriod
+waveDirection
+primarySwellHeight
+primarySwellDirection
+secondarySwellHeight
+secondarySwellDirection
+wavePeriod2
+windWaveHeight
+dispersionIndex
+pressure: Barometric pressure
+probabilityOfTropicalStormWinds
+probabilityOfHurricaneWinds
+potentialOf15mphWinds
+potentialOf25mphWinds
+potentialOf35mphWinds
+potentialOf45mphWinds
+potentialOf20mphWindGusts
+potentialOf30mphWindGusts
+potentialOf40mphWindGusts
+potentialOf50mphWindGusts
+potentialOf60mphWindGusts
+grasslandFireDangerIndex
+probabilityOfThunder
+davisStabilityIndex
+atmosphericDispersionIndex
+lowVisibilityOccurrenceRiskIndex
+stability
+redFlagThreatIndex
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+@id	string($uri)
+@type	string
+Enum:
+Array [ 1 ]
+updateTime	string($date-time)
+validTimes	ISO8601Interval{...}
+elevation	QuantitativeValue{...}
+forecastOffice	string($uri)
+gridId	string
+gridX	integer
+minimum: 0
+gridY	integer
+minimum: 0
+weather	{...}
+hazards	{...}
+< * >:	GridpointQuantitativeValueLayer{...}
+}
+GridpointQuantitativeValueLayer{
+description:	
+A gridpoint layer consisting of quantitative values (numeric values with associated units of measure).
+
+uom	UnitOfMeasurestring
+pattern: ^((wmo|uc|wmoUnit|nwsUnit):)?.*$
+A string denoting a unit of measure, expressed in the format "{unit}" or "{namespace}:{unit}". Units with the namespace "wmo" or "wmoUnit" are defined in the World Meteorological Organization Codes Registry at http://codes.wmo.int/common/unit and should be canonically resolvable to http://codes.wmo.int/common/unit/{unit}. Units with the namespace "nwsUnit" are currently custom and do not align to any standard. Units with no namespace or the namespace "uc" are compliant with the Unified Code for Units of Measure syntax defined at https://unitsofmeasure.org/. This also aligns with recent versions of the Geographic Markup Language (GML) standard, the IWXXM standard, and OGC Observations and Measurements v2.0 (ISO/DIS 19156). Namespaced units are considered deprecated. We will be aligning API to use the same standards as GML/IWXXM in the future.
+
+values*	[...]
+}
+GridpointGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	Gridpoint{...}
+}
+GridpointJsonLd{
+description:	
+Raw forecast data for a 2.5km grid square. This is a list of all potential data layers that may appear. Some layers may not be present in all areas.
+
+temperature
+dewpoint
+maxTemperature
+minTemperature
+relativeHumidity
+apparentTemperature
+heatIndex
+windChill
+wetBulbGlobeTemperature
+skyCover
+windDirection
+windSpeed
+windGust
+weather
+hazards: Watch and advisory products in effect
+probabilityOfPrecipitation
+quantitativePrecipitation
+iceAccumulation
+snowfallAmount
+snowLevel
+ceilingHeight
+visibility
+transportWindSpeed
+transportWindDirection
+mixingHeight
+hainesIndex
+lightningActivityLevel
+twentyFootWindSpeed
+twentyFootWindDirection
+waveHeight
+wavePeriod
+waveDirection
+primarySwellHeight
+primarySwellDirection
+secondarySwellHeight
+secondarySwellDirection
+wavePeriod2
+windWaveHeight
+dispersionIndex
+pressure: Barometric pressure
+probabilityOfTropicalStormWinds
+probabilityOfHurricaneWinds
+potentialOf15mphWinds
+potentialOf25mphWinds
+potentialOf35mphWinds
+potentialOf45mphWinds
+potentialOf20mphWindGusts
+potentialOf30mphWindGusts
+potentialOf40mphWindGusts
+potentialOf50mphWindGusts
+potentialOf60mphWindGusts
+grasslandFireDangerIndex
+probabilityOfThunder
+davisStabilityIndex
+atmosphericDispersionIndex
+lowVisibilityOccurrenceRiskIndex
+stability
+redFlagThreatIndex
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+@id	string($uri)
+@type	string
+Enum:
+Array [ 1 ]
+updateTime	string($date-time)
+validTimes	ISO8601Interval{...}
+elevation	QuantitativeValue{...}
+forecastOffice	string($uri)
+gridId	string
+gridX	integer
+minimum: 0
+gridY	integer
+minimum: 0
+weather	{...}
+hazards	{...}
+< * >:	GridpointQuantitativeValueLayer{...}
+}
+Gridpoint12hForecast{
+description:	
+A multi-day forecast for a 2.5km grid square.
+
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+units	GridpointForecastUnitsstring
+default: us
+Denotes the units used in the textual portions of the forecast.
+
+Enum:
+Array [ 2 ]
+forecastGenerator	string
+The internal generator class used to create the forecast text (used for NWS debugging).
+
+generatedAt	string($date-time)
+The time this forecast data was generated.
+
+updateTime	string($date-time)
+The last update time of the data this forecast was generated from.
+
+validTimes	ISO8601Interval{...}
+elevation	QuantitativeValue{...}
+periods	[...]
+}
+GridpointHourlyForecast{
+description:	
+An hourly forecast for a 2.5km grid square.
+
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+units	GridpointForecastUnitsstring
+default: us
+Denotes the units used in the textual portions of the forecast.
+
+Enum:
+Array [ 2 ]
+forecastGenerator	string
+The internal generator class used to create the forecast text (used for NWS debugging).
+
+generatedAt	string($date-time)
+The time this forecast data was generated.
+
+updateTime	string($date-time)
+The last update time of the data this forecast was generated from.
+
+validTimes	ISO8601Interval{...}
+elevation	QuantitativeValue{...}
+periods	[...]
+}
+GridpointHourlyForecastPeriod{
+description:	
+An object containing forecast information for a specific time period (generally 12-hour or 1-hour).
+
+number	integer
+minimum: 1
+Sequential period number.
+
+name	string
+example: Tuesday Night
+A textual identifier for the period. This value will not be present for hourly forecasts.
+
+startTime	string($date-time)
+The starting time that this forecast period is valid for.
+
+endTime	string($date-time)
+The ending time that this forecast period is valid for.
+
+isDaytime	boolean
+Indicates whether this period is daytime or nighttime.
+
+temperature	{...}
+temperatureUnit	string
+deprecated: true
+The unit of the temperature value (Fahrenheit or Celsius). This property is deprecated. Future versions will indicate the unit within the quantitative value object for the temperature property. To make use of the future standard format now, set the "forecast_temperature_qv" feature flag on the request.
+
+Enum:
+Array [ 2 ]
+temperatureTrend	string
+nullable: true
+If not null, indicates a non-diurnal temperature trend for the period (either rising temperature overnight, or falling temperature during the day)
+
+Enum:
+Array [ 2 ]
+probabilityOfPrecipitation	QuantitativeValue{...}
+dewpoint	QuantitativeValue{...}
+relativeHumidity	QuantitativeValue{...}
+windSpeed	{...}
+windGust	{...}
+windDirection	string
+The prevailing direction of the wind for the period, using a 16-point compass.
+
+Enum:
+Array [ 16 ]
+icon	string($uri)
+deprecated: true
+A link to an icon representing the forecast summary.
+
+shortForecast	string
+A brief textual forecast summary for the period.
+
+detailedForecast	string
+A detailed textual forecast for the period.
+
+}
+Gridpoint12hForecastPeriod{
+description:	
+An object containing forecast information for a specific time period (generally 12-hour or 1-hour).
+
+number	integer
+minimum: 1
+Sequential period number.
+
+name	string
+example: Tuesday Night
+A textual identifier for the period. This value will not be present for hourly forecasts.
+
+startTime	string($date-time)
+The starting time that this forecast period is valid for.
+
+endTime	string($date-time)
+The ending time that this forecast period is valid for.
+
+isDaytime	boolean
+Indicates whether this period is daytime or nighttime.
+
+temperature	{...}
+temperatureUnit	string
+deprecated: true
+The unit of the temperature value (Fahrenheit or Celsius). This property is deprecated. Future versions will indicate the unit within the quantitative value object for the temperature property. To make use of the future standard format now, set the "forecast_temperature_qv" feature flag on the request.
+
+Enum:
+Array [ 2 ]
+temperatureTrend	string
+nullable: true
+If not null, indicates a non-diurnal temperature trend for the period (either rising temperature overnight, or falling temperature during the day)
+
+Enum:
+Array [ 2 ]
+probabilityOfPrecipitation	QuantitativeValue{...}
+windSpeed	{...}
+windGust	{...}
+windDirection	string
+The prevailing direction of the wind for the period, using a 16-point compass.
+
+Enum:
+Array [ 16 ]
+icon	string($uri)
+deprecated: true
+A link to an icon representing the forecast summary.
+
+shortForecast	string
+A brief textual forecast summary for the period.
+
+detailedForecast	string
+A detailed textual forecast for the period.
+
+}
+GridpointForecastUnitsstring
+default: us
+Denotes the units used in the textual portions of the forecast.
+
+Enum:
+Array [ 2 ]
+Gridpoint12hForecastGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	Gridpoint12hForecast{...}
+}
+GridpointHourlyForecastGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	GridpointHourlyForecast{...}
+}
+Gridpoint12hForecastJsonLd{
+description:	
+A multi-day forecast for a 2.5km grid square.
+
+@context*	JsonLdContext{...}
+geometry*	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+units	GridpointForecastUnitsstring
+default: us
+Denotes the units used in the textual portions of the forecast.
+
+Enum:
+Array [ 2 ]
+forecastGenerator	string
+The internal generator class used to create the forecast text (used for NWS debugging).
+
+generatedAt	string($date-time)
+The time this forecast data was generated.
+
+updateTime	string($date-time)
+The last update time of the data this forecast was generated from.
+
+validTimes	ISO8601Interval{...}
+elevation	QuantitativeValue{...}
+periods	[...]
+}
+GridpointHourlyForecastJsonLd{
+description:	
+An hourly forecast for a 2.5km grid square.
+
+@context*	JsonLdContext{...}
+geometry*	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+units	GridpointForecastUnitsstring
+default: us
+Denotes the units used in the textual portions of the forecast.
+
+Enum:
+Array [ 2 ]
+forecastGenerator	string
+The internal generator class used to create the forecast text (used for NWS debugging).
+
+generatedAt	string($date-time)
+The time this forecast data was generated.
+
+updateTime	string($date-time)
+The last update time of the data this forecast was generated from.
+
+validTimes	ISO8601Interval{...}
+elevation	QuantitativeValue{...}
+periods	[...]
+}
+ISO8601Durationstring
+pattern: ^P(\d+Y)?(\d+M)?(\d+D)?(T(\d+H)?(\d+M)?(\d+S)?)?$
+example: P2DT12H
+A time duration in ISO 8601 format.
+
+ISO8601Interval{
+description:	
+A time interval in ISO 8601 format. This can be one of:
+
+1. Start and end time
+2. Start time and duration
+3. Duration and end time
+The string "NOW" can also be used in place of a start/end time.
+
+oneOf ->	
+string
+pattern: ^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2}?)|NOW)\/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2}?)|NOW)$
+example: 2007-03-01T13:00:00Z/2008-05-11T15:30:00Z
+string
+pattern: ^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2}?)|NOW)\/P(\d+Y)?(\d+M)?(\d+D)?(T(\d+H)?(\d+M)?(\d+S)?)?$
+example: 2007-03-01T13:00:00Z/P1Y2M10DT2H30M
+string
+pattern: ^P(\d+Y)?(\d+M)?(\d+D)?(T(\d+H)?(\d+M)?(\d+S)?)?\/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2}?)|NOW)$
+example: P1Y2M10DT2H30M/2008-05-11T15:30:00Z
+}
+JsonLdContext{
+anyOf ->	
+[...]
+{...}
+}
+LandRegionCodestring
+Land region code. These correspond to the six NWS regional headquarters:
+
+AR: Alaska Region
+CR: Central Region
+ER: Eastern Region
+PR: Pacific Region
+SR: Southern Region
+WR: Western Region
+Enum:
+Array [ 6 ]
+MarineAreaCodestring
+Marine area code as defined in NWS Directive 10-302:
+
+AM: Western North Atlantic Ocean and along U.S. East Coast south of Currituck Beach Light NC following the coastline into Gulf of Mexico to Ocean Reef FL including the Caribbean
+AN: Western North Atlantic Ocean and along U.S. East Coast from Canadian border south to Currituck Beach Light NC
+GM: Gulf of Mexico and along the U.S. Gulf Coast from the Mexican border to Ocean Reef FL
+LC: Lake St. Clair
+LE: Lake Erie
+LH: Lake Huron
+LM: Lake Michigan
+LO: Lake Ontario
+LS: Lake Superior
+PH: Central Pacific Ocean including Hawaiian waters
+PK: North Pacific Ocean near Alaska and along Alaska coastline including the Bering Sea and the Gulf of Alaska
+PM: Western Pacific Ocean including Mariana Island waters
+PS: South Central Pacific Ocean including American Samoa waters
+PZ: Eastern North Pacific Ocean and along U.S. West Coast from Canadian border to Mexican border
+SL: St. Lawrence River above St. Regis
+Enum:
+Array [ 15 ]
+MarineRegionCodestring
+Marine region code. These are groups of marine areas combined.
+
+AL: Alaska waters (PK)
+AT: Atlantic Ocean (AM, AN)
+GL: Great Lakes (LC, LE, LH, LM, LO, LS, SL)
+GM: Gulf of Mexico (GM)
+PA: Eastern Pacific Ocean and U.S. West Coast (PZ)
+PI: Central and Western Pacific (PH, PM, PS)
+Enum:
+Array [ 6 ]
+MetarPhenomenon{
+description:	
+An object representing a decoded METAR phenomenon string.
+
+intensity*	string
+nullable: true
+Enum:
+Array [ 2 ]
+modifier*	string
+nullable: true
+Enum:
+Array [ 7 ]
+weather*	string
+Enum:
+Array [ 23 ]
+rawString*	string
+inVicinity	boolean
+}
+MetarSkyCoveragestring
+Enum:
+Array [ 7 ]
+NWSCenterWeatherServiceUnitIdstring
+Three-letter identifier for a Center Weather Service Unit (CWSU).
+
+Enum:
+Array [ 22 ]
+NWSForecastOfficeIdstring
+Three-letter identifier for a NWS office.
+
+Enum:
+Array [ 131 ]
+NWSNationalHQIdstring
+Three-letter identifier for NWS National HQ.
+
+Enum:
+Array [ 1 ]
+NWSOfficeId{
+oneOf ->	
+NWSForecastOfficeIdstring
+Three-letter identifier for a NWS office.
+
+Enum:
+Array [ 131 ]
+NWSRegionalHQIdstring
+Three-letter identifier for a NWS Regional HQ.
+
+Enum:
+Array [ 6 ]
+NWSNationalHQIdstring
+Three-letter identifier for NWS National HQ.
+
+Enum:
+Array [ 1 ]
+}
+NWSRegionalHQIdstring
+Three-letter identifier for a NWS Regional HQ.
+
+Enum:
+Array [ 6 ]
+NWSZoneIDstring
+pattern: ^(A[KLMNRSZ]|C[AOT]|D[CE]|F[LM]|G[AMU]|I[ADLN]|K[SY]|L[ACEHMOS]|M[ADEHINOPST]|N[CDEHJMVY]|O[HKR]|P[AHKMRSWZ]|S[CDL]|T[NX]|UT|V[AIT]|W[AIVY]|[HR]I)[CZ]\d{3}$
+UGC identifier for a NWS forecast zone or county. The first two letters will correspond to either a state code or marine area code (see #/components/schemas/StateTerritoryCode and #/components/schemas/MarineAreaCode for lists of valid letter combinations). The third letter will be Z for public/fire zone or C for county.
+
+NWSZoneTypestring
+Enum:
+Array [ 8 ]
+Observation{
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+@id	string($uri)
+@type	string
+Enum:
+Array [ 1 ]
+elevation	QuantitativeValue{...}
+station	string($uri)
+timestamp	string($date-time)
+rawMessage	string
+textDescription	string
+icon	string($uri)
+nullable: true
+deprecated: true
+presentWeather	[...]
+temperature	QuantitativeValue{...}
+dewpoint	QuantitativeValue{...}
+windDirection	QuantitativeValue{...}
+windSpeed	QuantitativeValue{...}
+windGust	QuantitativeValue{...}
+barometricPressure	QuantitativeValue{...}
+seaLevelPressure	QuantitativeValue{...}
+visibility	QuantitativeValue{...}
+maxTemperatureLast24Hours	QuantitativeValue{...}
+minTemperatureLast24Hours	QuantitativeValue{...}
+precipitationLastHour	QuantitativeValue{...}
+precipitationLast3Hours	QuantitativeValue{...}
+precipitationLast6Hours	QuantitativeValue{...}
+relativeHumidity	QuantitativeValue{...}
+windChill	QuantitativeValue{...}
+heatIndex	QuantitativeValue{...}
+cloudLayers	[...]
+}
+ObservationGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	Observation{...}
+}
+ObservationJsonLd{
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+@id	string($uri)
+@type	string
+Enum:
+Array [ 1 ]
+elevation	QuantitativeValue{...}
+station	string($uri)
+timestamp	string($date-time)
+rawMessage	string
+textDescription	string
+icon	string($uri)
+nullable: true
+deprecated: true
+presentWeather	[...]
+temperature	QuantitativeValue{...}
+dewpoint	QuantitativeValue{...}
+windDirection	QuantitativeValue{...}
+windSpeed	QuantitativeValue{...}
+windGust	QuantitativeValue{...}
+barometricPressure	QuantitativeValue{...}
+seaLevelPressure	QuantitativeValue{...}
+visibility	QuantitativeValue{...}
+maxTemperatureLast24Hours	QuantitativeValue{...}
+minTemperatureLast24Hours	QuantitativeValue{...}
+precipitationLastHour	QuantitativeValue{...}
+precipitationLast3Hours	QuantitativeValue{...}
+precipitationLast6Hours	QuantitativeValue{...}
+relativeHumidity	QuantitativeValue{...}
+windChill	QuantitativeValue{...}
+heatIndex	QuantitativeValue{...}
+cloudLayers	[...]
+}
+ObservationCollectionGeoJson{
+description:	
+A GeoJSON feature collection. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+type*	string
+Enum:
+Array [ 1 ]
+features*	[...]
+}
+ObservationCollectionJsonLd{
+@context	JsonLdContext{...}
+@graph	[...]
+}
+ObservationStation{
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+@id	string($uri)
+@type	string
+Enum:
+Array [ 1 ]
+elevation	QuantitativeValue{...}
+stationIdentifier	string
+name	string
+timeZone	string($iana-time-zone-identifier)
+provider	string
+The data provider for this station. E.g., "ASOS," "MesoWest," etc.
+
+subProvider	string
+The sub-provider of for this station. E.g., "FAA," "DOT," etc.
+
+forecast	string($uri)
+A link to the NWS public forecast zone containing this station.
+
+county	string($uri)
+A link to the NWS county zone containing this station.
+
+fireWeatherZone	string($uri)
+A link to the NWS fire weather forecast zone containing this station.
+
+distance	QuantitativeValue{...}
+bearing	QuantitativeValue{...}
+}
+ObservationStationGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	ObservationStation{...}
+}
+ObservationStationJsonLd{
+@context*	JsonLdContext{...}
+geometry*	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+@id	string($uri)
+@type	string
+Enum:
+Array [ 1 ]
+elevation	QuantitativeValue{...}
+stationIdentifier	string
+name	string
+timeZone	string($iana-time-zone-identifier)
+provider	string
+The data provider for this station. E.g., "ASOS," "MesoWest," etc.
+
+subProvider	string
+The sub-provider of for this station. E.g., "FAA," "DOT," etc.
+
+forecast	string($uri)
+A link to the NWS public forecast zone containing this station.
+
+county	string($uri)
+A link to the NWS county zone containing this station.
+
+fireWeatherZone	string($uri)
+A link to the NWS fire weather forecast zone containing this station.
+
+distance	QuantitativeValue{...}
+bearing	QuantitativeValue{...}
+}
+ObservationStationCollectionGeoJson{
+description:	
+A GeoJSON feature collection. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+type*	string
+Enum:
+Array [ 1 ]
+features*	[...]
+observationStations	[...]
+pagination	PaginationInfo{...}
+}
+ObservationStationCollectionJsonLd{
+@context	JsonLdContext{...}
+@graph	[...]
+observationStations	[...]
+pagination	PaginationInfo{...}
+}
+Office{
+@context	JsonLdContext{...}
+@type	string
+Enum:
+Array [ 1 ]
+@id	string($uri)
+id	string
+name	string
+address	{...}
+telephone	string
+faxNumber	string
+email	string
+sameAs	string($uri)
+nwsRegion	string
+parentOrganization	string($uri)
+responsibleCounties	[...]
+responsibleForecastZones	[...]
+responsibleFireZones	[...]
+approvedObservationStations	[...]
+}
+OfficeHeadline{
+@context	JsonLdContext{...}
+@id	string($uri)
+id	string
+office	string($uri)
+important	boolean
+issuanceTime	string($date-time)
+link	string($uri)
+name	string
+title	string
+summary	string
+nullable: true
+content	string
+}
+OfficeHeadlineCollection{
+@context*	JsonLdContext{...}
+@graph*	[...]
+}
+PaginationInfo{
+description:	
+Links for retrieving more data from paged data sets
+
+next*	string($uri)
+A link to the next page of records
+
+}
+Point{
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+@id	string($uri)
+@type	string
+Enum:
+Array [ 1 ]
+cwa	NWSForecastOfficeIdstring
+Three-letter identifier for a NWS office.
+
+Enum:
+Array [ 131 ]
+forecastOffice	string($uri)
+gridId	NWSForecastOfficeIdstring
+Three-letter identifier for a NWS office.
+
+Enum:
+Array [ 131 ]
+gridX	integer
+minimum: 0
+gridY	integer
+minimum: 0
+forecast	string($uri)
+forecastHourly	string($uri)
+forecastGridData	string($uri)
+observationStations	string($uri)
+relativeLocation	{...}
+forecastZone	string($uri)
+county	string($uri)
+fireWeatherZone	string($uri)
+timeZone	string
+radarStation	string
+}
+PointGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	Point{...}
+}
+PointJsonLd{
+@context*	JsonLdContext{...}
+geometry*	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+@id	string($uri)
+@type	string
+Enum:
+Array [ 1 ]
+cwa	NWSForecastOfficeIdstring
+Three-letter identifier for a NWS office.
+
+Enum:
+Array [ 131 ]
+forecastOffice	string($uri)
+gridId	NWSForecastOfficeIdstring
+Three-letter identifier for a NWS office.
+
+Enum:
+Array [ 131 ]
+gridX	integer
+minimum: 0
+gridY	integer
+minimum: 0
+forecast	string($uri)
+forecastHourly	string($uri)
+forecastGridData	string($uri)
+observationStations	string($uri)
+relativeLocation	{...}
+forecastZone	string($uri)
+county	string($uri)
+fireWeatherZone	string($uri)
+timeZone	string
+radarStation	string
+}
+PointStringstring
+pattern: ^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$
+ProblemDetail{
+description:	
+Detail about an error. This document conforms to RFC 7807 (Problem Details for HTTP APIs).
+
+type*	string($uri)
+default: about:blank
+example: urn:noaa:nws:api:UnexpectedProblem
+A URI reference (RFC 3986) that identifies the problem type. This is only an identifier and is not necessarily a resolvable URL.
+
+title*	string
+example: Unexpected Problem
+A short, human-readable summary of the problem type.
+
+status*	number
+maximum: 999
+minimum: 100
+example: 500
+The HTTP status code (RFC 7231, Section 6) generated by the origin server for this occurrence of the problem.
+
+detail*	string
+example: An unexpected problem has occurred.
+A human-readable explanation specific to this occurrence of the problem.
+
+instance*	string($uri)
+example: urn:noaa:nws:api:request:493c3a1d-f87e-407f-ae2c-24483f5aab63
+A URI reference (RFC 3986) that identifies the specific occurrence of the problem. This is only an identifier and is not necessarily a resolvable URL.
+
+correlationId*	string
+example: 493c3a1d-f87e-407f-ae2c-24483f5aab63
+A unique identifier for the request, used for NWS debugging purposes. Please include this identifier with any correspondence to help us investigate your issue.
+
+}
+QuantitativeValue{
+description:	
+A structured value representing a measurement and its unit of measure. This object is a slightly modified version of the schema.org definition at https://schema.org/QuantitativeValue
+
+value	number
+nullable: true
+A measured value
+
+maxValue	number
+The maximum value of a range of measured values
+
+minValue	number
+The minimum value of a range of measured values
+
+unitCode	UnitOfMeasurestring
+pattern: ^((wmo|uc|wmoUnit|nwsUnit):)?.*$
+A string denoting a unit of measure, expressed in the format "{unit}" or "{namespace}:{unit}". Units with the namespace "wmo" or "wmoUnit" are defined in the World Meteorological Organization Codes Registry at http://codes.wmo.int/common/unit and should be canonically resolvable to http://codes.wmo.int/common/unit/{unit}. Units with the namespace "nwsUnit" are currently custom and do not align to any standard. Units with no namespace or the namespace "uc" are compliant with the Unified Code for Units of Measure syntax defined at https://unitsofmeasure.org/. This also aligns with recent versions of the Geographic Markup Language (GML) standard, the IWXXM standard, and OGC Observations and Measurements v2.0 (ISO/DIS 19156). Namespaced units are considered deprecated. We will be aligning API to use the same standards as GML/IWXXM in the future.
+
+qualityControl	string
+For values in observation records, the quality control flag from the MADIS system. The definitions of these flags can be found at https://madis.ncep.noaa.gov/madis_sfc_qc_notes.shtml
+
+Enum:
+Array [ 9 ]
+}
+RegionCode{
+oneOf ->	
+LandRegionCodestring
+Land region code. These correspond to the six NWS regional headquarters:
+
+AR: Alaska Region
+CR: Central Region
+ER: Eastern Region
+PR: Pacific Region
+SR: Southern Region
+WR: Western Region
+Enum:
+Array [ 6 ]
+MarineRegionCodestring
+Marine region code. These are groups of marine areas combined.
+
+AL: Alaska waters (PK)
+AT: Atlantic Ocean (AM, AN)
+GL: Great Lakes (LC, LE, LH, LM, LO, LS, SL)
+GM: Gulf of Mexico (GM)
+PA: Eastern Pacific Ocean and U.S. West Coast (PZ)
+PI: Central and Western Pacific (PH, PM, PS)
+Enum:
+Array [ 6 ]
+}
+RelativeLocation{
+city	string
+state	string
+distance	QuantitativeValue{...}
+bearing	QuantitativeValue{...}
+}
+RelativeLocationGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	RelativeLocation{...}
+}
+RelativeLocationJsonLd{
+city	string
+state	string
+distance	QuantitativeValue{...}
+bearing	QuantitativeValue{...}
+geometry*	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+}
+Sigmet{
+id	string($uri)
+issueTime	string($date-time)
+fir	string
+nullable: true
+atsu	ATSUIdentifierstring
+pattern: ^[A-Z]{3,4}$
+ATSU Identifier
+
+sequence	string
+nullable: true
+phenomenon	string($uri)
+nullable: true
+start	string($date-time)
+end	string($date-time)
+}
+SigmetCollectionGeoJson{
+description:	
+A GeoJSON feature collection. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+type*	string
+Enum:
+Array [ 1 ]
+features*	[...]
+}
+SigmetGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	Sigmet{...}
+}
+SigmetSequenceNumberstring
+StateTerritoryCodestring
+Enum:
+Array [ 59 ]
+TextProduct{
+@context	JsonLdContext{...}
+@id	string($uri)
+id	string
+wmoCollectiveId	string
+issuingOffice	string
+issuanceTime	string($date-time)
+productCode	string
+productName	string
+productText	string
+}
+TextProductCollection{
+@context	JsonLdContext{...}
+@graph	[...]
+}
+TextProductTypeCollection{
+@context	JsonLdContext{...}
+@graph	[...]
+}
+TextProductLocationCollection{
+@context	JsonLdContext{...}
+locations	{...}
+}
+Timestring
+pattern: ^([01][0-9]|2[0-3])[0-5][0-9]$
+A time (in HHMM format). This is always specified in UTC (Zulu) time.
+
+UnitOfMeasurestring
+pattern: ^((wmo|uc|wmoUnit|nwsUnit):)?.*$
+A string denoting a unit of measure, expressed in the format "{unit}" or "{namespace}:{unit}". Units with the namespace "wmo" or "wmoUnit" are defined in the World Meteorological Organization Codes Registry at http://codes.wmo.int/common/unit and should be canonically resolvable to http://codes.wmo.int/common/unit/{unit}. Units with the namespace "nwsUnit" are currently custom and do not align to any standard. Units with no namespace or the namespace "uc" are compliant with the Unified Code for Units of Measure syntax defined at https://unitsofmeasure.org/. This also aligns with recent versions of the Geographic Markup Language (GML) standard, the IWXXM standard, and OGC Observations and Measurements v2.0 (ISO/DIS 19156). Namespaced units are considered deprecated. We will be aligning API to use the same standards as GML/IWXXM in the future.
+
+Zone{
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+@id	string($uri)
+@type	string
+Enum:
+Array [ 1 ]
+id	NWSZoneIDstring
+pattern: ^(A[KLMNRSZ]|C[AOT]|D[CE]|F[LM]|G[AMU]|I[ADLN]|K[SY]|L[ACEHMOS]|M[ADEHINOPST]|N[CDEHJMVY]|O[HKR]|P[AHKMRSWZ]|S[CDL]|T[NX]|UT|V[AIT]|W[AIVY]|[HR]I)[CZ]\d{3}$
+UGC identifier for a NWS forecast zone or county. The first two letters will correspond to either a state code or marine area code (see #/components/schemas/StateTerritoryCode and #/components/schemas/MarineAreaCode for lists of valid letter combinations). The third letter will be Z for public/fire zone or C for county.
+
+type	NWSZoneTypestring
+Enum:
+Array [ 8 ]
+name	string
+effectiveDate	string($date-time)
+expirationDate	string($date-time)
+state	{...}
+forecastOffice	string($uri)
+gridIdentifier	string
+awipsLocationIdentifier	string
+cwa	[...]
+forecastOffices	[...]
+timeZone	[...]
+observationStations	[...]
+radarStation	string
+nullable: true
+}
+ZoneGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	Zone{...}
+}
+ZoneJsonLd{
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+@id	string($uri)
+@type	string
+Enum:
+Array [ 1 ]
+id	NWSZoneIDstring
+pattern: ^(A[KLMNRSZ]|C[AOT]|D[CE]|F[LM]|G[AMU]|I[ADLN]|K[SY]|L[ACEHMOS]|M[ADEHINOPST]|N[CDEHJMVY]|O[HKR]|P[AHKMRSWZ]|S[CDL]|T[NX]|UT|V[AIT]|W[AIVY]|[HR]I)[CZ]\d{3}$
+UGC identifier for a NWS forecast zone or county. The first two letters will correspond to either a state code or marine area code (see #/components/schemas/StateTerritoryCode and #/components/schemas/MarineAreaCode for lists of valid letter combinations). The third letter will be Z for public/fire zone or C for county.
+
+type	NWSZoneTypestring
+Enum:
+Array [ 8 ]
+name	string
+effectiveDate	string($date-time)
+expirationDate	string($date-time)
+state	{...}
+forecastOffice	string($uri)
+gridIdentifier	string
+awipsLocationIdentifier	string
+cwa	[...]
+forecastOffices	[...]
+timeZone	[...]
+observationStations	[...]
+radarStation	string
+nullable: true
+}
+ZoneCollectionGeoJson{
+description:	
+A GeoJSON feature collection. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+type*	string
+Enum:
+Array [ 1 ]
+features*	[...]
+}
+ZoneCollectionJsonLd{
+@context	JsonLdContext{...}
+@graph	[...]
+}
+ZoneForecast{
+description:	
+An object representing a zone area forecast.
+
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+zone	string($uri)
+An API link to the zone this forecast is for.
+
+updated	string($date-time)
+The time this zone forecast product was published.
+
+periods	[...]
+}
+ZoneForecastGeoJson{
+description:	
+A GeoJSON feature. Please refer to IETF RFC 7946 for information on the GeoJSON format.
+
+@context	JsonLdContext{...}
+id	string($uri)
+type*	string
+Enum:
+Array [ 1 ]
+geometry*	GeoJsonGeometry{...}
+properties*	ZoneForecast{...}
+}
+ZoneForecastJsonLd{
+description:	
+An object representing a zone area forecast.
+
+@context	JsonLdContext{...}
+geometry	GeometryStringstring($wkt)
+nullable: true
+A geometry represented in Well-Known Text (WKT) format.
+
+zone	string($uri)
+An API link to the zone this forecast is for.
+
+updated	string($date-time)
+The time this zone forecast product was published.
+
+periods	[...]
+}

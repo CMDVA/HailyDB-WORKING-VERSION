@@ -69,52 +69,66 @@ class Alert(db.Model):
         return f'<Alert {self.id}: {self.event}>'
     
     def to_dict(self):
-        """Convert alert to dictionary for JSON serialization"""
-        # Process county_names to create a proper state-to-counties mapping
-        county_mapping = {}
-        if self.county_names and isinstance(self.county_names, list):
-            for item in self.county_names:
-                if isinstance(item, dict) and 'state' in item and 'county' in item:
-                    state = item['state']
-                    county = item['county']
-                    if state not in county_mapping:
-                        county_mapping[state] = []
-                    if county not in county_mapping[state]:
-                        county_mapping[state].append(county)
+        """Convert alert to dictionary following NWS API OpenAPI specification"""
+        # Extract NWS standard fields from properties where stored
+        properties_data = self.properties or {}
         
+        # Build NWS-compliant response structure
         return {
+            # Core NWS API fields (exactly as per OpenAPI spec)
             'id': self.id,
-            'event': self.event,
-            'severity': self.severity,
-            'area_desc': self.area_desc,
-            'effective': self.effective.isoformat() if self.effective else None,
-            'expires': self.expires.isoformat() if self.expires else None,
+            'areaDesc': self.area_desc,
+            'geocode': properties_data.get('geocode', {}),
+            'affectedZones': properties_data.get('affectedZones', []),
+            'references': properties_data.get('references', []),
             'sent': self.sent.isoformat() if self.sent else None,
-            'geometry': self.geometry,
-            'properties': self.properties,
-            'ai_summary': self.ai_summary,
-            'ai_tags': self.ai_tags,
-            'spc_verified': self.spc_verified,
-            'spc_reports': self.spc_reports,
-            'spc_confidence_score': self.spc_confidence_score,
-            'spc_match_method': self.spc_match_method,
-            'spc_report_count': self.spc_report_count,
-            'spc_ai_summary': self.spc_ai_summary,
-            'radar_indicated': self.radar_indicated,  # Feature 1: Radar-indicated parsing
-            'fips_codes': self.fips_codes,            # Feature 3: FIPS county codes
-            'county_names': county_mapping,           # Feature 3: County-state mapping (processed)
-            'city_names': self.city_names,            # City names extracted from area_desc
-            'geometry_type': self.geometry_type,      # Feature 3: Geometry classification
-            'coordinate_count': self.coordinate_count, # Feature 3: Complexity analysis
-            'affected_states': self.affected_states,  # Feature 3: State list
-            'geometry_bounds': self.geometry_bounds,  # Feature 3: Coordinate bounds
-            'ingested_at': self.ingested_at.isoformat() if self.ingested_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'is_active': self.is_active,
-            'duration_minutes': self.duration_minutes,
-            'location_info': self.get_location_info(),
-            'enhanced_geometry': self.get_enhanced_geometry_info(),  # Feature 3: Comprehensive geometry data
-            'geocode': self.properties.get('geocode') if self.properties else None  # Add geocode for fallback parsing
+            'effective': self.effective.isoformat() if self.effective else None,
+            'onset': properties_data.get('onset'),
+            'expires': self.expires.isoformat() if self.expires else None,
+            'ends': properties_data.get('ends'),
+            'status': properties_data.get('status', 'Actual'),
+            'messageType': properties_data.get('messageType', 'Alert'),
+            'category': properties_data.get('category', 'Met'),
+            'severity': self.severity or properties_data.get('severity'),
+            'certainty': properties_data.get('certainty'),
+            'urgency': properties_data.get('urgency'),
+            'event': self.event,
+            'sender': properties_data.get('sender'),
+            'senderName': properties_data.get('senderName'),
+            'headline': properties_data.get('headline'),
+            'description': properties_data.get('description'),
+            'instruction': properties_data.get('instruction'),
+            'response': properties_data.get('response'),
+            'parameters': properties_data.get('parameters', {}),
+            'scope': properties_data.get('scope', 'Public'),
+            'code': properties_data.get('code'),
+            'language': properties_data.get('language'),
+            'web': properties_data.get('web'),
+            'eventCode': properties_data.get('eventCode', {}),
+            
+            # Our enrichment fields (clearly marked)
+            'hailydb_enrichments': {
+                'radar_indicated': self.radar_indicated,
+                'spc_verified': self.spc_verified,
+                'spc_reports': self.spc_reports,
+                'spc_confidence_score': self.spc_confidence_score,
+                'spc_match_method': self.spc_match_method,
+                'spc_report_count': self.spc_report_count,
+                'spc_ai_summary': self.spc_ai_summary,
+                'ai_summary': self.ai_summary,
+                'ai_tags': self.ai_tags,
+                'fips_codes': self.fips_codes,
+                'county_names': self.county_names,
+                'city_names': self.city_names,
+                'geometry_type': self.geometry_type,
+                'coordinate_count': self.coordinate_count,
+                'affected_states': self.affected_states,
+                'geometry_bounds': self.geometry_bounds,
+                'ingested_at': self.ingested_at.isoformat() if self.ingested_at else None,
+                'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+                'is_active': self.is_active,
+                'duration_minutes': self.duration_minutes
+            }
         }
     
     @property

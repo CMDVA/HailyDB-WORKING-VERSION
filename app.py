@@ -676,31 +676,41 @@ def get_expired_alerts():
     total = query.count()
     events = query.order_by(Alert.effective.desc()).offset((page - 1) * limit).limit(limit).all()
     
-    # Format response following NWS API standards
-    alerts_data = []
+    # Format response following NWS API OpenAPI specification
+    features = []
     for alert in events:
-        # Use .to_dict() method which already formats according to NWS standards
-        alert_dict = alert.to_dict()
-        # Add our enrichment fields
-        alert_dict['radarIndicated'] = alert.radar_indicated
-        alert_dict['spcVerified'] = alert.spc_verified
-        alert_dict['spcReports'] = alert.spc_report_count or 0
-        alerts_data.append(alert_dict)
+        # Create GeoJSON Feature structure as per NWS API spec
+        feature = {
+            'id': alert.id,
+            'type': 'Feature',
+            'properties': alert.to_dict(),
+            'geometry': alert.geometry
+        }
+        features.append(feature)
     
-    return jsonify({
-        'total': total,
-        'page': page,
-        'limit': limit,
-        'pages': (total + limit - 1) // limit,
-        'filters': {
-            'state': state,
-            'county': county,
-            'min_hail_inches': min_hail,
-            'min_wind_mph': min_wind,
-            'date_range': f"{start_date} to {end_date or 'today'}"
-        },
-        'alerts': alerts_data
-    })
+    # Return GeoJSON FeatureCollection format as per NWS API spec
+    response_data = {
+        'type': 'FeatureCollection',
+        'features': features,
+        'title': f'HailyDB Historical Alerts Repository - {total} expired alerts with radar-indicated parameters',
+        'updated': datetime.utcnow().isoformat(),
+        'metadata': {
+            'total_results': total,
+            'page': page,
+            'limit': limit,
+            'total_pages': (total + limit - 1) // limit,
+            'filters_applied': {
+                'state': state,
+                'county': county,
+                'min_hail_inches': min_hail,
+                'min_wind_mph': min_wind,
+                'date_range': f"{start_date} to {end_date or 'today'}",
+                'historical_only': True
+            }
+        }
+    }
+    
+    return jsonify(response_data)
 
 @app.route('/api/alerts/search')
 def search_alerts():
