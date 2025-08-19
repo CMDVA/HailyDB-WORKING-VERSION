@@ -282,11 +282,12 @@ class LiveRadarAlertService:
         
     def _extract_affected_states(self, properties: Dict[str, Any]) -> List[str]:
         """Extract affected states from alert properties"""
-        affected_zones = properties.get('affectedZones', [])
         states = set()
         
+        # Method 1: Extract from affectedZones URLs  
+        affected_zones = properties.get('affectedZones', [])
         for zone in affected_zones:
-            # Extract state code from zone URL like ".../zones/forecast/GAZ154"
+            # Extract state code from zone URL like ".../zones/forecast/GAZ154" or ".../zones/marine/LMZ080"
             if isinstance(zone, str) and '/zones/' in zone:
                 parts = zone.split('/')
                 if len(parts) > 0:
@@ -294,6 +295,27 @@ class LiveRadarAlertService:
                     if len(zone_code) >= 2:
                         state_code = zone_code[:2]
                         states.add(state_code)
+        
+        # Method 2: Parse from area description for marine/special alerts
+        area_desc = properties.get('areaDesc', '')
+        if area_desc and not states:
+            # Look for state abbreviations in area description like "WI", "IL", "CA" 
+            import re
+            state_pattern = r'\b([A-Z]{2})\b'
+            potential_states = re.findall(state_pattern, area_desc)
+            
+            # Valid US state abbreviations
+            valid_states = {
+                'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+                'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+                'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+                'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+                'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+            }
+            
+            for state in potential_states:
+                if state in valid_states:
+                    states.add(state)
                         
         return list(states)
         
