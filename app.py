@@ -403,6 +403,32 @@ def get_live_radar_service():
         print(f"Error getting live radar service: {e}")
         return None
 
+@app.route('/api/alerts/<path:alert_id>')
+def get_alert_api(alert_id):
+    """API endpoint to get individual alert data in JSON format - Core business endpoint"""
+    alert = Alert.query.filter_by(id=alert_id).first()
+    
+    if not alert:
+        return jsonify({
+            'error': 'Alert not found',
+            'message': f'Alert {alert_id} not found in HailyDB historical repository',
+            'alert_id': alert_id,
+            'note': 'This endpoint provides historical NWS alerts with radar-detected damage parameters'
+        }), 404
+    
+    # Return the full alert data as NWS-compliant JSON
+    alert_data = alert.to_dict()
+    
+    # Add metadata for API compliance
+    alert_data['hailydb_metadata'] = {
+        'repository_type': 'historical_weather_damage_intelligence',
+        'data_source': 'National Weather Service (NWS)',
+        'last_updated': alert.ingested_at.isoformat() if alert.ingested_at else None,
+        'nws_compliant': True
+    }
+    
+    return jsonify(alert_data)
+
 @app.route('/alerts/<path:alert_id>')
 def get_alert(alert_id):
     """Get single enriched alert - supports both historical and live radar alerts"""
