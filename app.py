@@ -614,14 +614,12 @@ def get_radar_parsing_summary():
             'message': str(e)
         }), 500
 
-@app.route('/api/damage-events')
-def get_damage_events():
+@app.route('/api/alerts/expired')
+def get_expired_alerts():
     """
-    PRIMARY BUSINESS VALUE ENDPOINT: Historical radar-detected damage events
-    Optimized for insurance claims, damage assessment, and restoration contractors
-    
-    Returns expired NWS alerts with radar-detected hail and/or high winds (50+ mph)
-    Default behavior focuses on historical damage events, not active weather
+    Historical NWS alert repository endpoint
+    Returns expired alerts with radar-indicated hail and/or wind parameters
+    Follows NWS API standards for alert data structure
     """
     # Location parameters for damage assessment
     state = request.args.get('state')
@@ -644,9 +642,9 @@ def get_damage_events():
     page = request.args.get('page', 1, type=int)
     limit = min(request.args.get('limit', 100, type=int), 500)  # Higher limit for damage events
     
-    # Base query: EXPIRED alerts with radar-detected damage
+    # Base query: EXPIRED alerts with radar-indicated parameters
     query = Alert.query.filter(
-        Alert.expires < datetime.utcnow(),  # Historical events only
+        Alert.expires < datetime.utcnow(),  # Historical alerts only
         Alert.radar_indicated.isnot(None),
         db.or_(
             Alert.radar_indicated['hail_inches'].astext.cast(db.Float) >= min_hail,
@@ -678,26 +676,19 @@ def get_damage_events():
     total = query.count()
     events = query.order_by(Alert.effective.desc()).offset((page - 1) * limit).limit(limit).all()
     
-    # Format response for damage assessment use cases
-    damage_events = []
-    for event in events:
-        damage_events.append({
-            'id': event.id,
-            'event_type': event.event,
-            'location': event.area_desc,
-            'states': event.affected_states,
-            'effective_time': event.effective.isoformat() if event.effective else None,
-            'expires_time': event.expires.isoformat() if event.expires else None,
-            'radar_parameters': event.radar_indicated,
-            'coordinates': event.geometry_bounds,
-            'duration_minutes': event.duration_minutes,
-            'severity': event.severity,
-            'spc_verified': event.spc_verified,
-            'spc_reports': event.spc_report_count or 0
-        })
+    # Format response following NWS API standards
+    alerts_data = []
+    for alert in events:
+        # Use .to_dict() method which already formats according to NWS standards
+        alert_dict = alert.to_dict()
+        # Add our enrichment fields
+        alert_dict['radarIndicated'] = alert.radar_indicated
+        alert_dict['spcVerified'] = alert.spc_verified
+        alert_dict['spcReports'] = alert.spc_report_count or 0
+        alerts_data.append(alert_dict)
     
     return jsonify({
-        'total_damage_events': total,
+        'total': total,
         'page': page,
         'limit': limit,
         'pages': (total + limit - 1) // limit,
@@ -708,8 +699,7 @@ def get_damage_events():
             'min_wind_mph': min_wind,
             'date_range': f"{start_date} to {end_date or 'today'}"
         },
-        'damage_events': damage_events,
-        'usage_note': 'This endpoint returns EXPIRED alerts with radar-detected damage for insurance and restoration use cases'
+        'alerts': alerts_data
     })
 
 @app.route('/api/alerts/search')

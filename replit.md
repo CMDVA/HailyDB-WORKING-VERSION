@@ -14,7 +14,7 @@ HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimiz
 ### Recent Achievements (August 19, 2025)
 - **Perfect SPC Synchronization**: Achieved 100% data capture with zero variance tolerance
 - **Core Business Value Defined**: Repositioned as historical damage intelligence platform
-- **Damage Event API**: Created dedicated `/api/damage-events` endpoint for core business value
+- **Historical Alert Repository**: Created `/api/alerts/expired` endpoint following NWS API standards
 - **Historical Data Stats**: 2,085 expired radar-detected damage events (27.6% of all alerts)
 - **Insurance Industry Focus**: Optimized for "where damage WAS" rather than active weather
 
