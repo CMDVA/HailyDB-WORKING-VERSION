@@ -1,4 +1,4 @@
-# HailyDB v2.0 - National Weather Service Alert Intelligence Platform
+# HailyDB v2.1 - National Weather Service Alert Intelligence Platform
 
 ## Overview
 HailyDB is a **historical weather damage intelligence platform** designed to capture and analyze expired NWS alerts containing radar-detected hail and high winds. Unlike active weather platforms, HailyDB's core value proposition is providing comprehensive historical data on **where likely weather damage WAS**, making it essential for insurance claims processing, damage assessment, restoration contractors, and forensic weather analysis.
@@ -11,12 +11,14 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimized for Replit deployment.
 
-### Recent Achievements (August 19, 2025)
+### Recent Achievements (August 19, 2025) - v2.1 Release
 - **Perfect SPC Synchronization**: Achieved 100% data capture with zero variance tolerance
 - **Core Business Value Defined**: Repositioned as historical damage intelligence platform
-- **Historical Alert Repository**: Created `/api/alerts/expired` endpoint following NWS API standards
+- **NWS API Compliance**: Complete adherence to official NWS OpenAPI specification for data formats
+- **Historical Alert Repository**: `/api/alerts/expired` endpoint returns GeoJSON FeatureCollection format
+- **Code Cleanup**: Deprecated unused parsers and moved legacy components to `/deprecated` folder
 - **Historical Data Stats**: 2,085 expired radar-detected damage events (27.6% of all alerts)
-- **Insurance Industry Focus**: Optimized for "where damage WAS" rather than active weather
+- **Production Ready**: Clean architecture with NWS-standard field naming and response structures
 
 ### Backend Architecture
 - **Flask Application**: Core web service utilizing SQLAlchemy ORM.
@@ -41,7 +43,7 @@ HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimiz
 - **SPC Matching**: Cross-references NWS alerts with SPC storm reports.
 - **SPC Verification**: Ensures data integrity against live SPC data.
 - **Radar Parsing**: Extracts specific weather parameters like hail sizes and wind speeds from alert descriptions.
-- **City Parser**: Extracts city names from NWS area descriptions.
+- **Enhanced Context Service**: AI-powered enrichment with OpenAI GPT-4o integration.
 
 #### Webhook System
 - **Webhook Service**: Delivers real-time HTTP notifications for external integrations.
@@ -53,17 +55,33 @@ The system prioritizes **historical damage event discovery** with intuitive filt
 ### Data Flow
 The system involves real-time ingestion of NWS alerts, followed by radar processing, SPC cross-referencing, AI enrichment, and ultimately, webhook dispatch and continuous data verification.
 
-## External Dependencies
+## Active Production Architecture
 
-- **Flask**: Web framework.
-- **SQLAlchemy**: Database ORM.
-- **psycopg2-binary**: PostgreSQL adapter.
-- **Gunicorn**: WSGI server.
-- **OpenAI**: For AI enrichment services (GPT-4o).
-- **Shapely**: For geometric operations related to alert boundaries.
-- **Requests**: HTTP client for external API calls.
-- **CacheTools**: Used for caching, specifically for webhook deduplication.
-- **National Weather Service (NWS)**: Official API for real-time alert ingestion.
-- **Storm Prediction Center (SPC)**: Source for historical storm verification reports.
-- **NOAA HURDAT2**: Source for the complete hurricane track database.
-```
+### Core Services
+- **Flask Application** (`app.py`): Main web service with NWS API-compliant endpoints
+- **Alert Model** (`models.py`): SQLAlchemy ORM with NWS field mapping and enrichments
+- **Autonomous Scheduler** (`autonomous_scheduler.py`): Background service orchestration
+- **SPC Ingestion** (`spc_ingest.py`): Storm Prediction Center data polling
+- **Live Radar Service** (`live_radar_service.py`): Real-time NWS alert processing
+- **Enhanced Context Service** (`enhanced_context_service.py`): AI enrichment with GPT-4o
+
+### Supporting Services
+- **SPC Matching** (`spc_matcher.py`): Cross-referencing alerts with storm reports
+- **SPC Verification** (`spc_verification.py`): Data integrity validation
+- **SPC Enrichment** (`spc_enrichment.py`): Multi-source data enhancement
+- **Webhook Service** (`webhook_service.py`): External integrations
+
+### Deprecated Components
+Moved to `/deprecated` folder:
+- Legacy parsers (`city_parser.py`, `historical_radar_parser.py`)
+- One-time utilities (`comprehensive_data_audit.py`, `spc_sync_fix.py`)
+- Development tools (`spc_perfect_parser.py`)
+
+## External Dependencies
+- **Flask**: Web framework following NWS API standards
+- **SQLAlchemy**: Database ORM with JSONB support for NWS data structures
+- **psycopg2-binary**: PostgreSQL adapter for production database
+- **Gunicorn**: WSGI server for production deployment
+- **OpenAI**: GPT-4o for professional weather intelligence summaries
+- **Requests**: HTTP client for NWS and SPC API integration
+- **Official Data Sources**: NWS API, Storm Prediction Center, NOAA HURDAT2
