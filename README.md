@@ -82,6 +82,77 @@ curl "http://localhost:5000/api/alerts/expired?limit=1" | jq '.type'
 curl "http://localhost:5000/api/health"
 ```
 
+### Complete API Integration Workflow
+
+**Step 1: Search for Historical Damage Events**
+```bash
+curl "http://localhost:5000/api/alerts/expired?state=TX&min_wind=50&limit=10"
+```
+
+**Step 2: Get Individual Alert Details**
+```bash
+# Use alert ID from search results
+curl "http://localhost:5000/api/alerts/{alert_id_from_step_1}"
+```
+
+**Step 3: Access Complete Dataset**
+All endpoints return NWS-compliant data with HailyDB enrichments for professional damage assessment and insurance claims verification.
+
+---
+
+## Complete API Reference
+
+### Core Endpoints
+
+| Endpoint | Method | Description | Use Case |
+|----------|--------|-------------|----------|
+| `/api/alerts/expired` | GET | Historical damage events repository | Primary business endpoint for insurance claims |
+| `/api/alerts/{alert_id}` | GET | Individual alert details | Complete alert data with enrichments |
+| `/api/health` | GET | System status and statistics | Integration health checks |
+
+### Search and Filter Parameters
+
+**Available for `/api/alerts/expired`:**
+- `state` (string): State abbreviation (TX, FL, CA, etc.)
+- `county` (string): County name filter
+- `min_hail` (float): Minimum hail size in inches (0.75, 1.0, 1.75, etc.)
+- `min_wind` (integer): Minimum wind speed in mph (50, 60, 70, etc.)
+- `start_date` (string): Filter start date (YYYY-MM-DD format)
+- `end_date` (string): Filter end date (YYYY-MM-DD format)
+- `page` (integer): Page number for pagination
+- `limit` (integer): Results per page (max 100)
+
+### Response Format Standards
+
+All endpoints follow NWS OpenAPI specification:
+- **GeoJSON FeatureCollection** format for alert collections
+- **Official NWS field names** (areaDesc, effective, expires, etc.)
+- **HailyDB enrichments** clearly separated in `hailydb_enrichments` object
+- **Metadata** includes repository type and data source attribution
+
+### Integration Examples
+
+**Insurance Claims Verification:**
+```bash
+# Find hail damage events in specific county
+curl "http://localhost:5000/api/alerts/expired?state=TX&county=Harris&min_hail=1.0"
+
+# Get complete alert details for claim assessment
+curl "http://localhost:5000/api/alerts/{alert_id}"
+```
+
+**Restoration Project Planning:**
+```bash
+# Find high-wind damage events by date range
+curl "http://localhost:5000/api/alerts/expired?min_wind=60&start_date=2025-01-01&end_date=2025-08-01"
+```
+
+**Legal Forensics:**
+```bash
+# Verify specific weather event for litigation
+curl "http://localhost:5000/api/alerts/{specific_alert_id}"
+```
+
 ### Sample Response Structure (NWS Compliant)
 
 ```json
@@ -160,6 +231,47 @@ The system follows the official National Weather Service OpenAPI specification e
 **Sample Request:**
 ```bash
 curl "http://localhost:5000/api/alerts/expired?state=TX&min_hail=1.0&limit=50"
+```
+
+### Individual Alert Details
+**`GET /api/alerts/{alert_id}`** - Get complete data for a specific alert
+
+**Sample Request:**
+```bash
+curl "http://localhost:5000/api/alerts/urn:oid:2.49.0.1.840.0.ba730699699a52f5bd5b9d53f1764ddb892213bb.001.1"
+```
+
+**Sample Response:**
+```json
+{
+  "id": "urn:oid:2.49.0.1.840.0.ba730699699a52f5bd5b9d53f1764ddb892213bb.001.1",
+  "event": "Special Weather Statement",
+  "areaDesc": "Castro; Swisher; Lamb; Hale; Floyd",
+  "effective": "2025-08-11T01:00:00",
+  "expires": "2025-08-11T01:30:00",
+  "severity": "Moderate",
+  "description": "Doppler radar tracking strong winds up to 50 mph...",
+  "hailydb_enrichments": {
+    "radar_indicated": {
+      "hail_inches": 0.0,
+      "wind_mph": 50
+    },
+    "spc_verified": false,
+    "geometry_bounds": {
+      "min_lat": 33.87,
+      "max_lat": 34.62,
+      "min_lon": -102.27,
+      "max_lon": -101.33
+    },
+    "is_active": false,
+    "duration_minutes": 30
+  },
+  "hailydb_metadata": {
+    "repository_type": "historical_weather_damage_intelligence",
+    "data_source": "National Weather Service (NWS)",
+    "nws_compliant": true
+  }
+}
 ```
 
 ---

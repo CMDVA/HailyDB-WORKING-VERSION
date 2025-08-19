@@ -11,11 +11,13 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimized for Replit deployment.
 
-### Recent Achievements (August 19, 2025) - v2.1 Release
+### Recent Achievements (August 19, 2025) - v2.1.1 Release
+- **Complete API Coverage**: Fixed missing `/api/alerts/{alert_id}` endpoint for individual alert details
 - **Perfect SPC Synchronization**: Achieved 100% data capture with zero variance tolerance
 - **Core Business Value Defined**: Repositioned as historical damage intelligence platform
 - **NWS API Compliance**: Complete adherence to official NWS OpenAPI specification for data formats
 - **Historical Alert Repository**: `/api/alerts/expired` endpoint returns GeoJSON FeatureCollection format
+- **Individual Alert Access**: Full JSON API for complete alert details with enrichments
 - **Code Cleanup**: Deprecated unused parsers and moved legacy components to `/deprecated` folder
 - **Historical Data Stats**: 2,085 expired radar-detected damage events (27.6% of all alerts)
 - **Production Ready**: Clean architecture with NWS-standard field naming and response structures
