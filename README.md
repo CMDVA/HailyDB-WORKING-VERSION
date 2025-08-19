@@ -1,10 +1,10 @@
-# HailyDB v2.0 - National Weather Service Alert Intelligence Platform
+# HailyDB v2.1 - Historical Weather Damage Intelligence Platform
 
 ![HailyDB Logo](generated-icon.png)
 
-**Production API:** `https://api.hailydb.com`  
-**Status:** Production Ready - 100% Autonomous Operation  
-**Data Coverage:** 5,939 NWS Alerts | 45,219 SPC Reports | Real-time Processing  
+**Production Status:** NWS API Compliant Repository  
+**Core Business Data:** 2,085 Historical Damage Events (27.6% of 7,566 total alerts)  
+**Data Sources:** National Weather Service | Storm Prediction Center | NOAA HURDAT2  
 
 ## Table of Contents
 
@@ -29,76 +29,137 @@
 
 ## Overview
 
-HailyDB is a comprehensive weather intelligence platform designed to ingest, process, and enrich National Weather Service (NWS) alerts using AI-powered analysis and Storm Prediction Center (SPC) verification. The system provides real-time weather data processing capabilities for enterprise applications, insurance claims processing, and emergency management systems.
+HailyDB is a professional repository of expired National Weather Service alerts containing radar-detected hail and high wind damage events. Designed for insurance companies, restoration contractors, and legal forensics teams, HailyDB answers the critical question: "Where likely weather damage WAS." The system mirrors official NWS data with value-added enrichments, following complete OpenAPI specification compliance.
 
 ### Key Features
 
-🌪️ **Real-time NWS Alert Processing** - Autonomous 5-minute polling with immediate API availability  
-🎯 **Radar-Detected Filtering** - Focus on hail (any size) and winds 50+ mph from radar sources  
-🤖 **AI-Enhanced Context** - OpenAI GPT-4o powered location analysis and meteorological summaries  
-📊 **SPC Verification System** - Cross-reference alerts with verified storm reports  
-🗺️ **Complete Geographic Coverage** - Full US coverage with state/county/FIPS mapping  
-⚡ **Sub-100ms Performance** - Optimized database queries with comprehensive indexing  
-🔗 **Webhook Integration** - Real-time notifications for external system integration  
-📈 **Historical Data Access** - Complete archive from January 2024 onwards  
+**Historical Damage Repository** - 2,085 expired alerts with radar-detected hail and high winds  
+**NWS API Compliance** - GeoJSON FeatureCollection format matching official weather.gov standards  
+**Professional Enrichments** - SPC cross-referencing and AI-powered meteorological summaries  
+**Insurance Industry Focus** - Optimized for damage claims verification and restoration planning  
+**Geographic Precision** - Complete FIPS county mapping and coordinate boundary data  
+**Production Architecture** - Clean, scalable codebase following industry standards  
+**Historical Archive** - Complete repository from January 2024 onwards  
+**OpenAPI Standards** - Exact field naming and response structures per NWS specification  
 
-### Business Value
+### Target Industries
 
-- **Insurance Industry**: Accurate storm damage assessment and claims validation
-- **Emergency Management**: Real-time severe weather monitoring and response coordination  
-- **Agricultural Risk**: Crop damage assessment from hail and wind events
-- **Supply Chain**: Weather-related logistics and transportation planning
-- **Research & Analytics**: Historical weather pattern analysis and trend identification
+- **Insurance Companies**: Claims verification using historical radar-detected damage events
+- **Restoration Contractors**: Project identification based on past weather damage locations
+- **Legal Forensics**: Weather event verification for litigation and expert testimony
+- **Risk Assessment**: Pattern analysis for underwriting and actuarial calculations
+- **Property Management**: Historical damage assessment for due diligence and planning
 
 ---
 
 ## Quick Start
 
-### System Health Check
+### Historical Damage Events
 
 ```bash
-# Check API status and database statistics
-curl "https://api.hailydb.com/api/health"
+# Get expired alerts with radar-detected hail and wind damage
+curl "http://localhost:5000/api/alerts/expired"
+
+# Search historical damage by location
+curl "http://localhost:5000/api/alerts/expired?state=TX&county=Harris&limit=25"
+
+# Find specific damage thresholds
+curl "http://localhost:5000/api/alerts/expired?min_hail=1.0&min_wind=60"
 ```
 
-### Basic Alert Search
+### NWS-Compliant Data Structure
 
 ```bash
-# Get active severe weather alerts
-curl "https://api.hailydb.com/api/alerts/search?active_only=true&has_radar_data=true"
-
-# Search by location
-curl "https://api.hailydb.com/api/alerts/search?state=TX&county=Harris&limit=25"
-
-# Find alerts with significant hail/wind
-curl "https://api.hailydb.com/api/alerts/search?min_hail=1.0&min_wind=60"
+# Returns GeoJSON FeatureCollection format per NWS OpenAPI spec
+curl "http://localhost:5000/api/alerts/expired?limit=1" | jq '.type'
+# Output: "FeatureCollection"
 ```
 
-### Live Radar Alerts
+### System Health and Statistics
 
 ```bash
-# Get current radar-detected severe weather (hail any size OR winds 50+ mph)
-curl "https://api.hailydb.com/api/live-radar-alerts?format=json"
+# System status and damage event statistics
+curl "http://localhost:5000/api/health"
 ```
 
-### SPC Storm Reports
+### Sample Response Structure (NWS Compliant)
 
-```bash
-# Get verified storm reports
-curl "https://api.hailydb.com/api/spc/reports?report_type=hail&state=TX&limit=50"
-
-# Search by date
-curl "https://api.hailydb.com/api/spc/reports?date=2025-08-11&type=wind"
+```json
+{
+  "type": "FeatureCollection",
+  "features": [{
+    "id": "alert_id", 
+    "type": "Feature",
+    "properties": {
+      "areaDesc": "County names per NWS standard",
+      "effective": "2025-01-15T12:00:00Z",
+      "expires": "2025-01-15T13:00:00Z",
+      "event": "Severe Thunderstorm Warning",
+      "severity": "Severe",
+      "hailydb_enrichments": {
+        "radar_indicated": {"hail_inches": 1.25, "wind_mph": 65},
+        "spc_verified": true,
+        "ai_summary": "Professional meteorological analysis"
+      }
+    },
+    "geometry": { "type": "Polygon", "coordinates": [...] }
+  }],
+  "title": "HailyDB Historical Alerts Repository",
+  "metadata": {
+    "total_results": 2085,
+    "filters_applied": {"historical_only": true}
+  }
+}
 ```
 
-### Geographic Search
+---
 
+## Production Architecture v2.1
+
+### Core Business Value
+HailyDB serves as a **historical weather damage intelligence repository** focused on expired NWS alerts containing radar-detected hail and high wind parameters. Unlike active weather monitoring systems, our value proposition centers on providing reliable historical data answering: **"Where likely weather damage WAS."**
+
+### Current Data Repository
+- **7,566 Total NWS Alerts** in historical database
+- **2,085 Core Business Events** (27.6%): Expired alerts with radar-detected damage parameters  
+- **Perfect Data Integrity**: 100% SPC synchronization with zero variance tolerance
+- **Geographic Coverage**: All 50 states, territories, and marine zones
+
+### NWS API Compliance
+The system follows the official National Weather Service OpenAPI specification exactly:
+- **Response Format**: GeoJSON FeatureCollection structure
+- **Field Names**: Official NWS naming conventions (`areaDesc`, `effective`, `expires`, etc.)
+- **Data Sources**: Pure mirror of government weather data with value-added enrichments
+- **Professional Standards**: Production-ready codebase suitable for enterprise integration
+
+### Target Client Base
+- **Insurance Companies**: Claims verification and damage assessment
+- **Restoration Contractors**: Historical damage location identification for project planning
+- **Legal Forensics**: Weather event verification for litigation support
+- **Risk Assessment**: Pattern analysis for underwriting and actuarial calculations
+
+### System Status  
+**Production Ready** - Clean, documented codebase with 20 active services and comprehensive historical weather damage intelligence.
+
+---
+
+## API Endpoints
+
+### Primary Historical Repository
+**`GET /api/alerts/expired`** - Core business endpoint returning expired alerts with radar-detected parameters
+
+**Parameters:**
+- `state` (string): State abbreviation filter
+- `county` (string): County name filter  
+- `min_hail` (float): Minimum hail size in inches
+- `min_wind` (integer): Minimum wind speed in mph
+- `start_date` / `end_date` (string): Date range filters
+- `page` (integer): Pagination
+- `limit` (integer): Results per page
+
+**Sample Request:**
 ```bash
-# Radius search around coordinates
-curl "https://api.hailydb.com/api/alerts/radius?lat=29.7604&lon=-95.3698&radius=50&active_only=true"
-
-# FIPS county code search
-curl "https://api.hailydb.com/api/alerts/fips/48201"  # Harris County, TX
+curl "http://localhost:5000/api/alerts/expired?state=TX&min_hail=1.0&limit=50"
 ```
 
 ---
