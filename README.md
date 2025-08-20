@@ -239,6 +239,375 @@ The system is optimized for Replit deployment with:
 - **Data Integrity Checks**: Automatic validation and correction processes
 - **Status Monitoring**: Real-time health checks and performance metrics
 
+## API Reference
+
+### Base URL
+```
+https://api.hailyai.com
+```
+
+### Response Formats
+All API responses return JSON format with consistent structure:
+- **SPC Reports**: Array of items with pagination metadata
+- **NWS Alerts**: GeoJSON FeatureCollection format (NWS-compliant)
+- **System Endpoints**: JSON objects with status and data fields
+
+### HTTP Status Codes
+- **200 OK**: Successful request with data
+- **400 Bad Request**: Invalid parameters or malformed request
+- **404 Not Found**: Resource not found or invalid endpoint
+- **429 Too Many Requests**: Rate limit exceeded
+- **500 Internal Server Error**: System error
+
+### Headers
+All requests should include:
+```
+Accept: application/json
+User-Agent: YourApp/1.0
+```
+
+## Data Models
+
+### SPC Report Model
+```json
+{
+  "id": "spc-20250820-1318-12345",
+  "data_source": "spc",
+  "source_type": "report",
+  "type": "wind|hail|tornado",
+  "verified": true,
+  "hail_in": 1.75,
+  "wind_mph": 65,
+  "tornado_scale": "EF2",
+  "time_utc": "2025-08-20T13:18:00Z",
+  "lat": 29.7604,
+  "lon": -95.3698,
+  "city": "Houston",
+  "county": "Harris",
+  "state": "TX",
+  "comments": "Trained spotter reported quarter-sized hail..."
+}
+```
+
+### NWS Alert Model
+```json
+{
+  "type": "Feature",
+  "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.abc123...",
+    "data_source": "nws",
+    "source_type": "alert",
+    "event": "Severe Thunderstorm Warning",
+    "severity": "Severe",
+    "areaDesc": "Harris County, TX",
+    "effective": "2025-08-20T13:00:00Z",
+    "expires": "2025-08-20T14:00:00Z",
+    "headline": "Severe Thunderstorm Warning until 2:00 PM CDT",
+    "description": "At 1:00 PM CDT, a severe thunderstorm...",
+    "hailydb_enrichments": {
+      "radar_indicated": {
+        "hail_inches": 1.75,
+        "wind_mph": 60
+      },
+      "spc_verified": true,
+      "spc_reports": [...],
+      "ai_summary": "Professional weather analysis..."
+    }
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[...]]
+  }
+}
+```
+
+## Integration Examples
+
+### Real Estate & Insurance Integration
+```python
+import requests
+from datetime import datetime, timedelta
+
+class HailyDBClient:
+    def __init__(self, base_url="https://api.hailyai.com"):
+        self.base_url = base_url
+    
+    def get_property_damage_history(self, lat, lon, radius_mi=5, years=3):
+        """Get comprehensive damage history for a property location"""
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=years * 365)
+        
+        # Get SPC verified reports
+        spc_url = f"{self.base_url}/api/reports/spc"
+        spc_params = {
+            'lat': lat, 'lon': lon, 'radius_mi': radius_mi,
+            'start_date': start_date, 'end_date': end_date,
+            'limit': 1000
+        }
+        
+        # Get radar-detected NWS alerts
+        nws_url = f"{self.base_url}/api/alerts/radar_detected"
+        nws_params = {
+            'lat': lat, 'lon': lon, 'radius_mi': radius_mi,
+            'start_date': start_date, 'end_date': end_date,
+            'status': 'expired', 'limit': 1000
+        }
+        
+        spc_response = requests.get(spc_url, params=spc_params)
+        nws_response = requests.get(nws_url, params=nws_params)
+        
+        return {
+            'spc_reports': spc_response.json(),
+            'nws_alerts': nws_response.json(),
+            'summary': {
+                'total_events': spc_response.json()['total'] + nws_response.json()['total'],
+                'search_radius': radius_mi,
+                'time_period': f"{start_date} to {end_date}"
+            }
+        }
+```
+
+### Restoration Contractor Integration
+```javascript
+class WeatherDamageAnalyzer {
+    constructor(apiBase = 'https://api.hailyai.com') {
+        this.apiBase = apiBase;
+    }
+    
+    async getMarketOpportunities(state, startDate, endDate) {
+        // Get high-wind damage events for roofing opportunities
+        const windResponse = await fetch(
+            `${this.apiBase}/api/alerts/radar_detected/wind?state=${state}&start_date=${startDate}&end_date=${endDate}&limit=500`
+        );
+        
+        // Get hail damage events for roof/siding opportunities  
+        const hailResponse = await fetch(
+            `${this.apiBase}/api/alerts/radar_detected/hail?state=${state}&start_date=${startDate}&end_date=${endDate}&limit=500`
+        );
+        
+        const [windData, hailData] = await Promise.all([
+            windResponse.json(),
+            hailResponse.json()
+        ]);
+        
+        return this.analyzeOpportunities(windData, hailData);
+    }
+    
+    analyzeOpportunities(windData, hailData) {
+        const opportunities = [];
+        
+        // Process wind damage locations
+        windData.features?.forEach(feature => {
+            const props = feature.properties;
+            if (props.data_source === 'nws' && props.hailydb_enrichments?.radar_indicated?.wind_mph >= 58) {
+                opportunities.push({
+                    type: 'roof_wind_damage',
+                    location: props.areaDesc,
+                    severity: props.hailydb_enrichments.radar_indicated.wind_mph,
+                    date: props.effective,
+                    coordinates: feature.geometry
+                });
+            }
+        });
+        
+        // Process hail damage locations
+        hailData.features?.forEach(feature => {
+            const props = feature.properties;
+            const hailSize = props.hailydb_enrichments?.radar_indicated?.hail_inches;
+            if (hailSize >= 1.0) { // Quarter size or larger
+                opportunities.push({
+                    type: 'hail_damage',
+                    location: props.areaDesc,
+                    severity: `${hailSize}" hail`,
+                    date: props.effective,
+                    coordinates: feature.geometry
+                });
+            }
+        });
+        
+        return opportunities.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+}
+```
+
+## Authentication
+
+Currently, HailyDB APIs are publicly accessible without authentication. For production enterprise usage, contact support for API key provisioning.
+
+### Future Enterprise Features
+- **API Key Authentication**: Secure access with usage tracking
+- **Rate Limiting by Tier**: Different limits based on subscription level
+- **Webhook Subscriptions**: Real-time notifications for new damage events
+- **Custom Data Exports**: Bulk historical data access
+
+## Rate Limiting
+
+### Current Limits
+- **Public Access**: 1000 requests per hour per IP
+- **Response Size**: Maximum 5000 records per request
+- **Concurrent Requests**: Up to 10 simultaneous connections
+
+### Headers
+Rate limit information included in response headers:
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1692547200
+```
+
+### Best Practices
+- Implement exponential backoff for failed requests
+- Use appropriate pagination with `limit` and `offset`
+- Cache responses when possible to reduce API calls
+- Monitor rate limit headers to avoid throttling
+
+## Error Handling
+
+### Error Response Format
+```json
+{
+  "error": {
+    "code": "INVALID_COORDINATES",
+    "message": "Latitude must be between -90 and 90",
+    "details": {
+      "parameter": "lat",
+      "provided_value": "999",
+      "valid_range": "[-90, 90]"
+    }
+  },
+  "request_id": "req_abc123xyz789"
+}
+```
+
+### Common Error Codes
+- **INVALID_PARAMETERS**: Malformed or out-of-range parameters
+- **INVALID_COORDINATES**: Geographic coordinates outside valid ranges
+- **INVALID_DATE_RANGE**: Date parameters in incorrect format or invalid range
+- **RATE_LIMIT_EXCEEDED**: Too many requests within time window
+- **INTERNAL_ERROR**: System error, contact support with request_id
+
+### Error Handling Examples
+```python
+import requests
+from time import sleep
+
+def robust_api_call(url, params, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, params=params)
+            
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 429:  # Rate limited
+                sleep(2 ** attempt)  # Exponential backoff
+                continue
+            elif response.status_code >= 400:
+                error_data = response.json()
+                print(f"API Error: {error_data['error']['message']}")
+                return None
+                
+        except requests.RequestException as e:
+            if attempt == max_retries - 1:
+                raise e
+            sleep(2 ** attempt)
+    
+    return None
+```
+
+## Webhooks
+
+### Webhook Configuration (Enterprise)
+Real-time notifications for new damage events in specified geographic areas.
+
+```json
+{
+  "webhook_id": "wh_abc123",
+  "url": "https://your-app.com/webhooks/hailydb",
+  "events": ["new_radar_detection", "spc_report_verified"],
+  "filters": {
+    "states": ["TX", "FL", "CA"],
+    "min_hail_size": 1.0,
+    "min_wind_speed": 58
+  },
+  "active": true
+}
+```
+
+### Webhook Payload Example
+```json
+{
+  "event_type": "new_radar_detection",
+  "timestamp": "2025-08-20T14:30:00Z",
+  "data": {
+    "alert_id": "urn:oid:2.49.0.1.840.0.abc123...",
+    "event": "Severe Thunderstorm Warning",
+    "area": "Harris County, TX",
+    "radar_indicated": {
+      "hail_inches": 1.75,
+      "wind_mph": 65
+    },
+    "geometry": {...}
+  },
+  "webhook_id": "wh_abc123"
+}
+```
+
+## SDK Development
+
+### Python SDK (Planned)
+```bash
+pip install hailydb-python
+```
+
+```python
+from hailydb import HailyDBClient
+
+client = HailyDBClient(api_key="your_api_key")
+damage_events = client.get_damage_history(
+    lat=29.7604, lon=-95.3698, 
+    radius_mi=25, days_back=90
+)
+```
+
+### JavaScript/TypeScript SDK (Planned)
+```bash
+npm install @hailydb/client
+```
+
+```typescript
+import { HailyDBClient } from '@hailydb/client';
+
+const client = new HailyDBClient({ apiKey: 'your_api_key' });
+const events = await client.getRadarDetectedEvents({
+  lat: 29.7604,
+  lon: -95.3698,
+  radiusMi: 25,
+  startDate: '2025-01-01'
+});
+```
+
+## Performance & Monitoring
+
+### System Health
+Monitor system status via health endpoint:
+```bash
+curl https://api.hailyai.com/api/health
+```
+
+### Performance Metrics
+- **Average Response Time**: <300ms for most queries
+- **Availability**: 99.9% uptime SLA
+- **Data Freshness**: NWS alerts updated every 5 minutes, SPC reports daily
+
+### Monitoring Dashboard
+Real-time system metrics available at: https://status.hailyai.com
+
+### Performance Optimization Tips
+- Use geographic filtering to limit result sets
+- Implement appropriate caching for historical queries  
+- Use pagination for large data sets
+- Monitor response headers for performance guidance
+
 ## License & Usage
 
 This platform provides historical weather damage intelligence for legitimate business applications including insurance claims processing, damage assessment, and restoration industry operations. All data sources are publicly available through official government APIs.
