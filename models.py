@@ -1,6 +1,6 @@
 from app import db
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
-from sqlalchemy import Column, String, Text, DateTime, Date, Boolean, func, Index, UniqueConstraint
+from sqlalchemy import Column, String, Text, DateTime, Date, Boolean, func, Index, UniqueConstraint, Float
 from datetime import datetime
 import re
 
@@ -44,6 +44,7 @@ class Alert(db.Model):
     fips_codes = Column(JSONB)             # List of FIPS county codes from geometry
     county_names = Column(JSONB)           # Extracted county names with state mapping
     city_names = Column(ARRAY(String))     # Extracted city names from area_desc for enhanced targeting
+    location_confidence = Column(Float)    # Phase 2: Confidence score for location accuracy (0.0-1.0)
     geometry_type = Column(String(20))     # "Polygon", "MultiPolygon", "Point"
     coordinate_count = Column(db.Integer)  # Number of coordinate pairs for complexity analysis
     affected_states = Column(JSONB)        # List of state abbreviations
@@ -120,6 +121,7 @@ class Alert(db.Model):
                 'fips_codes': self.fips_codes,
                 'county_names': self.county_names,
                 'city_names': self.city_names,
+                'location_confidence': self.location_confidence,
                 'geometry_type': self.geometry_type,
                 'coordinate_count': self.coordinate_count,
                 'affected_states': self.affected_states,
@@ -327,6 +329,9 @@ class Alert(db.Model):
         
         self.county_names = county_state_mapping
         self.affected_states = list(set(states))  # Remove duplicates
+        
+        # Phase 2: Enhanced city name extraction
+        self._extract_city_names()
     
     def _extract_states_from_ugc(self, ugc_codes: list) -> list:
         """Extract state codes from UGC codes"""
@@ -375,6 +380,33 @@ class Alert(db.Model):
                 if state_code in same_state_mapping:
                     states.append(same_state_mapping[state_code])
         return states
+    
+    def _extract_city_names(self):
+        """Phase 2: Extract and standardize city names from area description"""
+        try:
+            from city_enrichment_service import city_enrichment_service
+            
+            # Extract standardized city names
+            city_names = city_enrichment_service.enrich_alert_with_cities(self)
+            
+            # Update the city_names field
+            self.city_names = city_names if city_names else []
+            
+            # Calculate location confidence based on enrichment quality
+            location_matches = city_enrichment_service.extract_cities_from_area_desc(self.area_desc)
+            if location_matches:
+                # Use the highest confidence from extracted matches
+                max_confidence = max(match.confidence for match in location_matches)
+                self.location_confidence = round(max_confidence, 2)
+            else:
+                self.location_confidence = 0.0
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error extracting city names for alert {self.id}: {e}")
+            self.city_names = []
+            self.location_confidence = 0.0
     
     def get_enhanced_geometry_info(self):
         """Get comprehensive geometry information for API responses"""

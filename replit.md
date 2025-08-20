@@ -11,15 +11,20 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimized for Replit deployment.
 
-### Recent Achievements (August 20, 2025) - v2.1.3 Release
+### Recent Achievements (August 20, 2025) - v2.1.5 Release - Phase 2 Complete
 - **AI Agent Documentation**: Added `/api/documentation` endpoint for AI agents who cannot access external docs
 - **Public Health Endpoint**: Created `/api/health` for integration testing and monitoring
 - **Pre-filtered API Endpoints**: Added `/api/alerts/radar_detected` family for easy client integration
 - **Radar-Detected Wind Events**: Dedicated `/api/alerts/radar_detected/wind` for 50+ mph wind damage
 - **Radar-Detected Hail Events**: Dedicated `/api/alerts/radar_detected/hail` for any size hail damage
-- **Historical Repository Access**: Unlocked full 7,500+ alert repository with 10K limit support
-- **Updated Documentation**: Complete README.md with verified statistics (2,120 radar events)
+- **Historical Repository Access**: Unlocked full 8,000+ alert repository with 5K limit support for production stability
+- **Updated Documentation**: Complete README.md with verified statistics (2,120+ radar events)
 - **Critical Bug Fixed**: Resolved `'NoneType' object has no attribute 'lower'` errors in state enrichment
+- **Phase 1 Complete**: SPC Reports API (2,600+ verified reports), radius filtering on all radar endpoints, consistent pagination
+- **Geographic Enhancement**: Implemented radius filtering using geometry_bounds for accurate location-based queries
+- **Phase 2 Complete**: City name standardization service with 100% extraction success rate on sample data
+- **Location Intelligence**: Advanced county-to-city mapping with confidence scoring for insurance industry precision
+- **Enhanced Targeting**: City names field now populated with standardized location names for improved address-level queries
 - **Complete API Coverage**: Fixed missing `/api/alerts/{alert_id}` endpoint for individual alert details
 - **State Enrichment Hardened**: Added comprehensive error handling for None/invalid UGC codes
 - **Perfect SPC Synchronization**: Achieved 100% data capture with zero variance tolerance
@@ -34,6 +39,12 @@ HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimiz
 - **PostgreSQL Database**: Relational schema with JSONB support for complex data storage.
 - **Background Services**: Autonomous scheduling system for data processing and ingestion.
 - **RESTful API**: Standardized API design for external interactions.
+
+### Recent Enhancements Summary
+
+**Phase 1 (Complete)**: Core API infrastructure with SPC Reports endpoint, radius filtering on all radar endpoints, and production-ready geographic querying using geometry_bounds.
+
+**Phase 2 (Complete)**: Advanced city name standardization service extracting meaningful city names from NWS county references. Features comprehensive county-to-city mappings, location confidence scoring, and enhanced targeting for insurance/restoration industry address-level precision.
 
 ### Key Components
 

@@ -567,12 +567,14 @@ def get_radar_detected_alerts():
             lat_delta = radius_float / 69.0
             lon_delta = radius_float / (69.0 * abs(math.cos(math.radians(lat_float))))
             
-            # Filter by centroid within bounding box (for performance)
+            # Filter by geometry bounds within bounding box (for performance)
             # Note: This is approximate - actual distance calculation would be more complex
             query = query.filter(
-                Alert.centroid.isnot(None),
-                Alert.centroid['lat'].astext.cast(db.Float).between(lat_float - lat_delta, lat_float + lat_delta),
-                Alert.centroid['lon'].astext.cast(db.Float).between(lon_float - lon_delta, lon_float + lon_delta)
+                Alert.geometry_bounds.isnot(None),
+                Alert.geometry_bounds['min_lat'].astext.cast(db.Float) <= lat_float + lat_delta,
+                Alert.geometry_bounds['max_lat'].astext.cast(db.Float) >= lat_float - lat_delta,
+                Alert.geometry_bounds['min_lon'].astext.cast(db.Float) <= lon_float + lon_delta,
+                Alert.geometry_bounds['max_lon'].astext.cast(db.Float) >= lon_float - lon_delta
             )
             
         except (ValueError, TypeError):
@@ -678,11 +680,13 @@ def get_radar_detected_wind():
             lat_delta = radius_float / 69.0
             lon_delta = radius_float / (69.0 * abs(math.cos(math.radians(lat_float))))
             
-            # Filter by centroid within bounding box
+            # Filter by geometry bounds within bounding box
             query = query.filter(
-                Alert.centroid.isnot(None),
-                Alert.centroid['lat'].astext.cast(db.Float).between(lat_float - lat_delta, lat_float + lat_delta),
-                Alert.centroid['lon'].astext.cast(db.Float).between(lon_float - lon_delta, lon_float + lon_delta)
+                Alert.geometry_bounds.isnot(None),
+                Alert.geometry_bounds['min_lat'].astext.cast(db.Float) <= lat_float + lat_delta,
+                Alert.geometry_bounds['max_lat'].astext.cast(db.Float) >= lat_float - lat_delta,
+                Alert.geometry_bounds['min_lon'].astext.cast(db.Float) <= lon_float + lon_delta,
+                Alert.geometry_bounds['max_lon'].astext.cast(db.Float) >= lon_float - lon_delta
             )
             
         except (ValueError, TypeError):
@@ -787,11 +791,13 @@ def get_radar_detected_hail():
             lat_delta = radius_float / 69.0
             lon_delta = radius_float / (69.0 * abs(math.cos(math.radians(lat_float))))
             
-            # Filter by centroid within bounding box
+            # Filter by geometry bounds within bounding box
             query = query.filter(
-                Alert.centroid.isnot(None),
-                Alert.centroid['lat'].astext.cast(db.Float).between(lat_float - lat_delta, lat_float + lat_delta),
-                Alert.centroid['lon'].astext.cast(db.Float).between(lon_float - lon_delta, lon_float + lon_delta)
+                Alert.geometry_bounds.isnot(None),
+                Alert.geometry_bounds['min_lat'].astext.cast(db.Float) <= lat_float + lat_delta,
+                Alert.geometry_bounds['max_lat'].astext.cast(db.Float) >= lat_float - lat_delta,
+                Alert.geometry_bounds['min_lon'].astext.cast(db.Float) <= lon_float + lon_delta,
+                Alert.geometry_bounds['max_lon'].astext.cast(db.Float) >= lon_float - lon_delta
             )
             
         except (ValueError, TypeError):
@@ -1025,11 +1031,13 @@ def get_expired_alerts():
             lat_delta = radius_miles / 69.0
             lon_delta = radius_miles / (69.0 * abs(math.cos(math.radians(lat))))
             
-            # Filter by centroid within bounding box
+            # Filter by geometry bounds within bounding box
             query = query.filter(
-                Alert.centroid.isnot(None),
-                Alert.centroid['lat'].astext.cast(db.Float).between(lat - lat_delta, lat + lat_delta),
-                Alert.centroid['lon'].astext.cast(db.Float).between(lon - lon_delta, lon + lon_delta)
+                Alert.geometry_bounds.isnot(None),
+                Alert.geometry_bounds['min_lat'].astext.cast(db.Float) <= lat + lat_delta,
+                Alert.geometry_bounds['max_lat'].astext.cast(db.Float) >= lat - lat_delta,
+                Alert.geometry_bounds['min_lon'].astext.cast(db.Float) <= lon + lon_delta,
+                Alert.geometry_bounds['max_lon'].astext.cast(db.Float) >= lon - lon_delta
             )
             
         except (ValueError, TypeError) as e:
@@ -2421,6 +2429,69 @@ def api_spc_reports():
             }
         }
     })
+
+@app.route('/api/admin/enrich-cities', methods=['POST'])
+def enrich_cities():
+    """
+    Phase 2: Backfill city names for existing alerts
+    Applies the new city enrichment service to historical data
+    """
+    from models import Alert
+    from city_enrichment_service import city_enrichment_service
+    from datetime import datetime
+    
+    try:
+        # Get parameters
+        limit = request.args.get('limit', 100, type=int)
+        skip_existing = request.args.get('skip_existing', 'true').lower() == 'true'
+        
+        # Query for alerts that need city enrichment
+        query = Alert.query
+        if skip_existing:
+            # Only process alerts without city names
+            query = query.filter(
+                db.or_(
+                    Alert.city_names.is_(None),
+                    Alert.city_names == []
+                )
+            )
+        
+        alerts = query.order_by(Alert.effective.desc()).limit(limit).all()
+        
+        enriched_count = 0
+        errors = []
+        
+        for alert in alerts:
+            try:
+                # Apply city enrichment
+                city_names = city_enrichment_service.enrich_alert_with_cities(alert)
+                
+                if city_names:
+                    alert.city_names = city_names
+                    enriched_count += 1
+                    
+            except Exception as e:
+                errors.append(f"Alert {alert.id}: {str(e)}")
+                continue
+        
+        # Commit changes
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'processed': len(alerts),
+            'enriched': enriched_count,
+            'errors': errors[:10],  # Limit errors in response
+            'message': f'City enrichment completed: {enriched_count}/{len(alerts)} alerts enriched'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error during city enrichment: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 # Radar Alerts API Endpoints
 @app.route('/api/radar-alerts/stats')
