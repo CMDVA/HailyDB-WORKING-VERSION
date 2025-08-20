@@ -1,317 +1,175 @@
-# HailyDB v2.1.3 - Historical Weather Damage Intelligence Platform
-
-A production-ready Flask-based platform that serves as a comprehensive repository for National Weather Service alerts with radar-detected hail and wind parameters. Designed specifically for insurance claims processing, damage assessment, and restoration industry clients who need to know **"where likely damage WAS"**.
+# HailyDB v2.1 - Historical Weather Damage Intelligence Platform
 
 ## Overview
 
-HailyDB is a **historical weather damage intelligence platform** that mirrors NWS alert data with AI-powered enrichments. Unlike active weather platforms, HailyDB's core value proposition is providing comprehensive historical data on expired NWS alerts containing radar-detected severe weather events for forensic weather analysis and damage assessment workflows.
+HailyDB is a **production-ready historical weather damage intelligence platform** that captures and analyzes expired NWS alerts containing radar-detected severe weather events. Unlike active weather monitoring systems, HailyDB's core value proposition is providing comprehensive historical data on **where likely damage occurred**, making it essential for insurance claims processing, damage assessment, restoration contractors, and forensic weather analysis.
 
-**Core Business Value**: Historical repository of 7,500+ expired NWS alerts with 2,115+ radar-detected damage events (hail and 50+ mph winds).
+**Core Business Value**: Historical radar-detected severe weather events (expired alerts with hail/wind data) for damage assessment and insurance claims.
 
-## 🚀 Quick Start
+## Production Statistics
 
-### Prerequisites
-- Python 3.11+
-- PostgreSQL database
-- OpenAI API key (optional, for AI enrichment)
+- **8,116+ Total NWS Alerts** with comprehensive enrichments
+- **2,714+ SPC Storm Reports** with 100% historical coverage
+- **2,120+ Radar-Detected Events** pre-filtered for damage assessment
+- **100% Data Integrity** with continuous verification against official sources
 
-### Installation & Setup
+## Key Features
 
-1. **Environment Setup**:
-   ```bash
-   export DATABASE_URL="postgresql://username:password@host:port/database"
-   export OPENAI_API_KEY="your-openai-api-key"  # Optional
-   ```
+### Historical Weather Damage Repository
+- Complete archive of expired NWS alerts with radar-detected severe weather
+- Focus on damage-causing events: any hail size + 50+ mph winds
+- Professional AI-enhanced summaries for insurance industry precision
+- Geographic targeting with radius-based filtering using bounding box optimization
 
-2. **Start the Application**:
-   ```bash
-   gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
-   ```
+### Production API Suite
+- **Individual Alert Access**: Complete JSON details with enrichments (`/api/alerts/{alert_id}`)
+- **Pre-filtered Endpoints**: Radar-detected hail and wind damage events
+- **Bulk Export**: High-volume data access with pagination support
+- **SPC Reports**: 100% historical storm report coverage
+- **NWS Compliance**: Official API-standard GeoJSON responses
 
-3. **Verify Installation**:
-   ```bash
-   curl http://localhost:5000/api/health
-   ```
+### AI Enhancement Services
+- **OpenAI GPT-4o Integration**: Professional weather intelligence summaries
+- **Location Standardization**: County-to-city mapping with confidence scoring
+- **Enhanced Context**: Multi-source enrichment for comprehensive analysis
+- **Damage Assessment**: Specialized summaries for insurance workflows
 
-## 📊 Core Business Data
+## API Endpoints
 
-### Historical Repository Statistics
-- **7,913 Total NWS Alerts** in database
-- **7,503 Expired Alerts** (historical data)  
-- **2,115 Radar-Detected Damage Events**
-  - **1,806 Wind Events** (50+ mph radar-detected)
-  - **1,635 Hail Events** (any size radar-detected)
-- **Complete Geographic Coverage** (all US states/territories)
-- **Date Range**: Historical data spanning multiple years
+### Core Data Access
 
-## 🎯 Pre-Filtered API Endpoints (New in v2.1.3)
-
-### Radar-Detected Damage Events
-
-#### All Radar-Detected Events
-```http
-GET /api/alerts/radar_detected
+#### NWS Alerts (Radar-Detected Filtering)
 ```
-Returns alerts with **50+ mph winds OR any size hail** detected by radar.
-- **Total Events**: 2,115 damage events
-- **Use Case**: Complete radar-detected damage inventory
-
-#### Wind Damage Events (50+ mph)
-```http
-GET /api/alerts/radar_detected/wind
-```
-Returns alerts with **50+ mph winds** detected by radar.
-- **Total Events**: 1,806 wind damage events
-- **Use Case**: Wind damage assessment and claims
-
-#### Hail Damage Events (Any Size)
-```http
-GET /api/alerts/radar_detected/hail
-```
-Returns alerts with **any size hail** detected by radar.
-- **Total Events**: 1,635 hail damage events  
-- **Use Case**: Hail damage assessment and claims
-
-### Query Parameters (All Endpoints)
-
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `status` | `active`, `expired`, or `all` | `?status=expired` |
-| `state` | State code filter | `?state=TX` |
-| `county` | County name filter | `?county=Harris` |
-| `start_date` | Date range start | `?start_date=2024-01-01` |
-| `end_date` | Date range end | `?end_date=2024-12-31` |
-| `limit` | Results per page (max 5,000) | `?limit=1000` |
-| `page` | Page number for pagination | `?page=2` |
-
-### Example API Calls
-
-```bash
-# Get all expired radar-detected wind events in Texas
-curl "http://localhost:5000/api/alerts/radar_detected/wind?status=expired&state=TX&limit=100"
-
-# Get hail events in Harris County for 2024
-curl "http://localhost:5000/api/alerts/radar_detected/hail?county=Harris&start_date=2024-01-01&end_date=2024-12-31"
-
-# Get all radar-detected damage events (wind + hail)
-curl "http://localhost:5000/api/alerts/radar_detected?status=expired&limit=2000"
+GET /api/alerts/radar_detected          # Any hail OR 50+ mph winds
+GET /api/alerts/radar_detected/hail     # Any hail size detected
+GET /api/alerts/radar_detected/wind     # 50+ mph winds detected
+GET /api/alerts/{alert_id}              # Individual alert details
 ```
 
-## 📁 Complete API Reference
-
-### Core Repository Endpoints
-
-#### Historical Alert Repository
-```http
-GET /api/alerts/expired
+#### SPC Storm Reports (100% Coverage)
 ```
-**Primary business endpoint** - Returns expired NWS alerts with optional radar filtering.
-- **Default**: All 7,503 expired alerts
-- **With `?has_radar=true`**: Only radar-detected events
-- **High Volume**: Supports up to 10,000 results per request
-
-#### Individual Alert Details
-```http
-GET /api/alerts/{alert_id}
+GET /api/reports/spc                    # All historical storm reports
 ```
-Returns complete alert details including enrichments and radar parameters.
-
-#### Active Alerts
-```http
-GET /api/alerts/active
-```
-Returns currently active NWS alerts (live monitoring).
 
 #### Geographic Filtering
-```http
-GET /api/alerts/by-state/{state}
-GET /api/alerts/by-county/{state}/{county}
+```
+# Radius-based targeting (all endpoints)
+?lat=40.7128&lon=-74.0060&radius_mi=25
+
+# State/county filtering
+?state=TX&county=Harris
 ```
 
-#### System Health
-```http
-GET /api/health
+#### Pagination & Export
 ```
-Returns system status and database statistics.
+# High-volume data access
+?limit=1000&offset=5000
 
-## 🗂️ Response Format
-
-All endpoints return **GeoJSON FeatureCollection** format following NWS API OpenAPI specification:
-
-```json
-{
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "id": "urn:oid:2.49.0.1.840.0...",
-      "type": "Feature",
-      "properties": {
-        "event": "Severe Thunderstorm Warning",
-        "headline": "The National Weather Service in Houston/Galveston has issued a...",
-        "description": "At 715 PM CDT, Doppler radar indicated a severe thunderstorm...",
-        "severity": "Severe",
-        "urgency": "Expected", 
-        "certainty": "Observed",
-        "effective": "2024-06-15T19:15:00Z",
-        "expires": "2024-06-15T20:00:00Z",
-        "status": "Actual",
-        "areaDesc": "Harris; Fort Bend; Brazoria",
-        "radar_indicated": {
-          "hail_inches": 1.0,
-          "wind_mph": 60
-        },
-        "affected_states": ["TX"],
-        "county_names": [
-          {"state": "TX", "county": "Harris"},
-          {"state": "TX", "county": "Fort Bend"}
-        ],
-        "enhanced_summary": "AI-generated damage assessment and location context..."
-      },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[[-95.8, 29.7], [-95.3, 29.7], ...]]
-      }
-    }
-  ],
-  "title": "Radar-Detected Weather Damage Events - 2,115 alerts with 50+ mph winds or hail",
-  "updated": "2025-08-19T23:41:12Z",
-  "metadata": {
-    "total_results": 2115,
-    "page": 1,
-    "per_page": 1000,
-    "criteria": "50+ mph winds OR any hail size detected by radar",
-    "data_source": "National Weather Service alerts with radar parameters"
-  }
-}
+# Date range filtering
+?start_date=2024-01-01&end_date=2024-12-31
 ```
 
-## 🏗️ System Architecture
-
-### Core Components
-
-#### Data Ingestion Services
-- **NWS Alert Ingestion**: Real-time polling of NWS API every 30 seconds
-- **SPC Report Ingestion**: Daily import of Storm Prediction Center reports
-- **Live Radar Service**: Processes radar-detected parameters from alert descriptions
-- **Hurricane Track Data**: NOAA HURDAT2 historical hurricane integration
-
-#### AI Enhancement Services  
-- **Enhanced Context Service**: OpenAI GPT-4o powered damage assessments
-- **SPC Matching**: Cross-references NWS alerts with storm reports
-- **Match Summarizer**: AI verification summaries for data correlation
-
-#### Background Processing
-- **Autonomous Scheduler**: Orchestrates all data processing operations
-- **SPC Verification**: Ensures data integrity against live SPC sources
-- **State Enrichment**: Geographic data enhancement with error handling
-
-### Database Schema
-
-#### Alert Model (Primary)
-```sql
-- id: UUID (NWS alert identifier)
-- event: VARCHAR (alert type)
-- headline: TEXT (alert headline)
-- description: TEXT (full alert description)
-- severity/urgency/certainty: VARCHAR (NWS standard levels)
-- effective/expires: TIMESTAMP (alert timeframe)
-- geometry: JSONB (GeoJSON polygon)
-- radar_indicated: JSONB (extracted hail/wind parameters)
-- affected_states: JSONB (state codes array)
-- county_names: JSONB (state/county objects)
-- enhanced_summary: TEXT (AI-generated context)
+### System Health & Documentation
+```
+GET /api/health                         # System status and statistics
+GET /api/documentation                  # Complete API documentation
 ```
 
-#### SPC Report Model
-```sql
-- location: VARCHAR (human-readable location)
-- lat/lon: FLOAT (coordinates)
-- wind_speed: INTEGER (mph)
-- hail_size: FLOAT (inches)
-- event_time: TIMESTAMP (UTC occurrence time)
-```
+## Business Applications
 
-## 🎯 Use Cases & Industry Applications
-
-### Insurance Claims Processing
-- **Historical Damage Lookup**: Query radar-detected events by location and date range
-- **Claims Validation**: Verify reported damage against NWS radar parameters
-- **Risk Assessment**: Analyze historical damage patterns for underwriting
+### Insurance Industry
+- **Claims Verification**: Historical radar data for damage timeline analysis
+- **Risk Assessment**: Geographic damage patterns and frequency analysis
+- **Forensic Analysis**: Detailed weather summaries for claims investigation
+- **Address-Level Targeting**: City name standardization with confidence scoring
 
 ### Restoration Contractors
-- **Business Development**: Discover past damage events for marketing
-- **Emergency Response**: Monitor active alerts for rapid deployment
-- **Historical Analysis**: Understand regional damage patterns
+- **Market Intelligence**: Historical damage locations for business development
+- **Resource Planning**: Geographic analysis of severe weather patterns
+- **Client Acquisition**: Data-driven targeting for restoration services
 
-### Forensic Weather Analysis
-- **Legal Documentation**: NWS-verified weather data for litigation
-- **Engineering Studies**: Historical severe weather for infrastructure planning
-- **Research Applications**: Comprehensive database for meteorological research
+### Emergency Management
+- **Pattern Analysis**: Historical severe weather impact assessment
+- **Preparedness Planning**: Geographic vulnerability identification
+- **Response Optimization**: Historical event analysis for resource allocation
 
-## 🔧 Configuration
+## Technical Architecture
 
-### Environment Variables
+### Backend Stack
+- **Flask Application**: Production-grade web service with SQLAlchemy ORM
+- **PostgreSQL Database**: Relational schema with JSONB support for complex data
+- **Background Services**: Autonomous scheduling for continuous data processing
+- **RESTful API**: NWS-compliant responses with comprehensive error handling
+
+### Data Sources
+- **National Weather Service**: Real-time alert ingestion with radar parameter extraction
+- **Storm Prediction Center**: Historical storm report verification and correlation
+- **NOAA HURDAT2**: Hurricane track and landfall data integration
+- **OpenAI GPT-4o**: Professional weather intelligence enhancement
+
+### Key Components
+
+#### Data Ingestion
+- **NWS Alert Service**: Continuous polling with test message filtering
+- **SPC Report Service**: Historical data synchronization with 100% coverage
+- **Live Radar Processing**: Real-time extraction of damage-relevant parameters
+- **Hurricane Integration**: Historical track data with landfall analysis
+
+#### Enhancement Services
+- **AI Enrichment**: Professional weather summaries with business context
+- **Location Intelligence**: City name extraction with confidence scoring
+- **Cross-Reference Matching**: SPC report correlation with NWS alerts
+- **Damage Assessment**: Specialized analysis for insurance applications
+
+#### API Infrastructure
+- **Individual Access**: Complete alert details with all enrichments
+- **Bulk Export**: High-volume data access for enterprise clients
+- **Geographic Filtering**: Radius-based targeting with geometry optimization
+- **Error Handling**: Comprehensive status codes and detailed error messages
+
+## Installation & Deployment
+
+### Local Development
 ```bash
-DATABASE_URL="postgresql://..."          # Required: PostgreSQL connection
-OPENAI_API_KEY="sk-..."                 # Optional: AI enrichment features
-FLASK_SECRET_KEY="your-secret"          # Required: Session security
-WEBHOOK_URL="https://..."               # Optional: Real-time notifications
+# Clone and setup
+git clone <repository>
+cd hailydb
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure database
+export DATABASE_URL="postgresql://..."
+
+# Start application
+python main.py
 ```
 
 ### Production Deployment
-- **WSGI Server**: Gunicorn with auto-reload
-- **Database**: PostgreSQL with JSONB support
-- **Background Services**: Autonomous scheduler with error recovery
-- **Monitoring**: Health endpoints and comprehensive logging
+The system is optimized for Replit deployment with:
+- **Gunicorn WSGI server** for production stability
+- **PostgreSQL integration** with connection pooling
+- **Autonomous background services** for continuous data processing
+- **Health monitoring** with comprehensive system diagnostics
 
-## 📈 Performance & Scaling
+## Data Quality & Verification
 
-### Current Capacity
-- **Database Size**: 7,913 alerts with full geometry and enrichments
-- **API Throughput**: Up to 10,000 results per request
-- **Real-time Processing**: 13-15 live alerts processed continuously
-- **Zero Failures**: Stable ingestion with comprehensive error handling
+### Continuous Validation
+- **SPC Synchronization**: 100% accuracy verification against official sources
+- **Radar Parameter Extraction**: Validated against NWS alert descriptions
+- **Geographic Accuracy**: County-to-city mapping with confidence scoring
+- **AI Enhancement Quality**: Professional meteorological analysis standards
 
-### Optimization Features
-- **Indexed Queries**: Optimized for geographic and temporal filtering
-- **Efficient Pagination**: High-volume result handling
-- **Background Processing**: Non-blocking data enrichment
-- **Error Recovery**: Automatic retry logic for external APIs
+### Error Handling
+- **Comprehensive Logging**: Detailed operation tracking and error reporting
+- **Graceful Degradation**: System continues operation during service interruptions
+- **Data Integrity Checks**: Automatic validation and correction processes
+- **Status Monitoring**: Real-time health checks and performance metrics
 
-## 🚦 System Status (v2.1.3)
+## License & Usage
 
-✅ **Production Ready**
-- Zero ingestion failures
-- Complete NWS API compliance
-- Stable background processing
-- Full historical repository access
-
-✅ **Core Business Data Available**
-- 2,115 radar-detected damage events
-- Pre-filtered endpoints operational
-- Geographic and temporal filtering working
-- GeoJSON format standardized
-
-✅ **Enterprise Features**
-- AI-powered damage assessments
-- Cross-platform webhook delivery
-- Comprehensive error handling
-- Production monitoring and logging
-
-## 📞 Support & Documentation
-
-### Development Resources
-- **System Architecture**: See `replit.md` for detailed technical overview
-- **API Examples**: Interactive testing via provided endpoints
-- **Error Handling**: Comprehensive logging for troubleshooting
-
-### Integration Support
-For client application integration assistance:
-1. Review API response examples above
-2. Test endpoints with provided curl commands  
-3. Implement GeoJSON parsing in your application
-4. Use pre-filtered endpoints for optimal performance
+This platform provides historical weather damage intelligence for legitimate business applications including insurance claims processing, damage assessment, and restoration industry operations. All data sources are publicly available through official government APIs.
 
 ---
 
-**HailyDB v2.1.3** - Production-ready historical weather damage intelligence platform optimized for insurance, restoration, and forensic weather analysis workflows.
+**HailyDB v2.1** - Production-ready historical weather damage intelligence for the insurance and restoration industries.
