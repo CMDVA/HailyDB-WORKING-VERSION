@@ -338,11 +338,11 @@ function loadRadarAlerts(page = 1) {
     document.getElementById('directRadarTableBody').innerHTML = 
         '<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0 text-muted">Loading radar-detected alerts...</p></td></tr>';
     
-    fetch(`/api/alerts/direct?${params.toString()}`)
+    fetch(`/api/radar-alerts?${params.toString()}`)
         .then(response => response.json())
         .then(data => {
             // Statistics are now static - no longer updated from current page data
-            updateAlertsTable(data.alerts || []);
+            updateAlertsTable(data.events || []);
             updatePagination(data);
         })
         .catch(error => {
@@ -743,8 +743,8 @@ function clearFilters() {
     if (eventTypeEl) eventTypeEl.value = '';
     if (minHailEl) minHailEl.value = '';
     if (minWindEl) minWindEl.value = '';
-    if (startDateEl) startDateEl.value = '2025-06-02';
-    if (endDateEl) endDateEl.value = '2025-06-07';
+    if (startDateEl) startDateEl.value = '2025-08-01';
+    if (endDateEl) endDateEl.value = '2025-08-31';
     
     currentFilters = {};
     loadRadarAlerts(1);
@@ -773,8 +773,8 @@ function exportData() {
 // Initialize page when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Set default date range
-    document.getElementById('startDate').value = '2025-06-02';
-    document.getElementById('endDate').value = '2025-06-07';
+    document.getElementById('startDate').value = '2025-08-01';
+    document.getElementById('endDate').value = '2025-08-31';
     
     // Load radar alerts table
     loadRadarAlerts(1);
