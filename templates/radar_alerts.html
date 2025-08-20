@@ -370,9 +370,9 @@ function updateAlertsTable(alerts) {
     }
     
     tbody.innerHTML = alerts.map(alert => {
-        const radarData = alert.radar_indicated || {};
-        const hailSize = radarData.hail_inches || 0;
-        const windSpeed = radarData.wind_mph || 0;
+        // Use direct fields from radar-alerts API response
+        const hailSize = parseFloat(alert.hail_size) || 0;
+        const windSpeed = parseInt(alert.wind_speed) || 0;
         
         const hailDisplay = hailSize > 0 ? 
             `<span class="badge bg-danger">${hailSize.toFixed(2)}"</span><br><small>${getHailDescription(hailSize)}</small>` :
@@ -383,7 +383,7 @@ function updateAlertsTable(alerts) {
             '<span class="text-muted">-</span>';
         
         const severityBadge = getSeverityBadge(hailSize, windSpeed);
-        const effectiveTime = new Date(alert.effective).toLocaleString();
+        const effectiveTime = new Date(alert.time).toLocaleString();
         
         return `
             <tr class="clickable-row" onclick="window.location.href='/alerts/${alert.id}'" style="cursor: pointer;">
@@ -392,13 +392,13 @@ function updateAlertsTable(alerts) {
                     <small class="text-muted">${alert.id.substring(0, 8)}...</small>
                 </td>
                 <td>
-                    <span class="badge bg-secondary">${alert.event}</span>
+                    <span class="badge bg-secondary">${alert.event_type}</span>
                 </td>
                 <td>
-                    ${formatLocationInfo(alert)}
+                    <div>${alert.location}</div>
                 </td>
                 <td>
-                    ${formatStateInfo(alert)}
+                    <span class="badge bg-info">${alert.state}</span>
                 </td>
                 <td>${hailDisplay}</td>
                 <td>${windDisplay}</td>
