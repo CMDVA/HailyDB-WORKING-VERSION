@@ -8,9 +8,9 @@ HailyDB is a **production-ready historical weather damage intelligence platform*
 
 ## Production Statistics
 
-- **8,116+ Total NWS Alerts** with comprehensive enrichments
-- **2,714+ SPC Storm Reports** with 100% historical coverage
-- **2,120+ Radar-Detected Events** pre-filtered for damage assessment
+- **8,499+ Total NWS Alerts** with comprehensive enrichments
+- **45,934+ SPC Storm Reports** with 100% historical coverage
+- **7,669+ Radar-Detected Events** pre-filtered for damage assessment
 - **100% Data Integrity** with continuous verification against official sources
 
 ## Key Features
@@ -24,7 +24,8 @@ HailyDB is a **production-ready historical weather damage intelligence platform*
 ### Production API Suite
 - **Individual Alert Access**: Complete JSON details with enrichments (`/api/alerts/{alert_id}`)
 - **Pre-filtered Endpoints**: Radar-detected hail and wind damage events
-- **Bulk Export**: High-volume data access with pagination support
+- **Data Source Identifiers**: Clear `data_source` and `source_type` fields on 100% of records
+- **Bulk Export**: High-volume data access with pagination support (up to 5,000 records)
 - **SPC Reports**: 100% historical storm report coverage
 - **NWS Compliance**: Official API-standard GeoJSON responses
 
@@ -93,6 +94,59 @@ curl "https://api.hailyai.com/api/health"
 GET /api/health                         # System status and statistics
 GET /api/documentation                  # Complete API documentation
 ```
+
+## Data Source Identification
+
+All API responses include clear data source identifiers for easy client application integration:
+
+### Response Format Examples
+
+**SPC Reports Response:**
+```json
+{
+  "items": [
+    {
+      "id": "spc-20250820-1318-12345",
+      "data_source": "spc",
+      "source_type": "report",
+      "type": "wind",
+      "verified": true,
+      "wind_mph": 65,
+      "city": "Houston",
+      "state": "TX"
+    }
+  ]
+}
+```
+
+**NWS Alerts Response:**
+```json
+{
+  "features": [
+    {
+      "properties": {
+        "id": "urn:oid:2.49.0.1.840.0.abc123...",
+        "data_source": "nws",
+        "source_type": "alert",
+        "event": "Severe Thunderstorm Warning",
+        "areaDesc": "Harris County, TX",
+        "hailydb_enrichments": {
+          "radar_indicated": {
+            "hail_inches": 1.75,
+            "wind_mph": 60
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+### Client Integration Benefits
+- **Easy Filtering**: `event.data_source === 'nws'` or `'spc'`
+- **Source Type Distinction**: Separate verified reports from warning alerts
+- **100% Database Coverage**: All existing records have these identifiers
+- **Consistent API Responses**: Same field names across all endpoints
 
 ## Business Applications
 
@@ -191,4 +245,32 @@ This platform provides historical weather damage intelligence for legitimate bus
 
 ---
 
-**HailyDB v2.1** - Production-ready historical weather damage intelligence for the insurance and restoration industries.
+**HailyDB v2.1.9** - Production-ready historical weather damage intelligence platform with comprehensive API suite and clear data source identification for insurance and restoration industry clients.
+
+## Client Integration Examples
+
+### JavaScript/TypeScript
+```javascript
+// Get comprehensive damage feed for a location
+const response = await fetch('https://api.hailyai.com/api/reports/spc?lat=29.7604&lon=-95.3698&radius_mi=50');
+const data = await response.json();
+
+// Filter by data source
+const spcReports = data.items.filter(item => item.data_source === 'spc');
+const verifiedReports = data.items.filter(item => item.source_type === 'report');
+```
+
+### Python
+```python
+import requests
+
+# Get radar-detected alerts
+response = requests.get('https://api.hailyai.com/api/alerts/radar_detected?lat=40.7128&lon=-74.0060&radius_mi=25')
+data = response.json()
+
+# Process by data source
+for feature in data['features']:
+    props = feature['properties']
+    if props['data_source'] == 'nws' and props['source_type'] == 'alert':
+        print(f"NWS Alert: {props['event']} - {props['areaDesc']}")
+```
