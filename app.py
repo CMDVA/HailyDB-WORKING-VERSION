@@ -2562,42 +2562,81 @@ def api_radar_alerts_available_dates():
 
 @app.route('/api/radar-alerts')
 def api_radar_alerts_list():
-    """Get list of processed radar alerts with pagination"""
+    """Get list of radar-detected NWS alerts (fixed to use Alert table with radar filtering)"""
     try:
-        from models import RadarAlert
+        from datetime import datetime
         
-        # Get query parameters
-        limit = min(int(request.args.get('limit', 50)), 100)  # Max 100 for performance
+        # Get query parameters matching the web interface expectations
+        limit = min(int(request.args.get('limit', 50)), 1000)
         offset = int(request.args.get('offset', 0))
+        state = request.args.get('state')
         event_type = request.args.get('event_type')
-        date_filter = request.args.get('date')
+        min_hail_size = request.args.get('min_hail_size', 'All Sizes')
+        min_wind_speed = request.args.get('min_wind_speed', '50+ mph')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
         
-        # Build query
-        query = RadarAlert.query
+        # Base query: Alerts with radar-detected hail OR 50+ mph winds
+        query = Alert.query.filter(
+            Alert.radar_indicated.isnot(None),
+            db.or_(
+                Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0,
+                Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50
+            )
+        )
         
-        if event_type:
-            query = query.filter(RadarAlert.event_type == event_type)
+        # Apply filters matching web interface
+        if state and state.upper() not in ['ALL', 'ANY']:
+            query = query.filter(Alert.affected_states.contains([state.upper()]))
         
-        if date_filter:
+        if event_type and event_type != 'All':
+            query = query.filter(Alert.event.ilike(f'%{event_type}%'))
+        
+        # Date range filtering
+        if start_date:
             try:
-                filter_date = datetime.strptime(date_filter, '%Y-%m-%d').date()
-                query = query.filter(RadarAlert.event_date == filter_date)
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                query = query.filter(Alert.effective >= start_dt)
             except ValueError:
-                pass  # Invalid date format, ignore
+                pass
         
-        # Get results
-        alerts = query.order_by(
-            RadarAlert.detected_time.desc()
-        ).offset(offset).limit(limit).all()
+        if end_date:
+            try:
+                from datetime import timedelta
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+                query = query.filter(Alert.effective < end_dt)
+            except ValueError:
+                pass
         
-        # Convert to dict format
+        # Get total count before pagination
+        total = query.count()
+        
+        # Get results with pagination
+        alerts = query.order_by(Alert.effective.desc()).offset(offset).limit(limit).all()
+        
+        # Convert to format expected by web interface
         events = []
         for alert in alerts:
-            events.append(alert.to_dict())
+            # Extract radar data
+            radar_data = alert.radar_indicated or {}
+            hail_size = radar_data.get('hail_inches', 0)
+            wind_speed = radar_data.get('wind_mph', 0)
+            
+            events.append({
+                'id': alert.id,
+                'time': alert.effective.isoformat() if alert.effective else None,
+                'event_type': alert.event,
+                'location': alert.area_desc,
+                'state': alert.affected_states[0] if alert.affected_states else 'Unknown',
+                'hail_size': f"{hail_size:.2f}" if hail_size > 0 else "0.00",
+                'wind_speed': str(wind_speed) if wind_speed > 0 else "0",
+                'severity': alert.severity,
+                'expires': alert.expires.isoformat() if alert.expires else None
+            })
         
         return jsonify({
             'events': events,
-            'total': query.count(),
+            'total': total,
             'limit': limit,
             'offset': offset
         })
