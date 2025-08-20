@@ -311,7 +311,7 @@ class AutonomousScheduler:
             
             # Use the new backfill API for continuous processing
             result = requests.post(
-                f"http://localhost:5000/api/enhanced-context-backfill",
+                f"http://localhost:5000/api/enhanced-context-backfill",  # Internal service call
                 json={"batch_size": 100},
                 timeout=120
             )

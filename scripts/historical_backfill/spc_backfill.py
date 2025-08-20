@@ -23,7 +23,7 @@ class SPCBackfillService:
     Handles month-by-month backfill with verification and progress tracking
     """
     
-    def __init__(self, base_url: str = "http://localhost:5000"):
+    def __init__(self, base_url: str = "https://api.hailyai.com"):
         self.base_url = base_url.rstrip('/')
         self.session = requests.Session()
         self.session.headers.update({
@@ -340,7 +340,7 @@ def main():
     parser.add_argument('--start-date', type=str, help='Start date (YYYY-MM-DD)')
     parser.add_argument('--end-date', type=str, help='End date (YYYY-MM-DD)')
     parser.add_argument('--delay', type=int, default=2, help='Delay between requests (seconds)')
-    parser.add_argument('--base-url', type=str, default='http://localhost:5000', help='HailyDB base URL')
+    parser.add_argument('--base-url', type=str, default='https://api.hailyai.com', help='HailyDB base URL')
     
     args = parser.parse_args()
     

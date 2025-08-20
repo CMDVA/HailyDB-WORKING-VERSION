@@ -51,6 +51,25 @@ GET /api/alerts/{alert_id}              # Individual alert details
 GET /api/reports/spc                    # All historical storm reports
 ```
 
+### Example API Calls
+
+```bash
+# Get all expired radar-detected wind events in Texas
+curl "https://api.hailyai.com/api/alerts/radar_detected/wind?status=expired&state=TX&limit=100"
+
+# Get hail events in Harris County for 2024
+curl "https://api.hailyai.com/api/alerts/radar_detected/hail?county=Harris&start_date=2024-01-01&end_date=2024-12-31"
+
+# Get all radar-detected damage events (wind + hail)
+curl "https://api.hailyai.com/api/alerts/radar_detected?status=expired&limit=2000"
+
+# Get individual alert details
+curl "https://api.hailyai.com/api/alerts/urn:oid:2.49.0.1.840.0.abc123..."
+
+# Check system health and statistics
+curl "https://api.hailyai.com/api/health"
+```
+
 #### Geographic Filtering
 ```
 # Radius-based targeting (all endpoints)
