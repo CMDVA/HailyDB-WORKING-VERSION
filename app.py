@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import atexit
 import requests
 import json
+import math
 from sqlalchemy import text
 from live_radar_service import LiveRadarAlertService
 from enhanced_context_service import enhanced_context_service
@@ -550,14 +551,45 @@ def get_radar_detected_alerts():
         )
     )
     
-    # Geographic filters
-    state = request.args.get('state')
-    if state:
-        query = query.filter(Alert.affected_states.contains([state.upper()]))
+    # Geographic filters - radius takes precedence over state/county
+    lat = request.args.get('lat')
+    lon = request.args.get('lon')  
+    radius_mi = request.args.get('radius_mi')
     
-    county = request.args.get('county')
-    if county:
-        query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
+    if lat and lon and radius_mi:
+        try:
+            lat_float = float(lat)
+            lon_float = float(lon)
+            radius_float = float(radius_mi)
+            
+            # Calculate bounding box for initial filtering (approximate)
+            # 1 degree latitude ≈ 69 miles, longitude varies by latitude
+            lat_delta = radius_float / 69.0
+            lon_delta = radius_float / (69.0 * abs(math.cos(math.radians(lat_float))))
+            
+            # Filter by centroid within bounding box (for performance)
+            # Note: This is approximate - actual distance calculation would be more complex
+            query = query.filter(
+                Alert.centroid.isnot(None),
+                Alert.centroid['lat'].astext.cast(db.Float).between(lat_float - lat_delta, lat_float + lat_delta),
+                Alert.centroid['lon'].astext.cast(db.Float).between(lon_float - lon_delta, lon_float + lon_delta)
+            )
+            
+        except (ValueError, TypeError):
+            return jsonify({
+                'error': 'Invalid geographic parameters',
+                'message': 'lat, lon, and radius_mi must be valid numbers',
+                'provided': {'lat': lat, 'lon': lon, 'radius_mi': radius_mi}
+            }), 400
+    else:
+        # Fallback to state/county filtering
+        state = request.args.get('state')
+        if state:
+            query = query.filter(Alert.affected_states.contains([state.upper()]))
+        
+        county = request.args.get('county')
+        if county:
+            query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
     
     # Status filter (active vs expired)
     status = request.args.get('status', 'all').lower()
@@ -631,14 +663,43 @@ def get_radar_detected_wind():
         Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50
     )
     
-    # Apply same filters as main endpoint
-    state = request.args.get('state')
-    if state:
-        query = query.filter(Alert.affected_states.contains([state.upper()]))
+    # Geographic filters - radius takes precedence over state/county
+    lat = request.args.get('lat')
+    lon = request.args.get('lon')  
+    radius_mi = request.args.get('radius_mi')
     
-    county = request.args.get('county') 
-    if county:
-        query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
+    if lat and lon and radius_mi:
+        try:
+            lat_float = float(lat)
+            lon_float = float(lon)
+            radius_float = float(radius_mi)
+            
+            # Calculate bounding box for initial filtering (approximate)
+            lat_delta = radius_float / 69.0
+            lon_delta = radius_float / (69.0 * abs(math.cos(math.radians(lat_float))))
+            
+            # Filter by centroid within bounding box
+            query = query.filter(
+                Alert.centroid.isnot(None),
+                Alert.centroid['lat'].astext.cast(db.Float).between(lat_float - lat_delta, lat_float + lat_delta),
+                Alert.centroid['lon'].astext.cast(db.Float).between(lon_float - lon_delta, lon_float + lon_delta)
+            )
+            
+        except (ValueError, TypeError):
+            return jsonify({
+                'error': 'Invalid geographic parameters',
+                'message': 'lat, lon, and radius_mi must be valid numbers',
+                'provided': {'lat': lat, 'lon': lon, 'radius_mi': radius_mi}
+            }), 400
+    else:
+        # Fallback to state/county filtering
+        state = request.args.get('state')
+        if state:
+            query = query.filter(Alert.affected_states.contains([state.upper()]))
+        
+        county = request.args.get('county') 
+        if county:
+            query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
     
     status = request.args.get('status', 'all').lower()
     now = datetime.utcnow()
@@ -711,14 +772,43 @@ def get_radar_detected_hail():
         Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0
     )
     
-    # Apply same filters as main endpoint
-    state = request.args.get('state')
-    if state:
-        query = query.filter(Alert.affected_states.contains([state.upper()]))
+    # Geographic filters - radius takes precedence over state/county
+    lat = request.args.get('lat')
+    lon = request.args.get('lon')  
+    radius_mi = request.args.get('radius_mi')
     
-    county = request.args.get('county')
-    if county:
-        query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
+    if lat and lon and radius_mi:
+        try:
+            lat_float = float(lat)
+            lon_float = float(lon)
+            radius_float = float(radius_mi)
+            
+            # Calculate bounding box for initial filtering (approximate)
+            lat_delta = radius_float / 69.0
+            lon_delta = radius_float / (69.0 * abs(math.cos(math.radians(lat_float))))
+            
+            # Filter by centroid within bounding box
+            query = query.filter(
+                Alert.centroid.isnot(None),
+                Alert.centroid['lat'].astext.cast(db.Float).between(lat_float - lat_delta, lat_float + lat_delta),
+                Alert.centroid['lon'].astext.cast(db.Float).between(lon_float - lon_delta, lon_float + lon_delta)
+            )
+            
+        except (ValueError, TypeError):
+            return jsonify({
+                'error': 'Invalid geographic parameters',
+                'message': 'lat, lon, and radius_mi must be valid numbers',
+                'provided': {'lat': lat, 'lon': lon, 'radius_mi': radius_mi}
+            }), 400
+    else:
+        # Fallback to state/county filtering
+        state = request.args.get('state')
+        if state:
+            query = query.filter(Alert.affected_states.contains([state.upper()]))
+        
+        county = request.args.get('county')
+        if county:
+            query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
     
     status = request.args.get('status', 'all').lower()
     now = datetime.utcnow()
@@ -928,11 +1018,32 @@ def get_expired_alerts():
             )
         )
     
-    # Geographic filters
-    if state:
-        query = query.filter(Alert.affected_states.contains([state]))
-    if county:
-        query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
+    # Geographic filters - radius takes precedence over state/county
+    if lat and lon and radius_miles:
+        try:
+            # Calculate bounding box for initial filtering (approximate)
+            lat_delta = radius_miles / 69.0
+            lon_delta = radius_miles / (69.0 * abs(math.cos(math.radians(lat))))
+            
+            # Filter by centroid within bounding box
+            query = query.filter(
+                Alert.centroid.isnot(None),
+                Alert.centroid['lat'].astext.cast(db.Float).between(lat - lat_delta, lat + lat_delta),
+                Alert.centroid['lon'].astext.cast(db.Float).between(lon - lon_delta, lon + lon_delta)
+            )
+            
+        except (ValueError, TypeError) as e:
+            return jsonify({
+                'error': 'Invalid geographic parameters',
+                'message': 'lat, lon, and radius_miles must be valid numbers',
+                'provided': {'lat': lat, 'lon': lon, 'radius_miles': radius_miles}
+            }), 400
+    else:
+        # Fallback to state/county filtering
+        if state:
+            query = query.filter(Alert.affected_states.contains([state]))
+        if county:
+            query = query.filter(Alert.area_desc.ilike(f'%{county}%'))
     
     # Date range
     if start_date:
@@ -2134,6 +2245,182 @@ def api_documentation():
             'timestamp': datetime.utcnow().isoformat(),
             'fallback': 'Try /api/health for basic system status'
         }), 500
+
+@app.route('/api/reports/spc')
+def api_spc_reports():
+    """
+    SPC storm reports endpoint - Critical for IDOLCheck integration
+    Returns verified storm events from Storm Prediction Center
+    Supports radius filtering for location-based queries
+    """
+    from models import SPCReport
+    from datetime import datetime, timedelta
+    
+    # Base query for SPC reports
+    query = SPCReport.query
+    
+    # Geographic filters - radius takes precedence over state/county
+    lat = request.args.get('lat')
+    lon = request.args.get('lon')
+    radius_mi = request.args.get('radius_mi')
+    
+    if lat and lon and radius_mi:
+        try:
+            lat_float = float(lat)
+            lon_float = float(lon)
+            radius_float = float(radius_mi)
+            
+            # Calculate bounding box for initial filtering (approximate)
+            lat_delta = radius_float / 69.0
+            lon_delta = radius_float / (69.0 * abs(math.cos(math.radians(lat_float))))
+            
+            # Filter by coordinates within bounding box
+            query = query.filter(
+                SPCReport.latitude.isnot(None),
+                SPCReport.longitude.isnot(None),
+                SPCReport.latitude.between(lat_float - lat_delta, lat_float + lat_delta),
+                SPCReport.longitude.between(lon_float - lon_delta, lon_float + lon_delta)
+            )
+            
+        except (ValueError, TypeError):
+            return jsonify({
+                'error': 'Invalid geographic parameters',
+                'message': 'lat, lon, and radius_mi must be valid numbers',
+                'provided': {'lat': lat, 'lon': lon, 'radius_mi': radius_mi}
+            }), 400
+    else:
+        # Fallback to state filtering
+        state = request.args.get('state')
+        if state:
+            query = query.filter(SPCReport.state == state.upper())
+    
+    # Date range filtering (required for meaningful results)
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+            query = query.filter(SPCReport.report_date >= start_dt)
+        except ValueError:
+            return jsonify({
+                'error': 'Invalid start_date format',
+                'message': 'Use YYYY-MM-DD format',
+                'provided': start_date
+            }), 400
+    
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+            query = query.filter(SPCReport.report_date <= end_dt)
+        except ValueError:
+            return jsonify({
+                'error': 'Invalid end_date format', 
+                'message': 'Use YYYY-MM-DD format',
+                'provided': end_date
+            }), 400
+    
+    # If no date range provided, default to last 30 days
+    if not start_date and not end_date:
+        thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).date()
+        query = query.filter(SPCReport.report_date >= thirty_days_ago)
+    
+    # Event type filtering
+    event_type = request.args.get('type')
+    if event_type:
+        # Support comma-separated types: hail,wind,tornado
+        types = [t.strip().lower() for t in event_type.split(',')]
+        valid_types = ['hail', 'wind', 'tornado']
+        filtered_types = [t for t in types if t in valid_types]
+        if filtered_types:
+            query = query.filter(SPCReport.report_type.in_(filtered_types))
+    
+    # Magnitude filtering
+    min_wind_mph = request.args.get('min_wind_mph', type=int)
+    if min_wind_mph:
+        query = query.filter(
+            SPCReport.report_type == 'wind',
+            SPCReport.magnitude['speed'].astext.cast(db.Integer) >= min_wind_mph
+        )
+    
+    min_hail_in = request.args.get('min_hail_in', type=float)
+    if min_hail_in:
+        query = query.filter(
+            SPCReport.report_type == 'hail',
+            SPCReport.magnitude['size'].astext.cast(db.Float) >= min_hail_in
+        )
+    
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    limit = min(request.args.get('limit', 1000, type=int), 5000)
+    
+    # Execute query with ordering
+    total = query.count()
+    reports = query.order_by(SPCReport.report_date.desc(), SPCReport.time_utc.desc()).offset((page - 1) * limit).limit(limit).all()
+    
+    # Format response as requested in audit
+    items = []
+    for report in reports:
+        # Extract magnitude values
+        hail_in = None
+        wind_mph = None
+        tornado_scale = None
+        
+        if report.magnitude:
+            if report.report_type == 'hail':
+                hail_in = report.magnitude.get('size')
+            elif report.report_type == 'wind':
+                wind_mph = report.magnitude.get('speed')
+            elif report.report_type == 'tornado':
+                tornado_scale = report.magnitude.get('f_scale')
+        
+        # Create time_utc as proper ISO timestamp
+        time_utc = None
+        if report.time_utc and report.report_date:
+            try:
+                # Combine date and time for full timestamp
+                hour = int(report.time_utc[:2]) if len(report.time_utc) >= 2 else 0
+                minute = int(report.time_utc[2:4]) if len(report.time_utc) >= 4 else 0
+                time_utc = datetime.combine(report.report_date, datetime.min.time().replace(hour=hour, minute=minute)).isoformat() + 'Z'
+            except (ValueError, IndexError):
+                time_utc = report.report_date.isoformat() + 'T00:00:00Z'
+        
+        item = {
+            'id': f'spc-{report.report_date.strftime("%Y%m%d")}-{report.time_utc or "0000"}-{report.id}',
+            'type': report.report_type,
+            'verified': True,  # All SPC reports are verified by definition
+            'hail_in': hail_in,
+            'wind_mph': wind_mph,
+            'tornado_scale': tornado_scale,
+            'time_utc': time_utc,
+            'lat': report.latitude,
+            'lon': report.longitude,
+            'city': report.location,
+            'county': report.county,
+            'state': report.state,
+            'comments': report.comments
+        }
+        items.append(item)
+    
+    return jsonify({
+        'items': items,
+        'page': page,
+        'limit': limit,
+        'total': total,
+        'metadata': {
+            'data_source': 'Storm Prediction Center verified reports',
+            'updated': datetime.utcnow().isoformat(),
+            'criteria': {
+                'geographic': f'radius: {radius_mi}mi from {lat},{lon}' if lat and lon and radius_mi else f'state: {state}' if state else 'all locations',
+                'temporal': f'{start_date} to {end_date}' if start_date or end_date else 'last 30 days',
+                'event_types': event_type if event_type else 'all types',
+                'magnitude_filters': {
+                    'min_wind_mph': min_wind_mph,
+                    'min_hail_in': min_hail_in
+                }
+            }
+        }
+    })
 
 # Radar Alerts API Endpoints
 @app.route('/api/radar-alerts/stats')
