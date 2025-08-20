@@ -1,0 +1,239 @@
+Executive summary
+
+Strengths: Pre-filtered radar endpoints; GeoJSON FeatureCollection; polygon geometry available; stats suggest adequate coverage; SPC is ingested.
+
+Gaps blocking IDOLCheck: No documented lat/lon + radius filter; SPC report API not documented; city_names not guaranteed; rate limit / auth / error model unspecified; minor field naming inconsistencies; pagination limits conflict.
+
+Bottom line: Good foundation for your use case, but you need 3 additions to make the UI trustworthy:
+
+Radius filtering parameters on radar endpoints,
+
+Public SPC endpoint (points) with wind/hail magnitude,
+
+A minimal, stable DTO for the “event card”.
+
+What already fits IDOLCheck
+
+Pre-filtered endpoints for radar hail / wind ≥50 mph:
+
+GET /api/alerts/radar_detected
+
+GET /api/alerts/radar_detected/wind
+
+GET /api/alerts/radar_detected/hail
+These let you avoid free-text heuristics in the client.
+
+GeoJSON: polygons are present, so you can draw NWS alert areas and compute centroids.
+
+Core properties include effective, expires, severity, areaDesc, plus radar_indicated.hail_inches / wind_mph.
+
+Gaps & risks (fix before production)
+
+No radius filtering.
+Docs list only state and county. IDOLCheck needs address → (lat, lon) with a radius (mi) (your default 135).
+Add: lat, lon, radius_mi to radar endpoints and to /api/alerts/expired?has_radar=true.
+
+SPC reports endpoint missing.
+You say “Perfect SPC Sync,” but there’s no public GET /api/reports/spc (points) spec. IDOLCheck needs these to:
+
+show verified events,
+
+do “SPC inside NWS polygon” overlay,
+
+drive the “Verified Only” filter and scoring.
+Add: GET /api/reports/spc with filters: start_date, end_date, lat, lon, radius_mi, min_wind_mph, min_hail_in.
+
+Location granularity not guaranteed.
+Docs show county_names but not city_names. Your UI and workflows depend on a clean Locations: line.
+Add: hailydb_enrichments.city_names: string[] (normalized), or document a deterministic derivation (e.g., GNIS/TIGER join). Do not force clients to parse areaDesc.
+
+Inconsistencies / ambiguities.
+
+You state enrichments are isolated in hailydb_enrichments, but example shows enhanced_summary at top-level. Pick one.
+
+Pagination: query table says limit (max 5,000), another section says 10,000 per request. Pick one and enforce.
+
+Coordinate order: example looks like [lon, lat]. Document explicitly.
+
+Operational contract missing.
+
+Rate limiting (QPS/day, burst, 429 shape),
+
+Authentication (keys, headers),
+
+Error schema (structured JSON),
+
+Versioning (/v2/... path, deprecation window).
+IDOLCheck needs these guarantees to avoid edge-case outages in the field.
+
+“Historical only” vs active.
+You repositioned as historical. The UI shows a real-time “Active alerts” banner. Make it explicit: if GET /api/alerts/active is “best-effort” and not SLA’d, say so.
+
+Licensing language.
+You end with “All rights reserved.” That conflicts with the expectation that partners build on the API. Publish a short Terms of Use permitting commercial use of derived works with attribution; disclaim warranties.
+
+Minimal additions I’d require in the docs
+A) Radar-detected endpoints (updated)
+GET /v2/alerts/radar_detected
+GET /v2/alerts/radar_detected/wind
+GET /v2/alerts/radar_detected/hail
+
+
+Query params (new in bold):
+
+status=active|expired|all
+
+state=FL,GA (optional)
+
+county=Hillsborough (optional)
+
+start_date=YYYY-MM-DD / end_date=YYYY-MM-DD
+
+lat=<num>&lon=<num>&radius_mi=<num> (mutually exclusive with state/county)
+
+limit (max 5000, document consistently)
+
+page (1-based)
+
+Response notes:
+
+GeoJSON FeatureCollection; coordinates [lon,lat].
+
+properties.radar_indicated = { hail_inches?: number, wind_mph?: number }
+
+properties.affected_states: string[]
+
+hailydb_enrichments.city_names: string[] (documented)
+
+hailydb_enrichments.centroid: [lon, lat] (inside polygon)
+
+B) SPC reports endpoint (new)
+GET /v2/reports/spc
+
+
+Query params:
+
+start_date, end_date (UTC)
+
+lat,lon,radius_mi
+
+state (optional)
+
+type= hail|wind|tornado (comma‐sep)
+
+min_wind_mph (default 50)
+
+min_hail_in (default 1.00 if you want to screen)
+
+limit, page
+
+Response (JSON, not GeoJSON is fine):
+
+{
+  "items": [{
+    "id": "spc-20250621-1832-xyz",
+    "type": "hail" | "wind" | "tornado",
+    "verified": true,
+    "hail_in": 1.25,
+    "wind_mph": null,
+    "time_utc": "2025-06-21T18:32:00Z",
+    "lat": 27.951, "lon": -82.457,
+    "city": "Tampa", "county": "Hillsborough", "state": "FL"
+  }],
+  "page": 1, "limit": 1000, "total": 1234
+}
+
+C) Unified convenience endpoint (nice-to-have)
+GET /v2/events/unified
+
+
+Returns SPC verified events as primary; optional include_alerts=true returns radar-detected NWS alerts with spc_inside counts.
+
+Handles dedupe and time-window logic server-side.
+
+Query params: same geo/time; verified_only (default true); include_alerts=false (default).
+
+Response (trimmed for UI):
+
+{
+  "summary": { "counts": { "hail": 12, "wind": 8, "tornado": 1 } },
+  "events": [ /* SPC */ ],
+  "alerts": [ 
+    {
+      "id": "nws-...",
+      "badges": ["WARNING","NWS"],
+      "display": {
+        "time_local": "02:38 PM",
+        "date_local": "08/11/2025",
+        "risk": "Radar-detected wind ≥50 mph",
+        "locations": ["Bonita Beach","Englewood","Charlotte Harbor"],
+        "spc_inside": {"hail":0,"wind":2,"tornado":0}
+      },
+      "polygon": { "type":"Polygon", "coordinates":[...] },
+      "centroid":[-82.35,27.25]
+    }
+  ]
+}
+
+How IDOLCheck should call it (today vs. ideal)
+Today (with current docs)
+
+Address → lat/lon via your geocoder.
+
+Radar alerts: call GET /api/alerts/radar_detected?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&state=FL&limit=5000&page=1.. then server-side filter by radius.
+
+SPC reports: you don’t have a public endpoint—either expose it or pull directly from SPC until HailyDB publishes /reports/spc.
+
+Build the minimal DTO for cards server-side (time, date, risk label, locations, optional SPC-inside counts).
+
+Ideal (after fixes)
+
+Single call:
+
+GET /v2/events/unified?lat=...&lon=...&radius_mi=135&start_date=...&end_date=...&verified_only=true&include_alerts=true
+
+
+The client renders exactly what the API gives it—no guessing.
+
+Error / rate / auth (what to publish)
+
+Auth: Authorization: Bearer <key>; keys per account.
+
+Rate limit: e.g., 10 QPS, 50k/day; return 429 with Retry-After.
+
+Errors:
+
+{ "error": { "code": "RATE_LIMIT", "message": "...", "details": {...} } }
+
+
+Versioning: /v2/...; deprecate v1 with a 60-day window.
+
+Quick win you can deploy now
+
+Even before adding radius and SPC endpoints, you can ship the clean card:
+
+Derive risk label server-side
+
+function riskLabel(p:{radar_indicated?:{hail_inches?:number, wind_mph?:number}}){
+  const h = p?.radar_indicated?.hail_inches ?? 0;
+  const w = p?.radar_indicated?.wind_mph ?? 0;
+  if (w >= 50) return "Radar-detected wind ≥50 mph";
+  if (h > 0)   return "Radar-detected hail";
+  return "Radar-detected event";
+}
+
+
+Emit stable DTO to the client
+
+{
+  "id": "nws-...",
+  "badges": ["WARNING","NWS"],
+  "display": {
+    "time_local": "02:38 PM",
+    "date_local": "08/11/2025",
+    "risk": "Radar-detected wind ≥50 mph",
+    "locations": ["Tampa","Brandon","Seffner"]
+  },
+  "polygon": {...},
+  "centroid":[...]
+}
