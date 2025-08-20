@@ -719,7 +719,7 @@ function applyFilters() {
     // Apply new filters with null safety
     if (searchEl && searchEl.value) currentFilters.q = searchEl.value;
     if (stateEl && stateEl.value) currentFilters.state = stateEl.value;
-    if (eventTypeEl && eventTypeEl.value) currentFilters.event = eventTypeEl.value;
+    if (eventTypeEl && eventTypeEl.value) currentFilters.event_type = eventTypeEl.value;
     if (minHailEl && minHailEl.value) currentFilters.min_hail = parseFloat(minHailEl.value);
     if (minWindEl && minWindEl.value) currentFilters.min_wind = parseInt(minWindEl.value);
     if (startDateEl && startDateEl.value) currentFilters.start_date = startDateEl.value;
