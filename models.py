@@ -76,6 +76,10 @@ class Alert(db.Model):
         
         # Build NWS-compliant response structure
         return {
+            # Data source identifiers for client applications
+            'data_source': 'nws',  # Clear identifier for client applications
+            'source_type': 'alert',  # Distinguishes from 'report'
+            
             # Core NWS API fields (exactly as per OpenAPI spec)
             'id': self.id,
             'areaDesc': self.area_desc,

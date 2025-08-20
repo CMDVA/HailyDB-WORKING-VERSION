@@ -2395,6 +2395,8 @@ def api_spc_reports():
         
         item = {
             'id': f'spc-{report.report_date.strftime("%Y%m%d")}-{report.time_utc or "0000"}-{report.id}',
+            'data_source': 'spc',  # Clear identifier for client applications
+            'source_type': 'report',  # Distinguishes from 'alert'
             'type': report.report_type,
             'verified': True,  # All SPC reports are verified by definition
             'hail_in': hail_in,
