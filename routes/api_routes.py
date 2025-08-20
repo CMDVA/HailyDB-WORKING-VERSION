@@ -63,10 +63,11 @@ def active_alerts():
 def alerts_by_state(state):
     """Get alerts for a specific state"""
     try:
-        # Query alerts by state code in affected_states JSONB field
+        # Query alerts by state code in affected_states JSONB field  
+        from sqlalchemy import text
         alerts = Alert.query.filter(
-            Alert.affected_states.contains([state.upper()])
-        ).order_by(Alert.effective.desc()).limit(100).all()
+            text("affected_states @> :state_array")
+        ).params(state_array=f'["{state.upper()}"]').order_by(Alert.effective.desc()).limit(100).all()
         
         return jsonify({
             'alerts': [alert.to_dict() for alert in alerts],
@@ -83,9 +84,10 @@ def alerts_by_county(state, county):
     """Get alerts for a specific county"""
     try:
         # Query alerts by county name in county_names JSONB field
+        from sqlalchemy import text
         alerts = Alert.query.filter(
-            Alert.county_names.contains([{"state": state.upper(), "county": county}])
-        ).order_by(Alert.effective.desc()).limit(50).all()
+            text("county_names @> :county_obj")
+        ).params(county_obj=f'[{{"state": "{state.upper()}", "county": "{county}"}}]').order_by(Alert.effective.desc()).limit(50).all()
         
         return jsonify({
             'alerts': [alert.to_dict() for alert in alerts],
