@@ -11,11 +11,14 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimized for Replit deployment.
 
-### Recent Achievements (August 19, 2025) - v2.1.3 Release
+### Recent Achievements (August 20, 2025) - v2.1.3 Release
+- **AI Agent Documentation**: Added `/api/documentation` endpoint for AI agents who cannot access external docs
+- **Public Health Endpoint**: Created `/api/health` for integration testing and monitoring
 - **Pre-filtered API Endpoints**: Added `/api/alerts/radar_detected` family for easy client integration
 - **Radar-Detected Wind Events**: Dedicated `/api/alerts/radar_detected/wind` for 50+ mph wind damage
 - **Radar-Detected Hail Events**: Dedicated `/api/alerts/radar_detected/hail` for any size hail damage
 - **Historical Repository Access**: Unlocked full 7,500+ alert repository with 10K limit support
+- **Updated Documentation**: Complete README.md with verified statistics (2,120 radar events)
 - **Critical Bug Fixed**: Resolved `'NoneType' object has no attribute 'lower'` errors in state enrichment
 - **Complete API Coverage**: Fixed missing `/api/alerts/{alert_id}` endpoint for individual alert details
 - **State Enrichment Hardened**: Added comprehensive error handling for None/invalid UGC codes

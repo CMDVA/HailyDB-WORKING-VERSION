@@ -1869,6 +1869,272 @@ def internal_status():
             'error': str(e)
         }), 500
 
+@app.route('/api/health')
+def api_health():
+    """Public health check endpoint for monitoring and integration testing"""
+    try:
+        # Basic database connectivity test
+        total_alerts = Alert.query.count()
+        db.session.execute(db.text('SELECT 1'))
+        
+        return jsonify({
+            'status': 'healthy',
+            'service': 'HailyDB API v2.1.3',
+            'timestamp': datetime.utcnow().isoformat(),
+            'database': {
+                'status': 'healthy',
+                'total_alerts': total_alerts
+            },
+            'version': '2.1.3',
+            'documentation': '/api/documentation'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
+
+@app.route('/api/documentation')
+def api_documentation():
+    """
+    Comprehensive API documentation endpoint for AI agents
+    Returns complete system overview, endpoints, and usage examples
+    Designed specifically for AI agents who cannot access external documentation
+    """
+    try:
+        # Get current system statistics
+        total_alerts = Alert.query.count()
+        expired_alerts = Alert.query.filter(Alert.expires <= datetime.utcnow()).count()
+        
+        # Get radar-detected statistics
+        radar_wind_count = Alert.query.filter(
+            Alert.radar_indicated.isnot(None),
+            Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50
+        ).count()
+        
+        radar_hail_count = Alert.query.filter(
+            Alert.radar_indicated.isnot(None),
+            Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0
+        ).count()
+        
+        radar_total = Alert.query.filter(
+            Alert.radar_indicated.isnot(None),
+            db.or_(
+                Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50,
+                Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0
+            )
+        ).count()
+        
+        documentation = {
+            "system_info": {
+                "name": "HailyDB v2.1.3 - Historical Weather Damage Intelligence Platform",
+                "description": "Production-ready Flask-based platform serving as a comprehensive repository for National Weather Service alerts with radar-detected hail and wind parameters. Designed for insurance claims processing, damage assessment, and restoration industry clients.",
+                "core_value": "Historical repository of expired NWS alerts with radar-detected damage events - answers 'where likely damage WAS'",
+                "version": "2.1.3",
+                "last_updated": datetime.utcnow().isoformat(),
+                "data_sources": ["National Weather Service API", "Storm Prediction Center", "NOAA HURDAT2"],
+                "compliance": "NWS OpenAPI specification with GeoJSON FeatureCollection format"
+            },
+            
+            "repository_statistics": {
+                "total_alerts": total_alerts,
+                "expired_alerts": expired_alerts,
+                "radar_detected_events": {
+                    "total": radar_total,
+                    "wind_events_50plus_mph": radar_wind_count,
+                    "hail_events_any_size": radar_hail_count
+                },
+                "geographic_coverage": "All US states, territories, and marine zones",
+                "date_range": "Historical data spanning multiple years"
+            },
+            
+            "primary_endpoints": {
+                "radar_detected_damage_events": {
+                    "all_events": {
+                        "endpoint": "/api/alerts/radar_detected",
+                        "description": "All radar-detected damage events (50+ mph winds OR any size hail)",
+                        "total_events": radar_total,
+                        "use_case": "Complete radar-detected damage inventory"
+                    },
+                    "wind_events": {
+                        "endpoint": "/api/alerts/radar_detected/wind", 
+                        "description": "Wind damage events (50+ mph radar-detected)",
+                        "total_events": radar_wind_count,
+                        "use_case": "Wind damage assessment and claims"
+                    },
+                    "hail_events": {
+                        "endpoint": "/api/alerts/radar_detected/hail",
+                        "description": "Hail damage events (any size radar-detected)",
+                        "total_events": radar_hail_count,
+                        "use_case": "Hail damage assessment and claims"
+                    }
+                },
+                
+                "historical_repository": {
+                    "endpoint": "/api/alerts/expired",
+                    "description": "Primary business endpoint - all expired NWS alerts with optional radar filtering",
+                    "total_events": expired_alerts,
+                    "use_case": "Historical weather damage intelligence",
+                    "high_volume_support": "Up to 10,000 results per request"
+                },
+                
+                "individual_alerts": {
+                    "endpoint": "/api/alerts/{alert_id}",
+                    "description": "Complete alert details including enrichments and radar parameters",
+                    "use_case": "Detailed damage assessment for specific events"
+                },
+                
+                "active_monitoring": {
+                    "endpoint": "/api/alerts/active",
+                    "description": "Currently active NWS alerts for live monitoring",
+                    "use_case": "Real-time severe weather tracking"
+                },
+                
+                "system_health": {
+                    "endpoint": "/api/health",
+                    "description": "System status and database statistics",
+                    "use_case": "Integration health checks and monitoring"
+                }
+            },
+            
+            "query_parameters": {
+                "geographic_filtering": {
+                    "state": "State code filter (e.g., TX, CA, FL)",
+                    "county": "County name filter (partial match supported)"
+                },
+                "status_filtering": {
+                    "status": "active, expired, or all (default: all)"
+                },
+                "temporal_filtering": {
+                    "start_date": "Date range start (YYYY-MM-DD format)",
+                    "end_date": "Date range end (YYYY-MM-DD format)"
+                },
+                "pagination": {
+                    "page": "Page number (default: 1)",
+                    "limit": "Results per page (max 5,000 for radar endpoints, max 10,000 for expired)"
+                },
+                "radar_filtering": {
+                    "has_radar": "Filter for radar-detected events (use with /api/alerts/expired)"
+                }
+            },
+            
+            "response_format": {
+                "standard": "GeoJSON FeatureCollection following NWS OpenAPI specification",
+                "structure": {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "id": "NWS alert identifier",
+                            "type": "Feature",
+                            "properties": {
+                                "event": "Alert type (e.g., Severe Thunderstorm Warning)",
+                                "headline": "Official NWS headline",
+                                "description": "Full alert description with radar parameters",
+                                "severity": "NWS severity level",
+                                "effective": "ISO timestamp when alert became effective",
+                                "expires": "ISO timestamp when alert expires",
+                                "areaDesc": "Affected counties per NWS format",
+                                "radar_indicated": {
+                                    "hail_inches": "Hail size detected by radar",
+                                    "wind_mph": "Wind speed detected by radar"
+                                },
+                                "affected_states": "Array of state codes",
+                                "county_names": "Array of state/county objects",
+                                "enhanced_summary": "AI-generated damage assessment"
+                            },
+                            "geometry": "GeoJSON polygon of affected area"
+                        }
+                    ],
+                    "title": "Descriptive title with event counts",
+                    "updated": "ISO timestamp of response generation",
+                    "metadata": {
+                        "total_results": "Total matching events",
+                        "page": "Current page number", 
+                        "per_page": "Results per page",
+                        "criteria": "Applied filtering criteria",
+                        "data_source": "Data source attribution"
+                    }
+                }
+            },
+            
+            "example_api_calls": {
+                "wind_damage_texas": {
+                    "url": "/api/alerts/radar_detected/wind?status=expired&state=TX&limit=100",
+                    "description": "Get expired wind damage events in Texas"
+                },
+                "hail_harris_county": {
+                    "url": "/api/alerts/radar_detected/hail?county=Harris&start_date=2024-01-01&end_date=2024-12-31",
+                    "description": "Get hail events in Harris County for 2024"
+                },
+                "all_radar_events": {
+                    "url": "/api/alerts/radar_detected?status=expired&limit=2000",
+                    "description": "Get all historical radar-detected damage events"
+                },
+                "historical_with_radar": {
+                    "url": "/api/alerts/expired?has_radar=true&state=FL&limit=500",
+                    "description": "Get Florida historical alerts with radar parameters"
+                },
+                "individual_alert": {
+                    "url": "/api/alerts/{alert_id}",
+                    "description": "Get complete details for a specific alert ID"
+                }
+            },
+            
+            "industry_applications": {
+                "insurance_claims": [
+                    "Historical damage lookup by location and date range",
+                    "Claims validation using NWS radar parameters", 
+                    "Risk assessment through historical damage patterns"
+                ],
+                "restoration_contractors": [
+                    "Business development through past damage event discovery",
+                    "Emergency response via active alert monitoring",
+                    "Regional damage pattern analysis"
+                ],
+                "forensic_weather": [
+                    "Legal documentation with NWS-verified data",
+                    "Engineering studies using historical severe weather",
+                    "Meteorological research applications"
+                ]
+            },
+            
+            "data_integrity": {
+                "source_authenticity": "Pure mirror of NWS data with AI enrichments",
+                "compliance": "Complete adherence to NWS OpenAPI specification",
+                "no_synthetic_data": "All weather data sourced from official government APIs",
+                "enrichment_transparency": "AI-generated content clearly labeled as enhanced_summary"
+            },
+            
+            "integration_support": {
+                "getting_started": [
+                    "Test /api/health endpoint to verify connectivity",
+                    "Review example API calls provided above",
+                    "Start with pre-filtered radar_detected endpoints for optimal performance",
+                    "Implement GeoJSON parsing for geographic data"
+                ],
+                "best_practices": [
+                    "Use status=expired for historical damage analysis",
+                    "Combine geographic and temporal filters for precise results", 
+                    "Leverage pagination for large datasets",
+                    "Parse radar_indicated fields for damage parameters"
+                ],
+                "rate_limits": "No rate limits currently enforced - use responsibly",
+                "authentication": "No authentication required for public endpoints"
+            }
+        }
+        
+        return jsonify(documentation)
+        
+    except Exception as e:
+        logger.error(f"Error in documentation endpoint: {e}")
+        return jsonify({
+            'error': 'Documentation temporarily unavailable',
+            'message': str(e),
+            'timestamp': datetime.utcnow().isoformat(),
+            'fallback': 'Try /api/health for basic system status'
+        }), 500
+
 # Radar Alerts API Endpoints
 @app.route('/api/radar-alerts/stats')
 def api_radar_alerts_stats():
