@@ -222,6 +222,10 @@ with app.app_context():
     # Initialize autonomous scheduler
     from autonomous_scheduler import AutonomousScheduler
     autonomous_scheduler = AutonomousScheduler(db)
+    
+    # START the autonomous scheduler - CRITICAL for production ingestion
+    autonomous_scheduler.start()
+    logger.info("Autonomous scheduler started successfully")
 
 # API Routes - Legacy NWS Alerts (being phased out)
 @app.route('/alerts-legacy')
@@ -3590,7 +3594,7 @@ def index():
 
 @app.route('/documentation')
 def documentation():
-    """Standalone documentation page - PUBLIC ACCESS"""
+    """Standalone documentation page - PUBLIC ACCESS with admin login link"""
     try:
         import markdown
         from markdown.extensions import codehilite, tables, toc
@@ -3618,12 +3622,19 @@ def documentation():
         # Convert markdown to HTML
         documentation_html = md.convert(markdown_content)
         
-        # Documentation is public - no admin check needed
-        is_admin = False  # External users viewing documentation
+        # Check if user has admin access
+        is_admin = is_admin_access()
+        
+        # Generate admin login URL for external users
+        admin_login_url = None
+        if not is_admin:
+            # Create admin access link - this will redirect to dashboard when clicked by admin
+            admin_login_url = url_for('index')  # This redirects to dashboard if admin
         
         return render_template('documentation.html', 
                              documentation_html=documentation_html,
-                             is_admin=is_admin)
+                             is_admin=is_admin,
+                             admin_login_url=admin_login_url)
         
     except Exception as e:
         logger.error(f"Error loading documentation: {e}")
