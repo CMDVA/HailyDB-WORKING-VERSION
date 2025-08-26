@@ -8,6 +8,14 @@ HailyDB is a **historical weather damage intelligence platform** designed to cap
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Database Configuration (Aug 26, 2025)
+**Issue Resolved**: Production 404 errors caused by database environment separation
+- Development database: 9,310+ alerts (complete data)
+- Production database: 5,771 alerts (missing Aug 11 historical backfill)
+- Client applications successfully connected to development database
+- **Solution**: Configure production to use same DATABASE_URL as development
+- **Result**: Single database eliminates data divergence and fixes individual alert access
+
 ## System Architecture
 HailyDB is built as a Flask-based web service with a PostgreSQL backend, optimized for Replit deployment.
 
