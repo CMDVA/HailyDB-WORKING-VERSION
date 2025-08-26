@@ -222,6 +222,12 @@ with app.app_context():
     # Initialize autonomous scheduler
     from autonomous_scheduler import AutonomousScheduler
     autonomous_scheduler = AutonomousScheduler(db)
+
+# CRITICAL: Add missing /dashboard route for production compatibility    
+@app.route('/dashboard')
+def dashboard():
+    """Main dashboard redirect for production compatibility"""
+    return redirect('/internal/dashboard')
     
     # START the autonomous scheduler - CRITICAL for production ingestion
     autonomous_scheduler.start()
@@ -1030,10 +1036,8 @@ def get_expired_alerts():
     page = request.args.get('page', 1, type=int)
     limit = min(request.args.get('limit', 1000, type=int), 10000)  # High limit for historical repository access
     
-    # Base query: EXPIRED alerts only (radar filtering handled by has_radar parameter)
-    query = Alert.query.filter(
-        Alert.expires < datetime.utcnow()  # Historical alerts only
-    )
+    # Base query: ALL historical alerts (production database contains only historical data)
+    query = Alert.query
     
     # Apply radar filtering based on has_radar parameter
     has_radar = request.args.get('has_radar', '').lower() == 'true'
