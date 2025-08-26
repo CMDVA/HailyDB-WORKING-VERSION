@@ -411,13 +411,25 @@ def get_live_radar_service():
 @app.route('/api/alerts/<path:alert_id>')
 def get_alert_api(alert_id):
     """API endpoint to get individual alert data in JSON format - Core business endpoint"""
+    import urllib.parse
+    
+    # Handle URL decoding for production environments
+    try:
+        decoded_alert_id = urllib.parse.unquote(alert_id)
+    except:
+        decoded_alert_id = alert_id
+    
+    # Try both original and decoded versions
     alert = Alert.query.filter_by(id=alert_id).first()
+    if not alert and decoded_alert_id != alert_id:
+        alert = Alert.query.filter_by(id=decoded_alert_id).first()
     
     if not alert:
         return jsonify({
             'error': 'Alert not found',
             'message': f'Alert {alert_id} not found in HailyDB historical repository',
             'alert_id': alert_id,
+            'decoded_id': decoded_alert_id if decoded_alert_id != alert_id else None,
             'note': 'This endpoint provides historical NWS alerts with radar-detected damage parameters'
         }), 404
     
@@ -433,6 +445,12 @@ def get_alert_api(alert_id):
     }
     
     return jsonify(alert_data)
+
+# CRITICAL: Additional route for production URL handling compatibility
+@app.route('/api/alerts/<string:alert_id>')
+def get_alert_api_string(alert_id):
+    """Fallback API endpoint for string-based alert IDs"""
+    return get_alert_api(alert_id)
 
 @app.route('/alerts/<path:alert_id>')
 def get_alert(alert_id):
