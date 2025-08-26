@@ -600,10 +600,15 @@
             button.className = 'absolute top-2 right-2 bg-gray-700 text-white px-2 py-1 rounded text-xs hover:bg-gray-600';
             button.textContent = 'Copy';
             
+            const preElement = codeBlock.parentNode; // This is the <pre> element
             const wrapper = document.createElement('div');
             wrapper.className = 'relative';
-            codeBlock.parentNode.insertBefore(wrapper, codeBlock.parentNode);
-            wrapper.appendChild(codeBlock.parentNode);
+            
+            // Insert wrapper before the pre element
+            preElement.parentNode.insertBefore(wrapper, preElement);
+            // Move the pre element into the wrapper
+            wrapper.appendChild(preElement);
+            // Add the copy button to the wrapper
             wrapper.appendChild(button);
             
             button.addEventListener('click', () => {
