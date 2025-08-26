@@ -1,14 +1,14 @@
 # Production Database Configuration
 
 ## Current Status
-- **Development Database**: 9,310+ alerts (complete historical data)
+- **Main Database**: 9,310+ alerts (complete historical data)
 - **Client Applications**: Successfully connected and retrieving data
-- **Production Database**: 5,771 alerts (missing historical data)
+- **Production Environment**: 5,771 alerts (missing historical data)
 
 ## Solution: Single Database Configuration
 
 ### Database URL to Use in Production
-The complete DATABASE_URL that should be set in production environment:
+The complete DATABASE_URL that should be set in production environment to connect to the main database:
 
 ```
 DATABASE_URL=postgresql://neondb_owner:npg_LRqvaAt5j1uo@ep-cold-dew-adgprhde.c-2.us-east-1.aws.neon.tech/HailyDB_prod?sslmode=require
@@ -17,7 +17,7 @@ DATABASE_URL=postgresql://neondb_owner:npg_LRqvaAt5j1uo@ep-cold-dew-adgprhde.c-2
 ### Configuration Steps
 1. In production environment variables, set the DATABASE_URL above
 2. Restart production deployment  
-3. Production will now access the complete database with all 9,310+ alerts
+3. Production will now access the main database with all 9,310+ alerts
 4. All 404 errors for individual alerts will be resolved
 
 ### Benefits
