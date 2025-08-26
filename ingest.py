@@ -359,8 +359,8 @@ class IngestService:
     def _parse_radar_indicated(self, properties: Dict) -> Optional[Dict]:
         """
         Parse radar-indicated hail and wind data from NWS alerts
-        Returns {"hail_inches": float, "wind_mph": int} or None if no qualifying radar data found
-        Qualifies if: wind >= 50 MPH OR any hail size present
+        Returns {"hail_inches": float, "wind_mph": int} with ALL extracted data
+        CRITICAL: No filtering - populate ALL radar data for comprehensive client coverage
         """
         # Check NWS API parameters first (most reliable)
         parameters = properties.get('parameters', {})
@@ -376,7 +376,7 @@ class IngestService:
             except (ValueError, TypeError):
                 pass
         
-        # Extract wind from maxWindGust parameter
+        # Extract wind from maxWindGust parameter  
         max_wind_gust = parameters.get('maxWindGust')
         if max_wind_gust and isinstance(max_wind_gust, list) and len(max_wind_gust) > 0:
             wind_str = max_wind_gust[0]
@@ -390,26 +390,25 @@ class IngestService:
                     except (ValueError, TypeError):
                         pass
         
-        # Fall back to description parsing if parameters not available
-        if radar_hail is None or radar_wind is None:
-            description = properties.get('description', '')
-            if radar_hail is None:
-                radar_hail = self._extract_hail_size(description)
-            if radar_wind is None:
-                radar_wind = self._extract_wind_speed(description)
+        # Fall back to comprehensive text parsing
+        description = properties.get('description', '') or ''
+        headline = properties.get('headline', '') or ''
+        instruction = properties.get('instruction', '') or ''
         
-        # Filter by criteria: any hail OR wind >= 50 MPH
-        qualifies_hail = radar_hail is not None and radar_hail > 0
-        qualifies_wind = radar_wind is not None and radar_wind >= 50
+        # Combine all text for comprehensive extraction
+        all_text = f"{description} {headline} {instruction}"
         
-        if not (qualifies_hail or qualifies_wind):
-            return None
+        if radar_hail is None:
+            radar_hail = self._extract_hail_size(all_text)
+        if radar_wind is None:
+            radar_wind = self._extract_wind_speed(all_text)
         
-        # Return the extracted radar data
+        # CRITICAL: Return ALL extracted radar data, no filtering
+        # Client applications handle their own filtering criteria
         radar_data = {}
-        if radar_hail is not None:
+        if radar_hail is not None and radar_hail > 0:
             radar_data['hail_inches'] = radar_hail
-        if radar_wind is not None:
+        if radar_wind is not None and radar_wind > 0:
             radar_data['wind_mph'] = radar_wind
             
         return radar_data if radar_data else None
@@ -468,39 +467,64 @@ class IngestService:
             return None
     
     def _extract_wind_speed(self, text: str) -> Optional[int]:
-        """Extract wind speed in mph from text"""
+        """Extract wind speed in mph from text - COMPREHENSIVE patterns"""
         try:
-            # Pattern 1: "winds up to X mph"
-            pattern1 = r'winds up to (\d+)\s*mph'
-            match = re.search(pattern1, text)
-            if match:
-                return int(match.group(1))
+            if not text or not isinstance(text, str):
+                return None
             
-            # Pattern 2: "damaging winds of X mph"
-            pattern2 = r'damaging winds of (\d+)\s*mph'
-            match = re.search(pattern2, text)
-            if match:
-                return int(match.group(1))
+            text_lower = text.lower()
             
-            # Pattern 3: "X mph wind gusts"
-            pattern3 = r'(\d+)\s*mph wind gusts'
-            match = re.search(pattern3, text)
-            if match:
-                return int(match.group(1))
+            # Skip flood/water events that mention speed but aren't wind
+            skip_keywords = ['flood', 'tsunami', 'storm surge', 'high surf', 'river', 'stream']
+            for keyword in skip_keywords:
+                if keyword in text_lower:
+                    return None
+                    
+            # Comprehensive wind speed extraction patterns
+            patterns = [
+                # Pattern 1: "winds up to X mph"
+                r'winds up to (\d+)\s*mph',
+                # Pattern 2: "damaging winds of X mph" 
+                r'damaging winds of (\d+)\s*mph',
+                # Pattern 3: "X mph wind gusts"
+                r'(\d+)\s*mph wind gusts',
+                # Pattern 4: "wind gusts to X mph"
+                r'wind gusts to (\d+)\s*mph',
+                # Pattern 5: "winds of X mph"
+                r'winds of (\d+)\s*mph',
+                # Pattern 6: "X mph winds" - common NWS format
+                r'(\d+)\s*mph winds',
+                # Pattern 7: "wind speeds of X mph"
+                r'wind speeds of (\d+)\s*mph',
+                # Pattern 8: "X to Y mph" - take maximum
+                r'(\d+) to (\d+)\s*mph',
+                # Pattern 9: "winds to X mph"
+                r'winds to (\d+)\s*mph',
+                # Pattern 10: "gusts to X mph"
+                r'gusts to (\d+)\s*mph',
+                # Pattern 11: "X mph gusts"
+                r'(\d+)\s*mph gusts',
+                # Pattern 12: "wind gusts of X mph"
+                r'wind gusts of (\d+)\s*mph'
+            ]
             
-            # Pattern 4: "wind gusts to X mph"
-            pattern4 = r'wind gusts to (\d+)\s*mph'
-            match = re.search(pattern4, text)
-            if match:
-                return int(match.group(1))
+            max_wind = 0
+            for pattern in patterns:
+                matches = re.findall(pattern, text_lower)
+                for match in matches:
+                    if isinstance(match, tuple):
+                        # Handle "X to Y mph" - take maximum
+                        wind_values = [int(m) for m in match if m.isdigit()]
+                        if wind_values:
+                            max_wind = max(max_wind, max(wind_values))
+                    else:
+                        try:
+                            wind_speed = int(match)
+                            max_wind = max(max_wind, wind_speed)
+                        except (ValueError, TypeError):
+                            continue
             
-            # Pattern 5: "winds of X mph"
-            pattern5 = r'winds of (\d+)\s*mph'
-            match = re.search(pattern5, text)
-            if match:
-                return int(match.group(1))
-                
-            return None
+            return max_wind if max_wind > 0 else None
             
         except Exception as e:
             logger.debug(f"Error extracting wind speed: {e}")
