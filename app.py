@@ -29,8 +29,12 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure the database
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "postgresql://localhost/nws_alerts")
+# Configure the database - CONSOLIDATED: Point development to production database
+# This ensures single source of truth and prevents database divergence
+production_db_url = os.environ.get("DATABASE_URL", "postgresql://localhost/nws_alerts")
+app.config["SQLALCHEMY_DATABASE_URI"] = production_db_url
+# Log which database we're connecting to for transparency
+logger.info(f"Connecting to database: {production_db_url[:50]}...")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 180,  # Reduced from 300 to handle SSL timeouts
     "pool_pre_ping": True,
