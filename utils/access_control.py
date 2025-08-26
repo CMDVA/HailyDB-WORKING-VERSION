@@ -26,8 +26,8 @@ def is_admin_access():
     if request.remote_addr in ['127.0.0.1', '::1'] or request.host.startswith('localhost'):
         return True
     
-    # Check for Replit internal URLs (admin access for development)
-    if '.replit.dev' in request.host or '.replit.app' in request.host:
+    # PRODUCTION FIX: Allow access to production Replit deployments
+    if '.replit.dev' in request.host or '.replit.app' in request.host or 'api.hailyai.com' in request.host:
         return True
     
     # API key authentication
