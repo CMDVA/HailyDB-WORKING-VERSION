@@ -462,9 +462,21 @@ def get_alert_api_string(alert_id):
 @app.route('/alerts/<path:alert_id>')
 def get_alert(alert_id):
     """Get single enriched alert - supports both historical and live radar alerts"""
+    import urllib.parse
     
-    # First check the main alerts table (NWS alerts)
-    alert = Alert.query.filter_by(id=alert_id).first()
+    # PRODUCTION FIX: Handle URL decoding for production environments
+    try:
+        decoded_alert_id = urllib.parse.unquote(alert_id)
+        logger.info(f"Alert lookup: original='{alert_id}', decoded='{decoded_alert_id}'")
+    except Exception as e:
+        decoded_alert_id = alert_id
+        logger.error(f"URL decode failed for alert_id: {e}")
+    
+    # First check the main alerts table (NWS alerts) - try both original and decoded
+    alert = Alert.query.filter_by(id=decoded_alert_id).first()
+    if not alert:
+        alert = Alert.query.filter_by(id=alert_id).first()
+        logger.info(f"Fallback lookup used for alert_id: {alert_id}")
     
     if alert:
         if request.args.get('format') == 'json':
