@@ -2582,14 +2582,8 @@ def api_radar_alerts_list():
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
         
-        # Base query: Alerts with radar-detected hail OR 50+ mph winds
-        query = Alert.query.filter(
-            Alert.radar_indicated.isnot(None),
-            db.or_(
-                Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0,
-                Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50
-            )
-        )
+        # Base query: All alerts with radar data (regardless of hail/wind values)
+        query = Alert.query.filter(Alert.radar_indicated.isnot(None))
         
         # Apply filters matching web interface
         if state and state.upper() not in ['ALL', 'ANY']:
