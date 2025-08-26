@@ -420,16 +420,31 @@ def get_alert_api(alert_id):
     """API endpoint to get individual alert data in JSON format - Core business endpoint"""
     import urllib.parse
     
+    # PRODUCTION DEBUG: Log the exact alert_id being requested
+    logger.info(f"API Alert lookup requested: '{alert_id}'")
+    
     # Handle URL decoding for production environments
     try:
         decoded_alert_id = urllib.parse.unquote(alert_id)
+        logger.info(f"Decoded alert_id: '{decoded_alert_id}'")
     except:
         decoded_alert_id = alert_id
+        logger.info(f"No decoding needed for alert_id: '{alert_id}'")
     
-    # Try both original and decoded versions
+    # Try both original and decoded versions with detailed logging
+    logger.info(f"Querying database for alert_id: '{alert_id}'")
     alert = Alert.query.filter_by(id=alert_id).first()
+    logger.info(f"First query result: {alert is not None}")
+    
     if not alert and decoded_alert_id != alert_id:
+        logger.info(f"Trying decoded version: '{decoded_alert_id}'")
         alert = Alert.query.filter_by(id=decoded_alert_id).first()
+        logger.info(f"Decoded query result: {alert is not None}")
+    
+    # PRODUCTION DEBUG: If still not found, check if any similar IDs exist
+    if not alert:
+        similar_count = Alert.query.filter(Alert.id.like(f'%47199d556c7667ca8d58be1f58db503767724a66%')).count()
+        logger.error(f"Alert not found. Similar IDs in database: {similar_count}")
     
     if not alert:
         return jsonify({
