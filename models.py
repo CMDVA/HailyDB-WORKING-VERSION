@@ -111,6 +111,9 @@ class Alert(db.Model):
             'web': properties_data.get('web'),
             'eventCode': properties_data.get('eventCode', {}),
             
+            # CRITICAL: Radar data at top level for client applications
+            'radar_indicated': self.radar_indicated,
+            
             # Our enrichment fields (clearly marked)
             'hailydb_enrichments': {
                 'radar_indicated': self.radar_indicated,
