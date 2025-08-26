@@ -1998,24 +1998,131 @@ def api_health():
     try:
         # Basic database connectivity test
         total_alerts = Alert.query.count()
+        total_spc_reports = db.session.query(db.func.count(db.text('*'))).select_from(db.text('spc_reports')).scalar()
         db.session.execute(db.text('SELECT 1'))
         
         return jsonify({
             'status': 'healthy',
-            'service': 'HailyDB API v2.1.3',
+            'service': 'HailyDB API v2.0',
             'timestamp': datetime.utcnow().isoformat(),
             'database': {
-                'status': 'healthy',
-                'total_alerts': total_alerts
+                'alerts': total_alerts,
+                'spc_reports': total_spc_reports
             },
-            'version': '2.1.3',
-            'documentation': '/api/documentation'
+            'version': '2.0.0',
+            'documentation': '/documentation'
         })
     except Exception as e:
         return jsonify({
             'status': 'error',
             'error': str(e),
             'timestamp': datetime.utcnow().isoformat()
+        }), 500
+
+@app.route('/api/alerts')
+def api_alerts():
+    """Core API endpoint - Get all historical NWS alerts with comprehensive filtering and pagination"""
+    try:
+        # Parse query parameters
+        limit = min(int(request.args.get('limit', 50)), 1000)
+        offset = int(request.args.get('offset', 0))
+        page = int(request.args.get('page', 1))
+        
+        # Calculate offset from page if provided
+        if page > 1:
+            offset = (page - 1) * limit
+            
+        # Filtering parameters
+        state = request.args.get('state')
+        event_type = request.args.get('event_type')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        has_radar_data = request.args.get('has_radar_data')
+        severity = request.args.get('severity')
+        
+        # Build base query
+        query = Alert.query
+        
+        # Apply filters
+        if state and state.upper() not in ['ALL', 'ANY']:
+            query = query.filter(Alert.affected_states.contains([state.upper()]))
+            
+        if event_type and event_type != 'All':
+            query = query.filter(Alert.event.ilike(f'%{event_type}%'))
+            
+        if severity and severity != 'All':
+            query = query.filter(Alert.severity.ilike(f'%{severity}%'))
+            
+        if has_radar_data == 'true':
+            query = query.filter(Alert.radar_indicated.isnot(None))
+        elif has_radar_data == 'false':
+            query = query.filter(Alert.radar_indicated.is_(None))
+            
+        # Date filtering
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                query = query.filter(Alert.effective >= start_dt)
+            except ValueError:
+                pass
+                
+        if end_date:
+            try:
+                from datetime import timedelta
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+                query = query.filter(Alert.effective < end_dt)
+            except ValueError:
+                pass
+        
+        # Get total count before pagination
+        total = query.count()
+        
+        # Apply pagination and ordering
+        alerts = query.order_by(Alert.effective.desc()).offset(offset).limit(limit).all()
+        
+        # Format response
+        events = []
+        for alert in alerts:
+            alert_data = {
+                'id': alert.id,
+                'event': alert.event,
+                'severity': alert.severity,
+                'area_desc': alert.area_desc,
+                'effective': alert.effective.isoformat() if alert.effective else None,
+                'expires': alert.expires.isoformat() if alert.expires else None,
+                'sent': alert.sent.isoformat() if alert.sent else None,
+                'geometry': alert.geometry,
+                'properties': alert.properties,
+                'affected_states': alert.affected_states,
+                'county_names': alert.county_names,
+                'city_names': alert.city_names,
+                'radar_indicated': alert.radar_indicated,
+                'spc_verified': alert.spc_verified,
+                'spc_reports': alert.spc_reports,
+                'ai_summary': alert.ai_summary,
+                'data_source': 'National Weather Service',
+                'source_type': 'historical_nws_alert'
+            }
+            events.append(alert_data)
+        
+        return jsonify({
+            'events': events,
+            'total': total,
+            'limit': limit,
+            'offset': offset,
+            'page': page if page > 1 else (offset // limit) + 1,
+            'pages': (total + limit - 1) // limit,
+            'has_next': offset + limit < total,
+            'has_prev': offset > 0
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in /api/alerts endpoint: {e}")
+        return jsonify({
+            'error': 'Internal server error',
+            'message': str(e),
+            'events': [],
+            'total': 0
         }), 500
 
 @app.route('/api/documentation')
