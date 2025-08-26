@@ -230,13 +230,13 @@
                     <!-- Start Date -->
                     <div class="col-md-3">
                         <label for="startDate" class="form-label">Start Date</label>
-                        <input type="date" class="form-control" id="startDate" value="2025-08-01">
+                        <input type="date" class="form-control" id="startDate">
                     </div>
                     
                     <!-- End Date -->
                     <div class="col-md-3">
                         <label for="endDate" class="form-label">End Date</label>
-                        <input type="date" class="form-control" id="endDate" value="2025-08-31">
+                        <input type="date" class="form-control" id="endDate">
                     </div>
                 </div>
                 
@@ -743,8 +743,8 @@ function clearFilters() {
     if (eventTypeEl) eventTypeEl.value = '';
     if (minHailEl) minHailEl.value = '';
     if (minWindEl) minWindEl.value = '';
-    if (startDateEl) startDateEl.value = '2025-08-01';
-    if (endDateEl) endDateEl.value = '2025-08-31';
+    if (startDateEl) startDateEl.value = '';
+    if (endDateEl) endDateEl.value = '';
     
     currentFilters = {};
     loadRadarAlerts(1);
@@ -772,11 +772,7 @@ function exportData() {
 
 // Initialize page when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Set default date range
-    document.getElementById('startDate').value = '2025-08-01';
-    document.getElementById('endDate').value = '2025-08-31';
-    
-    // Load radar alerts table
+    // Load radar alerts table with no default filters
     loadRadarAlerts(1);
 });
 
