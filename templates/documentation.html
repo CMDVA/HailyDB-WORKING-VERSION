@@ -494,9 +494,10 @@
                     <span class="badge badge-success">Production Ready</span>
                     <span class="badge badge-version">v2.0.0</span>
                     {% if is_admin %}
-                    <a href="/" style="color: #667eea; text-decoration: none; font-weight: 500;">← Dashboard</a>
+                    <a href="/" style="color: #667eea; text-decoration: none; font-weight: 500; margin-right: 1rem;">← Dashboard</a>
+                    <a href="/admin/logout" style="color: #94a3b8; text-decoration: none; font-weight: 500;">Logout</a>
                     {% else %}
-                    <a href="{{ admin_login_url }}" style="color: #60a5fa; text-decoration: none; font-weight: 600; padding: 8px 16px; border: 1px solid #60a5fa; border-radius: 6px; transition: all 0.2s;">Admin Login</a>
+                    <a href="/admin/login" style="color: #60a5fa; text-decoration: none; font-weight: 600; padding: 8px 16px; border: 1px solid #60a5fa; border-radius: 6px; transition: all 0.2s;">Admin Login</a>
                     {% endif %}
                 </div>
             </div>

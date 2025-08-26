@@ -190,6 +190,7 @@ from spc_verification import SPCVerificationService
 from hurricane_ingest import HurricaneIngestService
 from scheduler_service import SchedulerService
 from config import Config
+from utils.access_control import verify_admin_credentials, login_admin, logout_admin
 import atexit
 
 # Global services
@@ -3762,6 +3763,33 @@ def documentation():
     except Exception as e:
         logger.error(f"Error loading documentation: {e}")
         return f"<h1>Documentation Error</h1><p>Error loading documentation: {str(e)}</p>", 500
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    """Admin login page and handler"""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        if verify_admin_credentials(email, password):
+            login_admin()
+            # Redirect to dashboard after successful login
+            return redirect(url_for('internal_dashboard'))
+        else:
+            error = "Invalid email or password"
+            return render_template('admin_login.html', error=error)
+    
+    # Check if already logged in
+    if is_admin_access():
+        return redirect(url_for('internal_dashboard'))
+    
+    return render_template('admin_login.html')
+
+@app.route('/admin/logout')
+def admin_logout():
+    """Admin logout"""
+    logout_admin()
+    return redirect(url_for('documentation'))
 
 @app.route('/ingestion-logs')
 def ingestion_logs():
