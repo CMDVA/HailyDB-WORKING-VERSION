@@ -81,7 +81,14 @@ app.template_filter('hail_severity')(hail_severity)
 
 # Register blueprints
 from routes.api_routes import api_bp
+from routes.stats_routes import stats_bp
 app.register_blueprint(api_bp)
+app.register_blueprint(stats_bp)
+
+@app.route('/live-stats-demo')
+def live_stats_demo():
+    """Demo page showing live statistics functionality"""
+    return render_template('live_stats_demo.html')
 
 def determine_enhanced_status(log_row):
     """Determine enhanced status display and color coding for operation logs"""
