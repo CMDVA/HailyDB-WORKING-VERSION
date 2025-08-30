@@ -3,7 +3,10 @@
  * Fetches real-time database statistics and updates displays
  */
 
-class LiveStatsManager {
+// Prevent duplicate class declaration
+if (typeof window.LiveStatsManager === 'undefined') {
+    
+window.LiveStatsManager = class LiveStatsManager {
     constructor() {
         this.cache = {};
         this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
@@ -23,14 +26,22 @@ class LiveStatsManager {
         try {
             // Use dedicated statistics endpoint for better performance
             const response = await fetch('/api/stats/summary');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
-
+            console.log('API Response:', data); // Debug logging
+            
             const stats = {
                 totalAlerts: data.total_alerts || 0,
                 spcReports: data.spc_reports || 0,
                 radarDetected: data.radar_detected_events || 0,
                 lastUpdated: new Date().toISOString()
             };
+            
+            console.log('Processed stats:', stats); // Debug logging
 
             this.cache = {
                 data: stats,
@@ -41,10 +52,11 @@ class LiveStatsManager {
 
         } catch (error) {
             console.error('Failed to fetch statistics:', error);
+            console.error('Error details:', error.message);
             // Return cached data if available, otherwise fallback
             return this.cache.data || {
                 totalAlerts: 'Error',
-                spcReports: 'Error',
+                spcReports: 'Error', 
                 radarDetected: 'Error',
                 lastUpdated: new Date().toISOString()
             };
@@ -256,22 +268,30 @@ class LiveStatsManager {
     }
 }
 
-// Global instance
-const liveStats = new LiveStatsManager();
+} // End of class declaration guard
 
-// Auto-initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
-    // Update README-style stats if elements exist
-    if (document.getElementById('total-alerts')) {
-        liveStats.updateReadmeStats();
-    }
+// Global instance (always available)
+if (typeof window.liveStats === 'undefined') {
+    window.liveStats = new window.LiveStatsManager();
+}
+
+// Auto-initialize on page load (only if not already initialized)
+if (typeof window.liveStatsInitialized === 'undefined') {
+    window.liveStatsInitialized = true;
     
-    // Create dashboard if container exists
-    const dashboardContainer = document.getElementById('live-dashboard-container');
-    if (dashboardContainer) {
-        liveStats.createLiveDashboard('live-dashboard-container');
-    }
-    
-    // Start auto-refresh
-    liveStats.startAutoRefresh(5);
-});
+    document.addEventListener('DOMContentLoaded', () => {
+        // Update README-style stats if elements exist
+        if (document.getElementById('total-alerts')) {
+            window.liveStats.updateReadmeStats();
+        }
+        
+        // Create dashboard if container exists
+        const dashboardContainer = document.getElementById('live-dashboard-container');
+        if (dashboardContainer) {
+            window.liveStats.createLiveDashboard('live-dashboard-container');
+        }
+        
+        // Start auto-refresh
+        window.liveStats.startAutoRefresh(5);
+    });
+}
