@@ -18,8 +18,7 @@ def verify_admin_credentials(email, password):
 
 def is_admin_access():
     """Check if the current request is from authenticated admin"""
-    # PRODUCTION FIX: Always allow access for now to fix the deployment
-    return True
+    return session.get('admin_authenticated', False)
 
 def require_admin_or_redirect():
     """Check admin access or redirect to documentation"""
