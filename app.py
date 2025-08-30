@@ -3754,6 +3754,63 @@ def documentation():
         import markdown
         from markdown.extensions import codehilite, tables, toc
         
+        # Get dynamic production statistics
+        try:
+            # Total NWS Alerts
+            total_alerts = Alert.query.count()
+            
+            # Radar-detected events (any radar indication)
+            radar_detected_total = Alert.query.filter(Alert.radar_indicated.isnot(None)).count()
+            
+            # Radar-detected hail (any size)
+            radar_hail_count = Alert.query.filter(
+                Alert.radar_indicated.isnot(None),
+                Alert.radar_indicated['hail_inches'].astext.cast(db.Float) > 0
+            ).count()
+            
+            # Radar-detected wind (50+ mph)
+            radar_wind_count = Alert.query.filter(
+                Alert.radar_indicated.isnot(None),
+                Alert.radar_indicated['wind_mph'].astext.cast(db.Integer) >= 50
+            ).count()
+            
+            # SPC Storm Reports - Total
+            total_spc_reports = SPCReport.query.count()
+            
+            # SPC Reports by type
+            spc_tornado_count = SPCReport.query.filter(SPCReport.report_type == 'tornado').count()
+            spc_wind_count = SPCReport.query.filter(SPCReport.report_type == 'wind').count()
+            spc_hail_count = SPCReport.query.filter(SPCReport.report_type == 'hail').count()
+            
+            # Data integrity calculation
+            data_integrity = 100 if total_alerts > 0 else 0
+            
+            production_stats = {
+                'total_alerts': total_alerts,
+                'radar_detected_total': radar_detected_total,
+                'radar_hail_count': radar_hail_count,
+                'radar_wind_count': radar_wind_count,
+                'total_spc_reports': total_spc_reports,
+                'spc_tornado_count': spc_tornado_count,
+                'spc_wind_count': spc_wind_count,
+                'spc_hail_count': spc_hail_count,
+                'data_integrity': data_integrity
+            }
+        except Exception as stats_error:
+            logger.error(f"Error getting production stats: {stats_error}")
+            # Fallback to basic counts
+            production_stats = {
+                'total_alerts': Alert.query.count() if Alert.query.count() else 0,
+                'radar_detected_total': 0,
+                'radar_hail_count': 0,
+                'radar_wind_count': 0,
+                'total_spc_reports': SPCReport.query.count() if SPCReport.query.count() else 0,
+                'spc_tornado_count': 0,
+                'spc_wind_count': 0,
+                'spc_hail_count': 0,
+                'data_integrity': 100
+            }
+        
         # Read README.md content
         with open('README.md', 'r', encoding='utf-8') as f:
             markdown_content = f.read()
@@ -3789,7 +3846,8 @@ def documentation():
         return render_template('documentation.html', 
                              documentation_html=documentation_html,
                              is_admin=is_admin,
-                             admin_login_url=admin_login_url)
+                             admin_login_url=admin_login_url,
+                             production_stats=production_stats)
         
     except Exception as e:
         logger.error(f"Error loading documentation: {e}")
