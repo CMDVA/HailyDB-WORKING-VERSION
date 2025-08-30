@@ -8,17 +8,10 @@ HailyDB is a **production-ready historical weather damage intelligence platform*
 
 ## Production Statistics
 
-- **<span id="total-alerts">Loading...</span> Total NWS Alerts** with comprehensive enrichments
-- **<span id="spc-reports">Loading...</span> SPC Storm Reports** with 100% historical coverage
-- **<span id="radar-detected">Loading...</span> Radar-Detected Events** pre-filtered for damage assessment
+- **8,499+ Total NWS Alerts** with comprehensive enrichments
+- **45,934+ SPC Storm Reports** with 100% historical coverage
+- **7,669+ Radar-Detected Events** pre-filtered for damage assessment
 - **100% Data Integrity** with continuous verification against official sources
-
-<div id="stats-last-updated" style="font-size: 0.9em; color: #666; margin-top: 8px;"></div>
-
-<!-- Live Dashboard Container (optional) -->
-<div id="live-dashboard-container"></div>
-
-<script src="static/js/live-stats.js"></script>
 
 ## Key Features
 
