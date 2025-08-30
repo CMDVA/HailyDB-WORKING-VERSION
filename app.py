@@ -3815,19 +3815,7 @@ def documentation():
         with open('README.md', 'r', encoding='utf-8') as f:
             markdown_content = f.read()
         
-        # Replace hardcoded statistics with real-time data
-        markdown_content = markdown_content.replace(
-            '- **8,499+ Total NWS Alerts** with comprehensive enrichments',
-            f'- **{total_alerts:,}+ Total NWS Alerts** with comprehensive enrichments'
-        )
-        markdown_content = markdown_content.replace(
-            '- **45,934+ SPC Storm Reports** with 100% historical coverage',
-            f'- **{total_spc_reports:,}+ SPC Storm Reports** with 100% historical coverage'
-        )
-        markdown_content = markdown_content.replace(
-            '- **7,669+ Radar-Detected Events** pre-filtered for damage assessment',
-            f'- **{radar_detected_total:,}+ Radar-Detected Events** pre-filtered for damage assessment'
-        )
+
         
         # Configure markdown with extensions
         md = markdown.Markdown(extensions=[

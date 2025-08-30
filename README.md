@@ -6,12 +6,6 @@ HailyDB is a **production-ready historical weather damage intelligence platform*
 
 **Core Business Value**: Historical radar-detected severe weather events (expired alerts with hail/wind data) for damage assessment and insurance claims.
 
-## Production Statistics
-
-- **8,499+ Total NWS Alerts** with comprehensive enrichments
-- **45,934+ SPC Storm Reports** with 100% historical coverage
-- **7,669+ Radar-Detected Events** pre-filtered for damage assessment
-- **100% Data Integrity** with continuous verification against official sources
 
 ## Key Features
 
