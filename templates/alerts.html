@@ -56,186 +56,105 @@
     </div>
 </div>
 
-<!-- Search Bar -->
+<!-- Radar-Detected Severe Weather Search & Filter -->
 <div class="row mb-4">
     <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-12">
-                        <div class="input-group input-group-lg">
-                            <span class="input-group-text"><i class="fas fa-search"></i></span>
-                            <input type="text" class="form-control" id="alertSearch" name="search" 
-                                   placeholder="Search alerts by location, event type, or description..." 
-                                   value="{{ request.args.get('search', '') }}">
-                            <button class="btn btn-primary" type="submit" form="filterForm">
-                                <i class="fas fa-search me-1"></i>Search
-                            </button>
-                            {% if request.args.get('search') %}
-                            <a href="{{ url_for('get_alerts') }}" class="btn btn-outline-secondary">
-                                <i class="fas fa-times me-1"></i>Clear
-                            </a>
-                            {% endif %}
-                        </div>
-                        {% if request.args.get('search') %}
-                        <div class="mt-2">
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Searching for: "<strong>{{ request.args.get('search') }}</strong>"
-                            </small>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-search me-2"></i>Search & Filter
+                </h5>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Filters -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
             <div class="card-body">
-                <form method="GET" id="filterForm" class="row g-3">
-                    <!-- Hidden search field to maintain search query with filters -->
-                    <input type="hidden" name="search" value="{{ request.args.get('search', '') }}">
-                    <div class="col-md-6 col-lg-3">
-                        <label for="severity" class="form-label">Severity</label>
-                        <select class="form-select" id="severity" name="severity">
-                            <option value="">All Severities</option>
-                            <option value="Extreme" {{ 'selected' if request.args.get('severity') == 'Extreme' }}>Extreme</option>
-                            <option value="Severe" {{ 'selected' if request.args.get('severity') == 'Severe' }}>Severe</option>
-                            <option value="Moderate" {{ 'selected' if request.args.get('severity') == 'Moderate' }}>Moderate</option>
-                            <option value="Minor" {{ 'selected' if request.args.get('severity') == 'Minor' }}>Minor</option>
-                        </select>
+                <form id="radarSearchForm" class="needs-validation" novalidate>
+                    <!-- Search Section -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="searchText" class="form-label">Search</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="searchText" 
+                                       placeholder="Search by location, event type, or description..." 
+                                       oninput="filterRadarEvents()">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="stateFilter" class="form-label">State</label>
+                            <input type="text" class="form-control" id="stateFilter" 
+                                   placeholder="TX, OK, etc." 
+                                   oninput="filterRadarEvents()" 
+                                   maxlength="2" 
+                                   style="text-transform: uppercase;">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="eventTypeFilter" class="form-label">Event Type</label>
+                            <select class="form-select" id="eventTypeFilter" onchange="filterRadarEvents()">
+                                <option value="">All Events</option>
+                                <option value="Tornado Warning">Tornado Warning</option>
+                                <option value="Severe Thunderstorm Warning">Severe Thunderstorm Warning</option>
+                                <option value="Severe Thunderstorm Watch">Severe Thunderstorm Watch</option>
+                                <option value="Tornado Watch">Tornado Watch</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="col-md-6 col-lg-3">
-                        <label for="category" class="form-label">Alert Category</label>
-                        <select class="form-select" id="category" name="category">
-                            <option value="">All Categories</option>
-                            <option value="Severe Weather Alert" {{ 'selected' if request.args.get('category') == 'Severe Weather Alert' }}>Severe Weather Alert</option>
-                            <option value="Winter Weather Alert" {{ 'selected' if request.args.get('category') == 'Winter Weather Alert' }}>Winter Weather Alert</option>
-                            <option value="Flood Alert" {{ 'selected' if request.args.get('category') == 'Flood Alert' }}>Flood Alert</option>
-                            <option value="Coastal Alert" {{ 'selected' if request.args.get('category') == 'Coastal Alert' }}>Coastal Alert</option>
-                            <option value="Wind & Fog Alert" {{ 'selected' if request.args.get('category') == 'Wind & Fog Alert' }}>Wind & Fog Alert</option>
-                            <option value="Fire Weather Alert" {{ 'selected' if request.args.get('category') == 'Fire Weather Alert' }}>Fire Weather Alert</option>
-                            <option value="Air Quality & Dust Alert" {{ 'selected' if request.args.get('category') == 'Air Quality & Dust Alert' }}>Air Quality & Dust Alert</option>
-                            <option value="Marine Alert" {{ 'selected' if request.args.get('category') == 'Marine Alert' }}>Marine Alert</option>
-                            <option value="Tropical Weather Alert" {{ 'selected' if request.args.get('category') == 'Tropical Weather Alert' }}>Tropical Weather Alert</option>
-                            <option value="Tsunami Alert" {{ 'selected' if request.args.get('category') == 'Tsunami Alert' }}>Tsunami Alert</option>
-                            <option value="General Weather Info" {{ 'selected' if request.args.get('category') == 'General Weather Info' }}>General Weather Info</option>
-                        </select>
+                    
+                    <!-- Radar-Detected Criteria Section -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label for="hailSizeFilter" class="form-label">Minimum Hail Size</label>
+                            <select class="form-select" id="hailSizeFilter" onchange="filterRadarEvents()">
+                                <option value="">All Sizes</option>
+                                <option value="0.25">Pea (0.25")</option>
+                                <option value="0.5">Marble (0.5")</option>
+                                <option value="0.75">Penny (0.75")</option>
+                                <option value="1">Quarter (1")</option>
+                                <option value="1.25">Half Dollar (1.25")</option>
+                                <option value="1.5">Walnut (1.5")</option>
+                                <option value="1.75">Golf Ball (1.75")</option>
+                                <option value="2.5">Tennis Ball (2.5")</option>
+                                <option value="2.75">Baseball (2.75")</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="windSpeedFilter" class="form-label">Minimum Wind Speed</label>
+                            <select class="form-select" id="windSpeedFilter" onchange="filterRadarEvents()">
+                                <option value="">All Speeds</option>
+                                <option value="50">50+ mph</option>
+                                <option value="58">58+ mph (Damaging)</option>
+                                <option value="65">65+ mph (Significant)</option>
+                                <option value="75">75+ mph (Extreme)</option>
+                                <option value="90">90+ mph (Catastrophic)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="startDate" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="startDate" onchange="filterRadarEvents()">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="endDate" class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="endDate" onchange="filterRadarEvents()">
+                        </div>
                     </div>
-                    <div class="col-md-6 col-lg-3">
-                        <label for="event" class="form-label">Alert Type</label>
-                        <select class="form-select" id="event" name="event">
-                            <option value="">All Alert Types</option>
-                            <optgroup label="Severe Weather Alert">
-                                <option value="Tornado Watch" {{ 'selected' if request.args.get('event') == 'Tornado Watch' }}>Tornado Watch</option>
-                                <option value="Tornado Warning" {{ 'selected' if request.args.get('event') == 'Tornado Warning' }}>Tornado Warning</option>
-                                <option value="Severe Thunderstorm Watch" {{ 'selected' if request.args.get('event') == 'Severe Thunderstorm Watch' }}>Severe Thunderstorm Watch</option>
-                                <option value="Severe Thunderstorm Warning" {{ 'selected' if request.args.get('event') == 'Severe Thunderstorm Warning' }}>Severe Thunderstorm Warning</option>
-                                <option value="Severe Weather Statement" {{ 'selected' if request.args.get('event') == 'Severe Weather Statement' }}>Severe Weather Statement</option>
-                                <option value="Extreme Wind Warning" {{ 'selected' if request.args.get('event') == 'Extreme Wind Warning' }}>Extreme Wind Warning</option>
-                                <option value="Snow Squall Warning" {{ 'selected' if request.args.get('event') == 'Snow Squall Warning' }}>Snow Squall Warning</option>
-                            </optgroup>
-                            <optgroup label="Winter Weather Alert">
-                                <option value="Winter Storm Watch" {{ 'selected' if request.args.get('event') == 'Winter Storm Watch' }}>Winter Storm Watch</option>
-                                <option value="Winter Storm Warning" {{ 'selected' if request.args.get('event') == 'Winter Storm Warning' }}>Winter Storm Warning</option>
-                                <option value="Blizzard Warning" {{ 'selected' if request.args.get('event') == 'Blizzard Warning' }}>Blizzard Warning</option>
-                                <option value="Ice Storm Warning" {{ 'selected' if request.args.get('event') == 'Ice Storm Warning' }}>Ice Storm Warning</option>
-                                <option value="Winter Weather Advisory" {{ 'selected' if request.args.get('event') == 'Winter Weather Advisory' }}>Winter Weather Advisory</option>
-                                <option value="Freezing Rain Advisory" {{ 'selected' if request.args.get('event') == 'Freezing Rain Advisory' }}>Freezing Rain Advisory</option>
-                                <option value="Wind Chill Advisory" {{ 'selected' if request.args.get('event') == 'Wind Chill Advisory' }}>Wind Chill Advisory</option>
-                                <option value="Wind Chill Warning" {{ 'selected' if request.args.get('event') == 'Wind Chill Warning' }}>Wind Chill Warning</option>
-                                <option value="Frost Advisory" {{ 'selected' if request.args.get('event') == 'Frost Advisory' }}>Frost Advisory</option>
-                                <option value="Freeze Warning" {{ 'selected' if request.args.get('event') == 'Freeze Warning' }}>Freeze Warning</option>
-                            </optgroup>
-                            <optgroup label="Flood Alert">
-                                <option value="Flood Watch" {{ 'selected' if request.args.get('event') == 'Flood Watch' }}>Flood Watch</option>
-                                <option value="Flood Warning" {{ 'selected' if request.args.get('event') == 'Flood Warning' }}>Flood Warning</option>
-                                <option value="Flash Flood Watch" {{ 'selected' if request.args.get('event') == 'Flash Flood Watch' }}>Flash Flood Watch</option>
-                                <option value="Flash Flood Warning" {{ 'selected' if request.args.get('event') == 'Flash Flood Warning' }}>Flash Flood Warning</option>
-                                <option value="Flood Advisory" {{ 'selected' if request.args.get('event') == 'Flood Advisory' }}>Flood Advisory</option>
-                            </optgroup>
-                            <optgroup label="Coastal Alert">
-                                <option value="Coastal Flood Watch" {{ 'selected' if request.args.get('event') == 'Coastal Flood Watch' }}>Coastal Flood Watch</option>
-                                <option value="Coastal Flood Warning" {{ 'selected' if request.args.get('event') == 'Coastal Flood Warning' }}>Coastal Flood Warning</option>
-                                <option value="Coastal Flood Advisory" {{ 'selected' if request.args.get('event') == 'Coastal Flood Advisory' }}>Coastal Flood Advisory</option>
-                                <option value="Lakeshore Flood Watch" {{ 'selected' if request.args.get('event') == 'Lakeshore Flood Watch' }}>Lakeshore Flood Watch</option>
-                                <option value="Lakeshore Flood Warning" {{ 'selected' if request.args.get('event') == 'Lakeshore Flood Warning' }}>Lakeshore Flood Warning</option>
-                                <option value="Lakeshore Flood Advisory" {{ 'selected' if request.args.get('event') == 'Lakeshore Flood Advisory' }}>Lakeshore Flood Advisory</option>
-                                <option value="Beach Hazards Statement" {{ 'selected' if request.args.get('event') == 'Beach Hazards Statement' }}>Beach Hazards Statement</option>
-                            </optgroup>
-                            <optgroup label="Wind & Fog Alert">
-                                <option value="High Wind Watch" {{ 'selected' if request.args.get('event') == 'High Wind Watch' }}>High Wind Watch</option>
-                                <option value="High Wind Warning" {{ 'selected' if request.args.get('event') == 'High Wind Warning' }}>High Wind Warning</option>
-                                <option value="Wind Advisory" {{ 'selected' if request.args.get('event') == 'Wind Advisory' }}>Wind Advisory</option>
-                                <option value="Dense Fog Advisory" {{ 'selected' if request.args.get('event') == 'Dense Fog Advisory' }}>Dense Fog Advisory</option>
-                                <option value="Freezing Fog Advisory" {{ 'selected' if request.args.get('event') == 'Freezing Fog Advisory' }}>Freezing Fog Advisory</option>
-                            </optgroup>
-                            <optgroup label="Fire Weather Alert">
-                                <option value="Fire Weather Watch" {{ 'selected' if request.args.get('event') == 'Fire Weather Watch' }}>Fire Weather Watch</option>
-                                <option value="Red Flag Warning" {{ 'selected' if request.args.get('event') == 'Red Flag Warning' }}>Red Flag Warning</option>
-                            </optgroup>
-                            <optgroup label="Air Quality & Dust Alert">
-                                <option value="Air Quality Alert" {{ 'selected' if request.args.get('event') == 'Air Quality Alert' }}>Air Quality Alert</option>
-                                <option value="Air Stagnation Advisory" {{ 'selected' if request.args.get('event') == 'Air Stagnation Advisory' }}>Air Stagnation Advisory</option>
-                                <option value="Blowing Dust Advisory" {{ 'selected' if request.args.get('event') == 'Blowing Dust Advisory' }}>Blowing Dust Advisory</option>
-                                <option value="Dust Storm Warning" {{ 'selected' if request.args.get('event') == 'Dust Storm Warning' }}>Dust Storm Warning</option>
-                                <option value="Ashfall Advisory" {{ 'selected' if request.args.get('event') == 'Ashfall Advisory' }}>Ashfall Advisory</option>
-                                <option value="Ashfall Warning" {{ 'selected' if request.args.get('event') == 'Ashfall Warning' }}>Ashfall Warning</option>
-                            </optgroup>
-                            <optgroup label="Marine Alert">
-                                <option value="Small Craft Advisory" {{ 'selected' if request.args.get('event') == 'Small Craft Advisory' }}>Small Craft Advisory</option>
-                                <option value="Gale Watch" {{ 'selected' if request.args.get('event') == 'Gale Watch' }}>Gale Watch</option>
-                                <option value="Gale Warning" {{ 'selected' if request.args.get('event') == 'Gale Warning' }}>Gale Warning</option>
-                                <option value="Storm Watch" {{ 'selected' if request.args.get('event') == 'Storm Watch' }}>Storm Watch</option>
-                                <option value="Storm Warning" {{ 'selected' if request.args.get('event') == 'Storm Warning' }}>Storm Warning</option>
-                                <option value="Hurricane Force Wind Warning" {{ 'selected' if request.args.get('event') == 'Hurricane Force Wind Warning' }}>Hurricane Force Wind Warning</option>
-                                <option value="Special Marine Warning" {{ 'selected' if request.args.get('event') == 'Special Marine Warning' }}>Special Marine Warning</option>
-                                <option value="Low Water Advisory" {{ 'selected' if request.args.get('event') == 'Low Water Advisory' }}>Low Water Advisory</option>
-                                <option value="Brisk Wind Advisory" {{ 'selected' if request.args.get('event') == 'Brisk Wind Advisory' }}>Brisk Wind Advisory</option>
-                                <option value="Marine Weather Statement" {{ 'selected' if request.args.get('event') == 'Marine Weather Statement' }}>Marine Weather Statement</option>
-                                <option value="Hazardous Seas Warning" {{ 'selected' if request.args.get('event') == 'Hazardous Seas Warning' }}>Hazardous Seas Warning</option>
-                            </optgroup>
-                            <optgroup label="Tropical Weather Alert">
-                                <option value="Tropical Storm Watch" {{ 'selected' if request.args.get('event') == 'Tropical Storm Watch' }}>Tropical Storm Watch</option>
-                                <option value="Tropical Storm Warning" {{ 'selected' if request.args.get('event') == 'Tropical Storm Warning' }}>Tropical Storm Warning</option>
-                                <option value="Hurricane Watch" {{ 'selected' if request.args.get('event') == 'Hurricane Watch' }}>Hurricane Watch</option>
-                                <option value="Hurricane Warning" {{ 'selected' if request.args.get('event') == 'Hurricane Warning' }}>Hurricane Warning</option>
-                                <option value="Storm Surge Watch" {{ 'selected' if request.args.get('event') == 'Storm Surge Watch' }}>Storm Surge Watch</option>
-                                <option value="Storm Surge Warning" {{ 'selected' if request.args.get('event') == 'Storm Surge Warning' }}>Storm Surge Warning</option>
-                            </optgroup>
-                            <optgroup label="Tsunami Alert">
-                                <option value="Tsunami Watch" {{ 'selected' if request.args.get('event') == 'Tsunami Watch' }}>Tsunami Watch</option>
-                                <option value="Tsunami Advisory" {{ 'selected' if request.args.get('event') == 'Tsunami Advisory' }}>Tsunami Advisory</option>
-                                <option value="Tsunami Warning" {{ 'selected' if request.args.get('event') == 'Tsunami Warning' }}>Tsunami Warning</option>
-                            </optgroup>
-                            <optgroup label="General Weather Info">
-                                <option value="Special Weather Statement" {{ 'selected' if request.args.get('event') == 'Special Weather Statement' }}>Special Weather Statement</option>
-                                <option value="Hazardous Weather Outlook" {{ 'selected' if request.args.get('event') == 'Hazardous Weather Outlook' }}>Hazardous Weather Outlook</option>
-                                <option value="Short Term Forecast" {{ 'selected' if request.args.get('event') == 'Short Term Forecast' }}>Short Term Forecast</option>
-                                <option value="Public Information Statement" {{ 'selected' if request.args.get('event') == 'Public Information Statement' }}>Public Information Statement</option>
-                                <option value="Administrative Message" {{ 'selected' if request.args.get('event') == 'Administrative Message' }}>Administrative Message</option>
-                                <option value="Test Message" {{ 'selected' if request.args.get('event') == 'Test Message' }}>Test Message</option>
-                            </optgroup>
-                        </select>
-                    </div>
-                    <div class="col-md-6 col-lg-3">
-                        <label for="per_page" class="form-label">Per Page</label>
-                        <select class="form-select" id="per_page" name="per_page">
-                            <option value="25" {{ 'selected' if request.args.get('per_page', '50') == '25' }}>25</option>
-                            <option value="50" {{ 'selected' if request.args.get('per_page', '50') == '50' }}>50</option>
-                            <option value="100" {{ 'selected' if request.args.get('per_page', '50') == '100' }}>100</option>
-                        </select>
-                    </div>
-                    <div class="col-12">
-                        <div class="d-grid d-md-flex justify-content-md-end">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-filter me-1"></i>Filter Alerts
-                            </button>
+                    
+                    <!-- Action Buttons -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="btn-group me-2" role="group">
+                                <button type="button" class="btn btn-primary" onclick="filterRadarEvents()">
+                                    <i class="fas fa-search me-1"></i>Search & Filter
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="clearAllFilters()">
+                                    <i class="fas fa-times me-1"></i>Clear All
+                                </button>
+                            </div>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-info" onclick="loadRadarDetectedHail()">
+                                    <i class="fas fa-snowflake me-1"></i>Hail Events
+                                </button>
+                                <button type="button" class="btn btn-outline-warning" onclick="loadRadarDetectedWind()">
+                                    <i class="fas fa-wind me-1"></i>Wind Events
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </form>
