@@ -180,11 +180,19 @@ class LiveRadarAlertService:
             max_wind_gust = self._extract_wind_parameter(parameters)
             max_hail_size = self._extract_hail_parameter(parameters)
             
-            # Filter: Process ANY hail size OR wind >= 50 mph (independent conditions)
+            # Filter: Accept severe weather warnings even without specific radar parameters
             has_qualifying_hail = max_hail_size is not None and max_hail_size > 0
             has_qualifying_wind = max_wind_gust is not None and max_wind_gust >= 50
             
-            if not (has_qualifying_hail or has_qualifying_wind):
+            # Accept alerts with radar parameters OR severe weather events
+            severe_weather_events = {
+                "Tornado Warning", "Severe Thunderstorm Warning", 
+                "Flash Flood Warning", "Special Weather Statement"
+            }
+            is_severe_weather = event in severe_weather_events
+            
+            if not (has_qualifying_hail or has_qualifying_wind or is_severe_weather):
+                logger.debug(f"Live Radar: Filtered out non-severe alert: {event} (ID: {alert_id})")
                 return None
                 
             # Extract location information

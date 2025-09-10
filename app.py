@@ -53,6 +53,9 @@ db.init_app(app)
 # Initialize database tables and services when app starts
 with app.app_context():
     try:
+        # Import models first so SQLAlchemy knows about them
+        from models import Alert, RadarAlert, IngestionLog, SchedulerLog, SPCReport, WebhookRule, HurricaneCountyImpact, HurricaneTrack, SPCIngestionLog, WebhookEvent
+        
         # Create all database tables
         db.create_all()
         
