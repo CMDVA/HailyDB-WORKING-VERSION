@@ -262,95 +262,78 @@
     </div>
 </div>
 
-<!-- Alerts List -->
+<!-- Radar-Detected Events Table -->
 <div class="row">
     <div class="col-12">
-        {% if alerts.items %}
-            {% for alert in alerts.items %}
-            <div class="card mb-3 alert-card">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <div class="d-flex align-items-start mb-2">
-                                <div class="severity-badge severity-{{ alert.severity.lower() if alert.severity else 'unknown' }} me-3">
-                                    {{ alert.severity or 'N/A' }}
-                                </div>
-                                <div class="flex-grow-1">
-                                    <h5 class="card-title mb-1">
-                                        <a href="{{ url_for('get_alert', alert_id=alert.id) }}" class="text-decoration-none">
-                                            {{ alert.event or 'Unknown Event' }}
-                                        </a>
-                                    </h5>
-                                    <p class="text-muted mb-2">
-                                        <i class="fas fa-map-marker-alt me-1"></i>
-                                        {{ alert.area_desc or 'Area not specified' }}
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            {% if alert.ai_summary %}
-                            <div class="ai-summary mb-2">
-                                <h6 class="text-primary mb-1">
-                                    <i class="fas fa-robot me-1"></i>AI Summary
-                                </h6>
-                                <p class="mb-0">{{ alert.ai_summary }}</p>
-                            </div>
-                            {% endif %}
-                            
-                            {% if alert.ai_tags %}
-                            <div class="alert-tags">
-                                {% for tag in alert.ai_tags %}
-                                    <span class="badge bg-secondary me-1">{{ tag }}</span>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="col-md-4">
-                            <div class="alert-metadata">
-                                {% if alert.effective %}
-                                <p class="mb-1">
-                                    <small class="text-muted">
-                                        <i class="fas fa-play me-1"></i>
-                                        Effective: {{ alert.effective.strftime('%m/%d %H:%M UTC') }}
-                                    </small>
-                                </p>
-                                {% endif %}
-                                
-                                {% if alert.expires %}
-                                <p class="mb-1">
-                                    <small class="text-muted">
-                                        <i class="fas fa-stop me-1"></i>
-                                        Expires: {{ alert.expires.strftime('%m/%d %H:%M UTC') }}
-                                    </small>
-                                </p>
-                                {% endif %}
-                                
-                                <p class="mb-2">
-                                    <small class="text-muted">
-                                        <i class="fas fa-clock me-1"></i>
-                                        Ingested: {{ alert.ingested_at.strftime('%m/%d %H:%M UTC') if alert.ingested_at }}
-                                    </small>
-                                </p>
-                                
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <a href="{{ url_for('get_alert', alert_id=alert.id) }}" class="btn btn-outline-primary">
-                                        <i class="fas fa-eye me-1"></i>View
-                                    </a>
-                                    {% if not alert.ai_summary %}
-                                    <form method="POST" action="{{ url_for('enrich_alert', alert_id=alert.id) }}" class="d-inline">
-                                        <button type="submit" class="btn btn-outline-success">
-                                            <i class="fas fa-robot me-1"></i>Enrich
-                                        </button>
-                                    </form>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-satellite-dish me-2"></i>
+                    <span id="events-title">Radar-Detected Severe Weather Events</span>
+                    <span id="events-count" class="badge bg-primary ms-2">Loading...</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th scope="col">
+                                    <i class="fas fa-calendar me-1"></i>Date/Time
+                                </th>
+                                <th scope="col">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>Severity
+                                </th>
+                                <th scope="col">
+                                    <i class="fas fa-cloud-bolt me-1"></i>Event Type
+                                </th>
+                                <th scope="col">
+                                    <i class="fas fa-map-marker-alt me-1"></i>Area
+                                </th>
+                                <th scope="col">
+                                    <i class="fas fa-radar me-1"></i>Radar Data
+                                </th>
+                                <th scope="col">
+                                    <i class="fas fa-cog me-1"></i>Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="alerts-tbody">
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <div class="spinner-border text-primary me-2" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    Loading radar-detected severe weather events...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Loading State -->
+                <div id="loading-state" class="text-center py-4" style="display: none;">
+                    <div class="spinner-border text-primary me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    Searching radar-detected events...
+                </div>
+                
+                <!-- No Results State -->
+                <div id="no-results-state" class="text-center py-4" style="display: none;">
+                    <div class="text-muted">
+                        <i class="fas fa-search fa-2x mb-3"></i>
+                        <h5>No radar-detected events found</h5>
+                        <p>Try adjusting your search filters or date range.</p>
+                        <button class="btn btn-outline-primary" onclick="clearAllFilters()">
+                            <i class="fas fa-refresh me-1"></i>Clear Filters
+                        </button>
                     </div>
                 </div>
             </div>
-            {% endfor %}
+        </div>
+    </div>
+</div>
             
             <!-- Pagination -->
             {% if alerts.pages > 1 %}
@@ -815,9 +798,32 @@ function clearAllFilters() {
 // Update the radar events display table
 function updateEventDisplay() {
     const alertsContainer = document.getElementById('alerts-tbody');
+    const eventsCountElement = document.getElementById('events-count');
+    const noResultsState = document.getElementById('no-results-state');
+    
     if (!alertsContainer) {
         console.error('Alerts container not found');
         return;
+    }
+
+    // Update events count
+    if (eventsCountElement) {
+        eventsCountElement.textContent = filteredEvents.length.toLocaleString();
+    }
+
+    // Show no results state if no events
+    if (filteredEvents.length === 0) {
+        alertsContainer.innerHTML = '';
+        if (noResultsState) {
+            noResultsState.style.display = 'block';
+        }
+        updateRadarStatistics();
+        return;
+    }
+
+    // Hide no results state
+    if (noResultsState) {
+        noResultsState.style.display = 'none';
     }
 
     let html = '';
