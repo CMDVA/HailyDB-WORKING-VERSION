@@ -634,37 +634,251 @@ async function getEnrichmentStats() {
     }
 }
 
-// Load enrichment counts when page loads
+// Global variables for radar event filtering
+let radarEvents = [];
+let filteredEvents = [];
+let currentFilters = {};
+
+// Load radar-detected events data
+async function loadRadarDetectedEvents() {
+    try {
+        const response = await fetch('/api/alerts/radar_detected?limit=1000');
+        const data = await response.json();
+        
+        if (response.ok && data.features) {
+            radarEvents = data.features.map(feature => ({
+                id: feature.properties.id,
+                event: feature.properties.event || 'Unknown',
+                area_desc: feature.properties.area_desc || '',
+                effective: feature.properties.effective,
+                expires: feature.properties.expires,
+                hail_inches: feature.properties.radar_indicated?.hail_inches || null,
+                wind_mph: feature.properties.radar_indicated?.wind_mph || null,
+                city_names: feature.properties.city_names || [],
+                description: feature.properties.description || '',
+                headline: feature.properties.headline || '',
+                severity: feature.properties.severity || 'Unknown'
+            }));
+            
+            filteredEvents = [...radarEvents];
+            updateEventDisplay();
+            showNotification(`Loaded ${radarEvents.length} radar-detected severe weather events`, 'success', 3000);
+        } else {
+            showNotification('Error loading radar-detected events', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading radar-detected events:', error);
+        showNotification('Error loading radar-detected events', 'error');
+    }
+}
+
+// Filter radar events based on current filters
+function filterRadarEvents() {
+    const searchText = document.getElementById('searchText')?.value.toLowerCase() || '';
+    const stateFilter = document.getElementById('stateFilter')?.value.toUpperCase() || '';
+    const eventTypeFilter = document.getElementById('eventTypeFilter')?.value || '';
+    const hailSizeFilter = parseFloat(document.getElementById('hailSizeFilter')?.value) || 0;
+    const windSpeedFilter = parseFloat(document.getElementById('windSpeedFilter')?.value) || 0;
+    const startDate = document.getElementById('startDate')?.value || '';
+    const endDate = document.getElementById('endDate')?.value || '';
+
+    filteredEvents = radarEvents.filter(event => {
+        // Text search across multiple fields
+        if (searchText) {
+            const searchableText = `${event.event} ${event.area_desc} ${event.description} ${event.headline} ${event.city_names.join(' ')}`.toLowerCase();
+            if (!searchableText.includes(searchText)) {
+                return false;
+            }
+        }
+
+        // State filter
+        if (stateFilter && !event.area_desc.includes(stateFilter)) {
+            return false;
+        }
+
+        // Event type filter
+        if (eventTypeFilter && !event.event.includes(eventTypeFilter)) {
+            return false;
+        }
+
+        // Hail size filter
+        if (hailSizeFilter > 0 && (!event.hail_inches || event.hail_inches < hailSizeFilter)) {
+            return false;
+        }
+
+        // Wind speed filter
+        if (windSpeedFilter > 0 && (!event.wind_mph || event.wind_mph < windSpeedFilter)) {
+            return false;
+        }
+
+        // Date range filters
+        if (startDate) {
+            const eventDate = new Date(event.effective);
+            const filterStartDate = new Date(startDate);
+            if (eventDate < filterStartDate) {
+                return false;
+            }
+        }
+
+        if (endDate) {
+            const eventDate = new Date(event.effective);
+            const filterEndDate = new Date(endDate + 'T23:59:59');
+            if (eventDate > filterEndDate) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    updateEventDisplay();
+    showNotification(`Found ${filteredEvents.length} matching radar-detected events`, 'info', 2000);
+}
+
+// Load radar-detected hail events specifically
+async function loadRadarDetectedHail() {
+    try {
+        const response = await fetch('/api/alerts/radar_detected/hail?limit=1000');
+        const data = await response.json();
+        
+        if (response.ok && data.features) {
+            radarEvents = data.features.map(feature => ({
+                id: feature.properties.id,
+                event: feature.properties.event || 'Unknown',
+                area_desc: feature.properties.area_desc || '',
+                effective: feature.properties.effective,
+                expires: feature.properties.expires,
+                hail_inches: feature.properties.radar_indicated?.hail_inches || null,
+                wind_mph: feature.properties.radar_indicated?.wind_mph || null,
+                city_names: feature.properties.city_names || [],
+                description: feature.properties.description || '',
+                headline: feature.properties.headline || '',
+                severity: feature.properties.severity || 'Unknown'
+            }));
+            
+            filteredEvents = [...radarEvents];
+            updateEventDisplay();
+            showNotification(`Loaded ${radarEvents.length} radar-detected hail events`, 'success', 3000);
+        }
+    } catch (error) {
+        console.error('Error loading hail events:', error);
+        showNotification('Error loading hail events', 'error');
+    }
+}
+
+// Load radar-detected wind events specifically
+async function loadRadarDetectedWind() {
+    try {
+        const response = await fetch('/api/alerts/radar_detected/wind?limit=1000');
+        const data = await response.json();
+        
+        if (response.ok && data.features) {
+            radarEvents = data.features.map(feature => ({
+                id: feature.properties.id,
+                event: feature.properties.event || 'Unknown',
+                area_desc: feature.properties.area_desc || '',
+                effective: feature.properties.effective,
+                expires: feature.properties.expires,
+                hail_inches: feature.properties.radar_indicated?.hail_inches || null,
+                wind_mph: feature.properties.radar_indicated?.wind_mph || null,
+                city_names: feature.properties.city_names || [],
+                description: feature.properties.description || '',
+                headline: feature.properties.headline || '',
+                severity: feature.properties.severity || 'Unknown'
+            }));
+            
+            filteredEvents = [...radarEvents];
+            updateEventDisplay();
+            showNotification(`Loaded ${radarEvents.length} radar-detected wind events`, 'success', 3000);
+        }
+    } catch (error) {
+        console.error('Error loading wind events:', error);
+        showNotification('Error loading wind events', 'error');
+    }
+}
+
+// Clear all filters
+function clearAllFilters() {
+    document.getElementById('searchText').value = '';
+    document.getElementById('stateFilter').value = '';
+    document.getElementById('eventTypeFilter').value = '';
+    document.getElementById('hailSizeFilter').value = '';
+    document.getElementById('windSpeedFilter').value = '';
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    
+    filteredEvents = [...radarEvents];
+    updateEventDisplay();
+    showNotification('All filters cleared', 'info', 2000);
+}
+
+// Update the radar events display table
+function updateEventDisplay() {
+    const alertsContainer = document.getElementById('alerts-tbody');
+    if (!alertsContainer) {
+        console.error('Alerts container not found');
+        return;
+    }
+
+    let html = '';
+    filteredEvents.forEach(event => {
+        const eventDate = new Date(event.effective).toLocaleString();
+        const radarInfo = [];
+        
+        if (event.hail_inches) {
+            radarInfo.push(`${event.hail_inches}" hail`);
+        }
+        if (event.wind_mph) {
+            radarInfo.push(`${event.wind_mph} mph winds`);
+        }
+        
+        const radarData = radarInfo.length > 0 ? radarInfo.join(', ') : 'Radar detected';
+        const cities = event.city_names.length > 0 ? event.city_names.slice(0, 3).join(', ') : '';
+        const cityDisplay = cities ? `<br><small class="text-muted">${cities}</small>` : '';
+
+        html += `
+            <tr>
+                <td>${eventDate}</td>
+                <td><span class="badge bg-${getSeverityColor(event.severity)}">${event.severity}</span></td>
+                <td>${event.event}${cityDisplay}</td>
+                <td>${event.area_desc}</td>
+                <td><span class="badge bg-info">${radarData}</span></td>
+                <td><a href="/alert/${event.id}" class="btn btn-sm btn-outline-primary">View Details</a></td>
+            </tr>
+        `;
+    });
+
+    alertsContainer.innerHTML = html;
+    
+    // Update statistics
+    updateRadarStatistics();
+}
+
+// Update statistics cards
+function updateRadarStatistics() {
+    const hailEvents = filteredEvents.filter(e => e.hail_inches && e.hail_inches > 0);
+    const windEvents = filteredEvents.filter(e => e.wind_mph && e.wind_mph >= 50);
+    const maxHail = Math.max(...filteredEvents.map(e => e.hail_inches || 0));
+    const maxWind = Math.max(...filteredEvents.map(e => e.wind_mph || 0));
+
+    document.getElementById('total-hail-alerts').textContent = hailEvents.length.toLocaleString();
+    document.getElementById('total-wind-alerts').textContent = windEvents.length.toLocaleString();
+    document.getElementById('max-hail-size').textContent = maxHail > 0 ? `${maxHail.toFixed(2)}"` : '0"';
+    document.getElementById('max-wind-speed').textContent = maxWind > 0 ? `${maxWind} mph` : '0 mph';
+}
+
+// Initialize radar events functionality when page loads
 document.addEventListener('DOMContentLoaded', function() {
     loadEnrichmentCounts();
+    loadRadarDetectedEvents(); // Load radar-detected events on page load
     
-    // Enhanced search functionality
-    const searchInput = document.getElementById('alertSearch');
-    const filterForm = document.getElementById('filterForm');
-    
-    // Submit form when Enter is pressed in search box
-    if (searchInput) {
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                filterForm.submit();
-            }
-        });
-        
-        // Auto-focus search if there's a search query
-        if (searchInput.value.trim()) {
-            searchInput.focus();
+    // Set up keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'f') {
+            e.preventDefault();
+            document.getElementById('searchText')?.focus();
         }
-    }
-    
-    // Update hidden search field when search input changes
-    if (searchInput && filterForm) {
-        searchInput.addEventListener('input', function() {
-            const hiddenSearch = filterForm.querySelector('input[name="search"]');
-            if (hiddenSearch) {
-                hiddenSearch.value = this.value;
-            }
-        });
-    }
+    });
 });
 </script>
 {% endblock %}
