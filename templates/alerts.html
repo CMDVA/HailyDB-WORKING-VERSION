@@ -657,7 +657,8 @@ async function loadRadarDetectedEvents() {
 
 // Filter radar events based on current filters
 function filterRadarEvents() {
-    const searchText = document.getElementById('searchText')?.value.toLowerCase() || '';
+    const searchTextElement = document.getElementById('searchText');
+    const searchText = searchTextElement ? searchTextElement.value.trim().toLowerCase() : '';
     const stateFilter = document.getElementById('stateFilter')?.value.toUpperCase() || '';
     const eventTypeFilter = document.getElementById('eventTypeFilter')?.value || '';
     const hailSizeFilter = parseFloat(document.getElementById('hailSizeFilter')?.value) || 0;
@@ -665,12 +666,29 @@ function filterRadarEvents() {
     const startDate = document.getElementById('startDate')?.value || '';
     const endDate = document.getElementById('endDate')?.value || '';
 
+    // Debug logging
+    console.log(`Filtering with search text: "${searchText}"`);
+    console.log(`Total events before filtering: ${radarEvents.length}`);
+
     filteredEvents = radarEvents.filter(event => {
-        // Text search across multiple fields
-        if (searchText) {
-            const searchableText = `${event.event} ${event.area_desc} ${event.description} ${event.headline} ${event.city_names.join(' ')}`.toLowerCase();
+        // Text search across multiple fields - only apply if searchText is not empty
+        if (searchText.length > 0) {
+            const searchableFields = [
+                event.event || '',
+                event.area_desc || '',
+                event.description || '',
+                event.headline || '',
+                (event.city_names || []).join(' ')
+            ];
+            const searchableText = searchableFields.join(' ').toLowerCase();
+            
+            console.log(`Checking event: "${event.event}" with searchable text containing: "${searchableText.substring(0, 100)}..."`);
+            
             if (!searchableText.includes(searchText)) {
+                console.log(`EXCLUDED: "${event.event}" - does not contain "${searchText}"`);
                 return false;
+            } else {
+                console.log(`INCLUDED: "${event.event}" - contains "${searchText}"`);
             }
         }
 
@@ -714,6 +732,7 @@ function filterRadarEvents() {
         return true;
     });
 
+    console.log(`Events after filtering: ${filteredEvents.length}`);
     updateEventDisplay();
     showNotification(`Found ${filteredEvents.length} matching radar-detected events`, 'info', 2000);
 }
