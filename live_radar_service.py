@@ -177,8 +177,8 @@ class LiveRadarAlertService:
             
             # Extract parameters for wind/hail filtering
             parameters = properties.get('parameters', {})
-            max_wind_gust = self._extract_wind_parameter(parameters)
-            max_hail_size = self._extract_hail_parameter(parameters)
+            max_wind_gust = self._extract_wind_parameter(parameters, description)
+            max_hail_size = self._extract_hail_parameter(parameters, description)
             
             # Filter: Accept severe weather warnings even without specific radar parameters
             has_qualifying_hail = max_hail_size is not None and max_hail_size > 0
@@ -253,8 +253,9 @@ class LiveRadarAlertService:
             logger.error(f"Error processing alert feature: {e}")
             return None
             
-    def _extract_wind_parameter(self, parameters: Dict[str, Any]) -> Optional[int]:
-        """Extract wind gust parameter from NWS alert parameters"""
+    def _extract_wind_parameter(self, parameters: Dict[str, Any], description: str = None) -> Optional[int]:
+        """Extract wind gust parameter from NWS alert parameters and description text"""
+        # First try structured parameters
         wind_params = ['maxWindGust', 'windGust', 'windSpeed']
         
         for param in wind_params:
@@ -268,11 +269,41 @@ class LiveRadarAlertService:
                         return wind_value
                 except (ValueError, TypeError):
                     continue
+        
+        # If no structured data, parse description text for wind speeds
+        if description:
+            import re
+            description_upper = description.upper()
+            
+            # Patterns to match wind speeds in description
+            wind_patterns = [
+                r'GUSTS?\s+(?:UP\s+TO\s+|OF\s+)?(\d+)\s*MPH',
+                r'WINDS?\s+(?:UP\s+TO\s+|OF\s+|TO\s+)?(\d+)\s*MPH', 
+                r'WIND\s+GUSTS?\s+(?:UP\s+TO\s+|OF\s+)?(\d+)\s*MPH',
+                r'(\d+)\s*MPH\s+(?:WIND|GUST)',
+                r'WINDS?\s+(?:TO\s+AROUND\s+)?(\d+)\s*KNOTS?'
+            ]
+            
+            max_wind = 0
+            for pattern in wind_patterns:
+                matches = re.findall(pattern, description_upper)
+                for match in matches:
+                    try:
+                        wind_speed = int(match)
+                        # Convert knots to mph if needed (1 knot ≈ 1.15 mph)
+                        if 'KNOT' in pattern:
+                            wind_speed = int(wind_speed * 1.15)
+                        max_wind = max(max_wind, wind_speed)
+                    except (ValueError, TypeError):
+                        continue
+            
+            return max_wind if max_wind > 0 else None
                     
         return None
         
-    def _extract_hail_parameter(self, parameters: Dict[str, Any]) -> Optional[float]:
-        """Extract hail size parameter from NWS alert parameters"""
+    def _extract_hail_parameter(self, parameters: Dict[str, Any], description: str = None) -> Optional[float]:
+        """Extract hail size parameter from NWS alert parameters and description text"""
+        # First try structured parameters
         hail_params = ['maxHailSize', 'hailSize']
         
         for param in hail_params:
@@ -285,6 +316,31 @@ class LiveRadarAlertService:
                     return hail_value if hail_value > 0 else None
                 except (ValueError, TypeError):
                     continue
+        
+        # If no structured data, parse description text for hail sizes  
+        if description:
+            import re
+            description_upper = description.upper()
+            
+            # Patterns to match hail sizes in description
+            hail_patterns = [
+                r'HAIL\s+(?:UP\s+TO\s+|OF\s+)?(\d+(?:\.\d+)?)\s*(?:INCH|IN)',
+                r'(\d+(?:\.\d+)?)\s*(?:INCH|IN)\s+HAIL',
+                r'HAIL\s+(?:SIZE\s+)?(\d+(?:\.\d+)?)',
+                r'(\d+(?:\.\d+)?)"?\s+HAIL'
+            ]
+            
+            max_hail = 0.0
+            for pattern in hail_patterns:
+                matches = re.findall(pattern, description_upper)
+                for match in matches:
+                    try:
+                        hail_size = float(match)
+                        max_hail = max(max_hail, hail_size)
+                    except (ValueError, TypeError):
+                        continue
+                        
+            return max_hail if max_hail > 0 else None
                     
         return None
         
