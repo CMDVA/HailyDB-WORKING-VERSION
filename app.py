@@ -4093,8 +4093,8 @@ def get_alerts():
                 ingested_end = datetime.fromisoformat(f"{ingested_date}T23:59:59")
                 query = query.filter(
                     and_(
-                        Alert.ingested >= ingested_start,
-                        Alert.ingested <= ingested_end
+                        Alert.ingested_at >= ingested_start,
+                        Alert.ingested_at <= ingested_end
                     )
                 )
             
