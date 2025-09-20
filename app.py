@@ -227,19 +227,19 @@ with app.app_context():
     live_radar_service = LiveRadarAlertService(db.session())
     live_radar_service.start_polling()
     
-    # Initialize autonomous scheduler
+    # Initialize autonomous scheduler with app instance to prevent circular imports
     from autonomous_scheduler import AutonomousScheduler
-    autonomous_scheduler = AutonomousScheduler(db)
+    autonomous_scheduler = AutonomousScheduler(db, app)
+    
+    # START the autonomous scheduler - CRITICAL for production ingestion
+    autonomous_scheduler.start()
+    logger.info("Autonomous scheduler started successfully (persistent mode)")
 
 # CRITICAL: Add missing /dashboard route for production compatibility    
 @app.route('/dashboard')
 def dashboard():
     """Main dashboard redirect for production compatibility"""
     return redirect('/internal/dashboard')
-    
-    # START the autonomous scheduler - CRITICAL for production ingestion
-    autonomous_scheduler.start()
-    logger.info("Autonomous scheduler started successfully")
 
 # API Routes - Legacy NWS Alerts (being phased out)
 @app.route('/alerts-legacy')

@@ -23,10 +23,12 @@ class AutonomousScheduler:
     """
     Self-running scheduler that maintains autonomous ingestion
     Prevents overlapping operations and provides self-diagnosis
+    Fixed: Non-daemon threads with health monitoring
     """
     
-    def __init__(self, db):
+    def __init__(self, db, app_instance=None):
         self.db = db
+        self.app = app_instance  # Store app instance to avoid circular imports
         self.ingest_service = IngestService(db)
         self.spc_service = SPCIngestService(db.session)
         self.matching_service = SPCMatchingService(db.session)
@@ -34,6 +36,8 @@ class AutonomousScheduler:
         
         self.running = False
         self.thread = None
+        self.restart_count = 0
+        self.max_restarts = 10
         
         # Scheduling intervals (minutes)
         self.nws_interval = Config.POLLING_INTERVAL_MINUTES  # 5 minutes
@@ -53,6 +57,8 @@ class AutonomousScheduler:
         
         # Track last operation results for dashboard
         self.last_operation_result = None
+        self.health_check_interval = 60  # Check health every minute
+        self.last_health_check = None
     
     def start(self):
         """Start the autonomous scheduler"""
@@ -61,9 +67,10 @@ class AutonomousScheduler:
             return
         
         self.running = True
-        self.thread = threading.Thread(target=self._scheduler_loop, daemon=True)
+        # CRITICAL FIX: Remove daemon=True to prevent thread death on idle
+        self.thread = threading.Thread(target=self._scheduler_loop_with_restart, daemon=False)
         self.thread.start()
-        logger.info("Autonomous scheduler started")
+        logger.info("Autonomous scheduler started (persistent mode)")
     
     def stop(self):
         """Stop the autonomous scheduler"""
@@ -72,14 +79,36 @@ class AutonomousScheduler:
             self.thread.join(timeout=5)
         logger.info("Autonomous scheduler stopped")
     
+    def _scheduler_loop_with_restart(self):
+        """Wrapper for scheduler loop with automatic restart capability"""
+        while self.running and self.restart_count < self.max_restarts:
+            try:
+                self._scheduler_loop()
+            except Exception as e:
+                self.restart_count += 1
+                logger.error(f"Scheduler loop crashed (restart {self.restart_count}/{self.max_restarts}): {e}")
+                if self.restart_count < self.max_restarts:
+                    logger.info(f"Restarting scheduler loop in 30 seconds...")
+                    time.sleep(30)
+                else:
+                    logger.error("Max restart attempts reached. Scheduler stopped.")
+                    self.running = False
+    
     def _scheduler_loop(self):
         """Main scheduler loop that runs continuously"""
-        from app import app
-        logger.info("Scheduler loop started")
+        logger.info("Scheduler loop started (persistent mode)")
         
         while self.running:
             try:
-                with app.app_context():
+                # Use stored app instance instead of importing
+                if self.app:
+                    app_context = self.app.app_context()
+                else:
+                    # Fallback import if app not provided
+                    from app import app
+                    app_context = app.app_context()
+                
+                with app_context:
                     current_time = datetime.utcnow()
                     
                     # Check if NWS polling is due
@@ -97,13 +126,18 @@ class AutonomousScheduler:
                     # Check if Enhanced Context generation is due
                     if self._should_run_enhanced_context(current_time):
                         self._run_enhanced_context_generation()
+                    
+                    # Health check for monitoring
+                    if self._should_run_health_check(current_time):
+                        self._run_health_check()
                 
                 # Sleep for 30 seconds before next check
                 time.sleep(30)
                 
             except Exception as e:
-                logger.error(f"Error in scheduler loop: {e}")
-                time.sleep(60)  # Wait longer on errors
+                logger.error(f"Error in scheduler loop iteration: {e}")
+                # Don't sleep too long - this is just one iteration failure
+                time.sleep(30)  # Shorter wait for individual iteration errors
     
     def _should_run_nws_poll(self, current_time: datetime) -> bool:
         """Check if NWS polling should run - aligned to exact 5-minute intervals"""
@@ -343,6 +377,29 @@ class AutonomousScheduler:
             
         except Exception as e:
             logger.error(f"Error in webhook evaluation: {e}")
+    
+    def _should_run_health_check(self, current_time: datetime) -> bool:
+        """Check if health check should run"""
+        if self.last_health_check is None:
+            return True
+        
+        time_since_last = current_time - self.last_health_check
+        return time_since_last.total_seconds() >= self.health_check_interval
+    
+    def _run_health_check(self):
+        """Perform health check and log status"""
+        try:
+            self.last_health_check = datetime.utcnow()
+            
+            # Check if thread is alive
+            if not (self.thread and self.thread.is_alive()):
+                logger.warning("Scheduler thread health check: Thread not alive!")
+            
+            # Log health status
+            logger.debug(f"Scheduler health check: Running={self.running}, Thread alive={self.thread.is_alive() if self.thread else False}")
+            
+        except Exception as e:
+            logger.error(f"Error in health check: {e}")
     
     def get_status(self) -> dict:
         """Get scheduler status for diagnostics"""
