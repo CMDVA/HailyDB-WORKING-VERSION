@@ -1,0 +1,96 @@
+Subject
+
+Production data visibility for Replit Agent (workspace uses dev DB, deployment uses prod DB)
+
+Message
+
+Hi Replit Support,
+
+Summary (non-code user):
+My app (HailyDB / api.hailyai.com) ingests public NWS/SPC weather data into Postgres. Replit created two databases by default—one for the workspace (“development”) and one for the deployment (“production”). My deployed ingestion service writes to production, but the Replit Agent runs in the workspace context and keeps reporting:
+
+“I can only access your development database – I cannot directly query your production database for security reasons.”
+
+This means anything the Agent analyzes or “compares” is based on dev data, not what customers see in production. I need the Agent, acting as my “lead engineer,” to see live production data reliably while keeping write access governed by my deployed service.
+
+Impact:
+
+I cannot validate ingestion health or counts from the Agent because it only sees the dev DB.
+
+Operational decisions and diagnostics are wrong or delayed.
+
+I need a supported, stable pattern so the Agent can read prod safely and predictably.
+
+What I need from you
+
+Database topology & defaults
+
+In Replit Deployments, does the platform always provision separate DBs for workspace vs deployment by default?
+
+Where do I view and copy the production DB connection string that the deployment is using (including host, database name, and whether it’s managed by Replit or external)?
+
+Agent → production (read-only) access
+
+What is the supported mechanism for giving a Replit Agent read-only access to the deployment’s production database?
+
+Can the Agent read from a second connection string (e.g., PROD_DB_URL) stored as a Secret in the workspace?
+
+If the Agent is restricted to DATABASE_URL, can we instead set DATABASE_URL to the production read-only URL and introduce a new DEV_DATABASE_URL for local/dev tools—without breaking normal workspace features?
+
+Are there network/IP restrictions or egress policies the Agent must satisfy to reach the production DB endpoint?
+
+If yes, please provide the static egress IPs or the recommended approach (e.g., Replit-managed private networking, Cloudflare Tunnel, etc.).
+
+Secrets & environment propagation
+
+How do workspace Secrets differ from deployment environment variables for Agents?
+
+Can I add PROD_DB_URL as a workspace Secret and ensure the Agent can read it?
+
+Is there a recommended naming convention or config location the Agent expects for multiple datasources?
+
+Role/permission recommendations
+
+Do you have an official guide for creating a read-only role for production (Postgres) specifically for Replit Agents?
+
+For example, setting default_transaction_read_only=on, SELECT only on all tables, and no DDL permissions.
+
+Any timeouts or session settings you recommend for Agent connections (e.g., statement_timeout, idle_in_transaction_session_timeout)?
+
+Supported patterns
+
+Of these patterns, which does Replit officially recommend and support for Agents?
+
+A. Dual URLs: Workspace has DATABASE_URL (dev) and PROD_DB_URL (prod read-only); Agent uses PROD_DB_URL for “live data” tasks.
+
+B. Flip default: Set DATABASE_URL = prod read-only; add DEV_DATABASE_URL for sandboxing.
+
+C. HTTP facade: Agent queries read-only admin endpoints on the deployed app (which talks to prod DB), not the DB directly.
+
+If A or B are supported, please confirm exact steps to wire the Agent to the prod read-only URL.
+
+Verification & tooling
+
+Is there a built-in way to confirm which DB the Agent is actually querying (logs, environment dump, or a diagnostic command)?
+
+Any known gotchas with Prisma/SQLAlchemy/psql in Replit Agents when multiple datasources exist?
+
+Desired end state (what I’m aiming for)
+
+The Replit Agent can read the production database reliably (ideally via a separate PROD_DB_URL Secret) while remaining read-only.
+
+The deployed ingestion service remains the only writer to prod.
+
+From the Agent, when I run a “Database Comparison Analysis” or a live check, the numbers match what customers see.
+
+What I can provide (tell me what you need)
+
+Deployment ID / project URL (workspace and deployment).
+
+Current environment variables (redacted).
+
+A test SQL SELECT you can run to confirm prod visibility.
+
+Any logs or screenshots showing the “dev-only” limitation message.
+
+Thanks—please advise the supported, stable way to give the Replit Agent production read-only visibility so my diagnostics reflect reality while keeping writes controlled by the deployment. I’m a non-coder, so step-by-step instructions are appreciated.

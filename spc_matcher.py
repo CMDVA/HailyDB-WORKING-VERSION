@@ -83,17 +83,18 @@ class SPCMatchingService:
         Match a single alert with SPC reports
         Returns match result and updates alert if matches found
         """
-        if not alert.effective:
+        if not getattr(alert, 'effective', None):
             return {'matched': False, 'updated': False, 'reason': 'No effective time'}
         
         # Determine eligible SPC report types based on alert event
-        eligible_types = self._get_eligible_spc_types(alert.event or '')
+        eligible_types = self._get_eligible_spc_types(getattr(alert, 'event', '') or '')
         if not eligible_types:
             return {'matched': False, 'updated': False, 'reason': 'No eligible SPC types'}
         
         # Extract time window
-        start_time = alert.effective - timedelta(hours=self.time_window_hours)
-        end_time = alert.effective + timedelta(hours=self.time_window_hours)
+        alert_effective = getattr(alert, 'effective')
+        start_time = alert_effective - timedelta(hours=self.time_window_hours)
+        end_time = alert_effective + timedelta(hours=self.time_window_hours)
         
         # Get report date(s) to search
         report_dates = self._get_report_dates_for_timerange(start_time, end_time)
@@ -115,20 +116,22 @@ class SPCMatchingService:
         
         # Update alert with match results
         try:
-            alert.spc_verified = True
-            alert.spc_reports = [self._spc_report_to_dict(match) for match in matches]
-            alert.spc_match_method = match_method
-            alert.spc_confidence_score = confidence
-            alert.spc_report_count = len(matches)
+            # Use proper SQLAlchemy updates instead of direct assignment
+            setattr(alert, 'spc_verified', True)
+            setattr(alert, 'spc_reports', [self._spc_report_to_dict(match) for match in matches])
+            setattr(alert, 'spc_match_method', match_method)
+            setattr(alert, 'spc_confidence_score', confidence)
+            setattr(alert, 'spc_report_count', len(matches))
             
             # Generate AI summary for verified matches
             try:
+                spc_reports_data = [self._spc_report_to_dict(match) for match in matches]
                 ai_summary = self.summarizer.generate_match_summary(
                     alert=alert.to_dict(),
-                    spc_reports=alert.spc_reports
+                    spc_reports=spc_reports_data
                 )
                 if ai_summary:
-                    alert.spc_ai_summary = ai_summary
+                    setattr(alert, 'spc_ai_summary', ai_summary)
                     logger.info(f"Generated AI summary for alert {alert.id}")
             except Exception as e:
                 logger.warning(f"Failed to generate AI summary for alert {alert.id}: {e}")
@@ -248,13 +251,14 @@ class SPCMatchingService:
     def _get_alert_centroid(self, alert: Alert) -> Tuple[Optional[float], Optional[float]]:
         """Extract centroid coordinates from alert geometry or area description"""
         # Try geometry first
-        if alert.geometry and isinstance(alert.geometry, dict):
-            coordinates = alert.geometry.get('coordinates')
+        alert_geometry = getattr(alert, 'geometry', None)
+        if alert_geometry and isinstance(alert_geometry, dict):
+            coordinates = alert_geometry.get('coordinates')
             if coordinates:
                 # Handle different geometry types
-                if alert.geometry.get('type') == 'Point':
+                if alert_geometry.get('type') == 'Point':
                     return coordinates[1], coordinates[0]  # lat, lon
-                elif alert.geometry.get('type') in ['Polygon', 'MultiPolygon']:
+                elif alert_geometry.get('type') in ['Polygon', 'MultiPolygon']:
                     # Calculate centroid of polygon (simplified)
                     return self._calculate_polygon_centroid(coordinates)
         
@@ -301,17 +305,17 @@ class SPCMatchingService:
     def _is_time_match(self, spc_report: SPCReport, alert: Alert, 
                       start_time: datetime, end_time: datetime) -> bool:
         """Check if SPC report time falls within alert time window"""
-        if not spc_report.time_utc or not alert.effective:
+        if not getattr(spc_report, 'time_utc', None) or not getattr(alert, 'effective', None):
             return True  # If no time data, assume match (location-based only)
         
         try:
             # Parse SPC time (HHMM format) and combine with report date
-            spc_time_str = spc_report.time_utc.zfill(4)  # Pad to 4 digits
+            spc_time_str = str(getattr(spc_report, 'time_utc')).zfill(4)  # Pad to 4 digits
             spc_hour = int(spc_time_str[:2])
             spc_minute = int(spc_time_str[2:])
             
             spc_datetime = datetime.combine(
-                spc_report.report_date,
+                getattr(spc_report, 'report_date'),
                 datetime.min.time().replace(hour=spc_hour, minute=spc_minute)
             )
             
