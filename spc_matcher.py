@@ -29,8 +29,8 @@ class SPCMatchingService:
             'hail': ['Severe Thunderstorm Warning', 'Severe Weather Statement', 'Significant Weather Advisory']
         }
         
-        # Time window for matching (±2 hours as specified)
-        self.time_window_hours = 2
+        # Time window for matching (±6 hours to capture more matches)
+        self.time_window_hours = 6
         
         # Distance threshold for lat/lon fallback (25 miles as specified)
         self.distance_threshold_miles = 25
@@ -40,8 +40,8 @@ class SPCMatchingService:
         Match a batch of unverified alerts with SPC reports
         Returns statistics about matching process
         """
-        # Get unverified alerts from last 48 hours for broader matching
-        cutoff_time = datetime.utcnow() - timedelta(hours=48)
+        # Get unverified alerts from last 7 days for broader matching
+        cutoff_time = datetime.utcnow() - timedelta(days=7)
         
         unverified_alerts = Alert.query.filter(
             and_(
@@ -50,7 +50,7 @@ class SPCMatchingService:
             )
         ).limit(limit).all()
         
-        logger.info(f"Processing {len(unverified_alerts)} unverified alerts for SPC matching")
+        logger.info(f"Processing {len(unverified_alerts)} unverified alerts for SPC matching (cutoff: {cutoff_time})")
         
         matched_count = 0
         updated_count = 0
@@ -60,6 +60,7 @@ class SPCMatchingService:
                 match_result = self.match_alert_with_spc(alert)
                 if match_result['matched']:
                     matched_count += 1
+                    logger.info(f"MATCH FOUND: Alert {alert.id} matched via {match_result.get('method', 'unknown')} with confidence {match_result.get('confidence', 'N/A')}")
                 if match_result['updated']:
                     updated_count += 1
             except Exception as e:
@@ -89,6 +90,7 @@ class SPCMatchingService:
         # Determine eligible SPC report types based on alert event
         eligible_types = self._get_eligible_spc_types(getattr(alert, 'event', '') or '')
         if not eligible_types:
+            logger.debug(f"No eligible SPC types for alert event: {getattr(alert, 'event', 'N/A')}")
             return {'matched': False, 'updated': False, 'reason': 'No eligible SPC types'}
         
         # Extract time window
@@ -123,18 +125,24 @@ class SPCMatchingService:
             setattr(alert, 'spc_confidence_score', confidence)
             setattr(alert, 'spc_report_count', len(matches))
             
-            # Generate AI summary for verified matches
+            # Generate AI summary for verified matches (non-blocking)
             try:
                 spc_reports_data = [self._spc_report_to_dict(match) for match in matches]
-                ai_summary = self.summarizer.generate_match_summary(
-                    alert=alert.to_dict(),
-                    spc_reports=spc_reports_data
-                )
-                if ai_summary:
-                    setattr(alert, 'spc_ai_summary', ai_summary)
-                    logger.info(f"Generated AI summary for alert {alert.id}")
+                # Make AI summary generation non-blocking to prevent rate limit hangs
+                try:
+                    ai_summary = self.summarizer.generate_match_summary(
+                        alert=alert.to_dict(),
+                        spc_reports=spc_reports_data
+                    )
+                    if ai_summary:
+                        setattr(alert, 'spc_ai_summary', ai_summary)
+                        logger.info(f"Generated AI summary for alert {alert.id}")
+                except Exception as ai_error:
+                    # Don't let AI failures block the entire matching process
+                    setattr(alert, 'spc_ai_summary', f"Match verified with {len(matches)} SPC reports")
+                    logger.warning(f"AI summary failed for alert {alert.id}, using fallback: {ai_error}")
             except Exception as e:
-                logger.warning(f"Failed to generate AI summary for alert {alert.id}: {e}")
+                logger.warning(f"Failed to generate any summary for alert {alert.id}: {e}")
             
             logger.info(f"Matched alert {alert.id} with {len(matches)} SPC reports via {match_method}")
             
@@ -193,13 +201,40 @@ class SPCMatchingService:
                            report_dates: List, start_time: datetime, end_time: datetime) -> List[SPCReport]:
         """Find SPC reports matching by county/state"""
         # Get counties and states from alert
-        alert_counties = alert.extract_counties()
-        alert_states = alert.extract_states()
+        try:
+            alert_counties = alert.extract_counties()
+            alert_states = alert.extract_states()
+        except Exception as e:
+            logger.warning(f"Failed to extract counties/states from alert {alert.id}: {e}")
+            alert_counties = []
+            alert_states = []
+        
+        # Also try to extract from area description as fallback
+        if not alert_counties or not alert_states:
+            area_desc = getattr(alert, 'area_desc', '') or ''
+            if area_desc:
+                # Simple extraction from area_desc like "Hodgeman, KS; Ness, KS"
+                parts = area_desc.split(';')
+                for part in parts:
+                    part = part.strip()
+                    if ', ' in part:
+                        county_part, state_part = part.rsplit(', ', 1)
+                        county_name = county_part.strip()
+                        state_name = state_part.strip()
+                        if county_name and state_name:
+                            if not alert_counties:
+                                alert_counties = []
+                            if not alert_states:
+                                alert_states = []
+                            alert_counties.append(county_name)
+                            alert_states.append(state_name)
         
         if not alert_counties or not alert_states:
+            logger.debug(f"No counties/states found for alert {alert.id}, area_desc: {getattr(alert, 'area_desc', 'N/A')}")
             return []
         
         # Query SPC reports in same counties
+        logger.debug(f"Looking for matches: counties={alert_counties}, states={alert_states}, types={eligible_types}, dates={report_dates}")
         matches = SPCReport.query.filter(
             and_(
                 SPCReport.report_date.in_(report_dates),
@@ -208,6 +243,7 @@ class SPCMatchingService:
                 SPCReport.county.in_(alert_counties)
             )
         ).all()
+        logger.debug(f"Found {len(matches)} county-based matches before time filtering")
         
         # Filter by time if time_utc is available
         time_filtered_matches = []
@@ -215,6 +251,7 @@ class SPCMatchingService:
             if self._is_time_match(match, alert, start_time, end_time):
                 time_filtered_matches.append(match)
         
+        logger.debug(f"After time filtering: {len(time_filtered_matches)} matches for alert {alert.id}")
         return time_filtered_matches
     
     def _find_proximity_matches(self, alert: Alert, eligible_types: List[str],
@@ -226,6 +263,7 @@ class SPCMatchingService:
             return []
         
         # Query all SPC reports in the time/type range with coordinates
+        logger.debug(f"Proximity search: alert coords=({alert_lat}, {alert_lon}), types={eligible_types}, dates={report_dates}")
         candidates = SPCReport.query.filter(
             and_(
                 SPCReport.report_date.in_(report_dates),
@@ -234,6 +272,7 @@ class SPCMatchingService:
                 SPCReport.longitude.isnot(None)
             )
         ).all()
+        logger.debug(f"Found {len(candidates)} proximity candidates with coordinates")
         
         # Filter by distance and time
         matches = []
@@ -245,6 +284,7 @@ class SPCMatchingService:
             if distance <= self.distance_threshold_miles:
                 if self._is_time_match(candidate, alert, start_time, end_time):
                     matches.append(candidate)
+                    logger.debug(f"Proximity match: {distance:.1f} miles from alert {alert.id}")
         
         return matches
     
