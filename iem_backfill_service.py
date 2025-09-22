@@ -22,6 +22,10 @@ from models import db
 
 logger = logging.getLogger(__name__)
 
+class SecurityError(Exception):
+    """Raised when security validation fails (ZIP bombs, path traversal, etc.)"""
+    pass
+
 class IemBackfillService:
     """
     Service for downloading and processing historical NWS alerts from IEM
@@ -39,6 +43,12 @@ class IemBackfillService:
         self.max_concurrent = 2
         self.retry_delay = 5  # seconds
         self.max_retries = 3
+        
+        # ZIP bomb protection limits (production safety)
+        self.max_zip_file_count = 50  # Maximum files in ZIP
+        self.max_file_size = 100 * 1024 * 1024  # 100MB per file
+        self.max_total_uncompressed = 500 * 1024 * 1024  # 500MB total
+        self.max_compression_ratio = 100  # Alert if compression ratio > 100:1
         
     def get_florida_url(self, start_date: str, end_date: str) -> str:
         """
@@ -532,23 +542,85 @@ class IemBackfillService:
     
     def _safe_extract_zip(self, zip_file: zipfile.ZipFile, extract_to: str):
         """
-        Safely extract ZIP file with path traversal protection
+        Safely extract ZIP file with comprehensive security protection
+        Prevents path traversal, ZIP bombs, and resource exhaustion attacks
         """
-        for member in zip_file.infolist():
+        members = zip_file.infolist()
+        
+        # ZIP bomb protection: Check file count
+        if len(members) > self.max_zip_file_count:
+            raise SecurityError(f"ZIP contains too many files: {len(members)} > {self.max_zip_file_count}")
+        
+        total_uncompressed_size = 0
+        extracted_count = 0
+        
+        for member in members:
             # Get the file path and normalize it
             file_path = member.filename
             
-            # Security checks
+            # ZIP bomb protection: Check for symlinks/hardlinks
+            if member.external_attr & 0o120000:  # Check for symlink/hardlink
+                logger.warning(f"Blocked symlink/hardlink in ZIP: {file_path}")
+                continue
+            
+            # ZIP bomb protection: Check individual file size
+            if member.file_size > self.max_file_size:
+                raise SecurityError(f"File too large in ZIP: {file_path} ({member.file_size} bytes > {self.max_file_size})")
+            
+            # ZIP bomb protection: Check total uncompressed size
+            total_uncompressed_size += member.file_size
+            if total_uncompressed_size > self.max_total_uncompressed:
+                raise SecurityError(f"ZIP total size too large: {total_uncompressed_size} bytes > {self.max_total_uncompressed}")
+            
+            # ZIP bomb protection: Check compression ratio
+            if member.file_size > 0 and member.compress_size > 0:
+                compression_ratio = member.file_size / member.compress_size
+                if compression_ratio > self.max_compression_ratio:
+                    logger.warning(f"Suspicious compression ratio for {file_path}: {compression_ratio:.1f}:1")
+            
+            # Path traversal protection
             if self._is_safe_path(file_path, extract_to):
                 try:
-                    # Extract individual file
-                    zip_file.extract(member, extract_to)
-                    logger.debug(f"Extracted safe file: {file_path}")
+                    # Extract individual file with size validation
+                    self._extract_member_safely(zip_file, member, extract_to)
+                    extracted_count += 1
+                    logger.debug(f"Extracted safe file: {file_path} ({member.file_size} bytes)")
                 except Exception as e:
                     logger.warning(f"Failed to extract {file_path}: {e}")
                     continue
             else:
                 logger.warning(f"Blocked unsafe path in ZIP: {file_path}")
+        
+        logger.info(f"Safely extracted {extracted_count}/{len(members)} files, total size: {total_uncompressed_size} bytes")
+    
+    def _extract_member_safely(self, zip_file: zipfile.ZipFile, member: zipfile.ZipInfo, extract_to: str):
+        """
+        Extract a single ZIP member with additional runtime protection
+        """
+        bytes_read = 0
+        chunk_size = 8192
+        
+        with zip_file.open(member) as source:
+            target_path = os.path.join(extract_to, member.filename)
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            
+            with open(target_path, 'wb') as target:
+                while True:
+                    chunk = source.read(chunk_size)
+                    if not chunk:
+                        break
+                    
+                    bytes_read += len(chunk)
+                    
+                    # Runtime protection: Stop if file exceeds declared size
+                    if bytes_read > member.file_size * 1.1:  # 10% tolerance for compression artifacts
+                        raise SecurityError(f"File {member.filename} exceeded declared size during extraction")
+                    
+                    # Runtime protection: Stop if exceeds absolute limit
+                    if bytes_read > self.max_file_size:
+                        raise SecurityError(f"File {member.filename} exceeded maximum size limit during extraction")
+                    
+                    target.write(chunk)
     
     def _is_safe_path(self, file_path: str, extract_to: str) -> bool:
         """
