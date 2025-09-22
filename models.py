@@ -1,6 +1,7 @@
 from app import db
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy import Column, String, Text, DateTime, Date, Boolean, func, Index, UniqueConstraint, Float
+from geoalchemy2 import Geometry
 from datetime import datetime
 import re
 
@@ -24,6 +25,11 @@ class Alert(db.Model):
     geometry = Column(JSONB)               # Store full geometry block
     properties = Column(JSONB)             # Store all original NWS fields
     raw = Column(JSONB)                    # Entire feature object
+    
+    # Backfill system fields (PostGIS integration)
+    geom = Column(Geometry('GEOMETRY', srid=4326))  # PostGIS geometry for spatial queries
+    vtec_key = Column(String(50), index=True)        # VTEC key for unique identification (WFO-PHENOMSIG-YEAR-ETN)
+    data_source = Column(String(20), index=True, default='nws_live')  # Data source identifier (nws_live, iem_watchwarn, etc.)
 
     # AI Enrichment Fields
     ai_summary = Column(Text)              # AI-generated summary
@@ -64,6 +70,10 @@ class Alert(db.Model):
         Index('idx_alert_ingested_at_desc', 'ingested_at'),  # Optimized for recent queries
         Index('idx_alert_active', 'effective', 'expires'),
         Index('idx_alert_spc_verified', 'spc_verified'),  # For verification tracking
+        # Backfill system indexes
+        Index('idx_alert_vtec_key', 'vtec_key'),  # For VTEC key uniqueness
+        Index('idx_alert_data_source', 'data_source'),  # For data source filtering
+        Index('idx_alert_geom_spatial', 'geom', postgresql_using='gist'),  # PostGIS spatial index
     )
 
     def __repr__(self):

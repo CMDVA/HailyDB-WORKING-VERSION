@@ -19,7 +19,6 @@ from shapely.ops import unary_union
 import json
 
 from models import db
-from config import Config
 
 logger = logging.getLogger(__name__)
 
