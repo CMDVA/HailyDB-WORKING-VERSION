@@ -19,6 +19,7 @@ from shapely.ops import unary_union
 import json
 
 from models import db
+from scheduler_service import SchedulerService
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ class IemBackfillService:
     
     def __init__(self, db_session):
         self.db = db_session
+        self.scheduler_service = SchedulerService(db_session)
         self.base_url = "https://mesonet.agron.iastate.edu/cgi-bin/request/gis/watchwarn.py"
         self.headers = {
             'User-Agent': 'HailyDB-IEM-Backfill/1.0 (contact@hailydb.com)',
@@ -328,10 +330,26 @@ class IemBackfillService:
     
     def process_florida_month(self, year: int, month: int) -> Dict:
         """
-        Process one month of Florida data
+        Process one month of Florida data with SchedulerService logging
         Returns summary statistics
         """
         logger.info(f"Processing Florida data for {year}-{month:02d}")
+        
+        # Start logging with SchedulerService for ingestion success tracking
+        operation_metadata = {
+            'year': year,
+            'month': month,
+            'state': 'FL',
+            'source': 'IEM',
+            'date_range': f"{year}-{month:02d}",
+            'operation_type': 'historical_backfill'
+        }
+        
+        log_entry = self.scheduler_service.log_operation_start(
+            operation_type='iem_backfill',
+            trigger_method='manual',
+            metadata=operation_metadata
+        )
         
         # Build date range for the month
         start_date = f"{year}-{month:02d}-01"
@@ -348,8 +366,6 @@ class IemBackfillService:
         }
         
         try:
-            # Record start of download
-            self.record_progress('FL', year, month, 'shapefile_download')
             
             # Download shapefile
             url = self.get_florida_url(start_date, end_date)
@@ -357,13 +373,12 @@ class IemBackfillService:
             
             if not zip_data:
                 error_msg = "Failed to download shapefile"
-                self.record_progress('FL', year, month, 'shapefile_download', 
-                                   error_message=error_msg)
                 stats['errors'].append(error_msg)
+                # Log failure with SchedulerService
+                self.scheduler_service.log_operation_complete(
+                    log_entry, success=False, error_message=error_msg
+                )
                 return stats
-            
-            # Record start of parsing
-            self.record_progress('FL', year, month, 'parsing')
             
             # Parse shapefile
             alerts = self.parse_shapefile(zip_data)
@@ -371,12 +386,11 @@ class IemBackfillService:
             
             if not alerts:
                 logger.info(f"No alerts found for {year}-{month:02d}")
-                self.record_progress('FL', year, month, 'completed', 
-                                   records_processed=0)
+                # Log success but with zero records
+                self.scheduler_service.log_operation_complete(
+                    log_entry, success=True, records_processed=0, records_new=0
+                )
                 return stats
-            
-            # Record start of database operations
-            self.record_progress('FL', year, month, 'database_insert')
             
             # Process alerts in batches with progress checkpoints
             batch_size = 50  # Process in smaller batches for better progress tracking
@@ -390,10 +404,7 @@ class IemBackfillService:
                 
                 logger.info(f"Processing batch {batch_start}-{batch_end} of {len(alerts)} alerts")
                 
-                # Record batch progress
-                self.record_progress('FL', year, month, 'processing_batch', 
-                                   records_processed=batch_end,
-                                   metadata={'batch_start': batch_start, 'batch_end': batch_end})
+                # Log batch progress (keeping record_progress for detailed tracking)
                 
                 batch_inserted = 0
                 batch_updated = 0
@@ -423,17 +434,22 @@ class IemBackfillService:
             stats['records_inserted'] = inserted
             stats['records_updated'] = updated
             
-            # Record completion
-            self.record_progress('FL', year, month, 'completed',
-                               records_processed=len(alerts),
-                               records_inserted=inserted,
-                               records_updated=updated)
+            # Log successful completion with SchedulerService
+            self.scheduler_service.log_operation_complete(
+                log_entry, 
+                success=True,
+                records_processed=len(alerts),
+                records_new=inserted  # New records for legal clients
+            )
             
             logger.info(f"Completed {year}-{month:02d}: {inserted} inserted, {updated} updated")
             
         except Exception as e:
             error_msg = f"Error processing month {year}-{month:02d}: {e}"
-            self.record_progress('FL', year, month, 'failed', error_message=error_msg)
+            # Log failure with SchedulerService
+            self.scheduler_service.log_operation_complete(
+                log_entry, success=False, error_message=error_msg
+            )
             stats['errors'].append(error_msg)
             logger.error(error_msg)
         
