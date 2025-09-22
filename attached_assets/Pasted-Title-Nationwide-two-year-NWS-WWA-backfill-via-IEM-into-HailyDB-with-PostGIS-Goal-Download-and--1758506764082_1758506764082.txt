@@ -1,0 +1,98 @@
+Title: “Nationwide two-year NWS WWA backfill via IEM into HailyDB with PostGIS”
+
+Goal:
+Download and ingest all NWS VTEC watch/warn/advisory alerts for the past 24 months nationwide into our PostgreSQL (Neon) database. Store polygons in a PostGIS geom column, maintain idempotent UPSERT by VTEC key, enrich SV/TO with radar-indicated hail/wind from CAP text, and ingest LSRs for verification. Add a weekly reconciliation job (14-day overlap). IEM services are bulk-only; app runtime remains on HailyDB.
+
+References:
+
+IEM API/CGI overview and commercial-use disclaimer: https://mesonet.agron.iastate.edu/api/ 
+Iowa Environmental Mesonet
+
+watchwarn.py docs: https://mesonet.agron.iastate.edu/cgi-bin/request/gis/watchwarn.py?help 
+Iowa Environmental Mesonet
+
+CAP hourly archive: https://mesonet.agron.iastate.edu/nws/text.php (mtarchive directories) 
+Iowa Environmental Mesonet
+
+LSR bulk CGI: https://mesonet.agron.iastate.edu/request/gis/lsrs.phtml (backend doc link on page) 
+Iowa Environmental Mesonet
+
+Deliverables / Acceptance criteria:
+
+DB migration
+
+Enable PostGIS: CREATE EXTENSION IF NOT EXISTS postgis; (Neon supports it). 
+Neon
+
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS geom geometry(MULTIPOLYGON,4326);
+
+CREATE INDEX IF NOT EXISTS alerts_geom_gix ON alerts USING GIST (geom);
+
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS data_source TEXT;
+
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS vtec_key TEXT;
+
+Unique index to enforce idempotency for backfill records: CREATE UNIQUE INDEX IF NOT EXISTS alerts_vtec_key_uidx ON alerts (vtec_key) WHERE data_source='iem_watchwarn';
+
+Backfill worker
+
+Language: Python 3.11+.
+
+Libraries: requests, pyshp (shapefile), shapely (geometry ops), psycopg2-binary. Avoid GDAL.
+
+Download loop: iterate state FIPS/USPS codes × year for last 24 months; build URLs like:
+https://mesonet.agron.iastate.edu/cgi-bin/request/gis/watchwarn.py?location_group=states&states=TX&sts=2024-01-01T00:00Z&ets=2025-01-01T00:00Z&accept=shapefile&limit1=yes&limitps=yes
+Notes: limit1/limitps reduce payload; don’t set phenomena to get all WWA; throttle (sleep between requests). 
+Iowa Environmental Mesonet
+
+Unzip; parse with pyshp. For each record:
+
+Read attributes (WFO, PHENOM, SIG, ETN, ISSUED, EXPIRED, etc.). IEM’s dataset page documents semantics (last-known state). 
+Iowa Environmental Mesonet
+
+Build vtec_key = f"{wfo}-{phenom}{sig}-{year}-{etn}".
+
+Convert geometry to GeoJSON (via shapely.shape(...) → mapping(...)).
+
+UPSERT: if id exists, update; else insert with id=vtec_key, data_source='iem_watchwarn', set geom = ST_GeomFromGeoJSON(:geojson), keep geometry JSONB copy of the GeoJSON, and store attributes under properties.
+
+Severe enrichment: For PHENOM in ('SV','TO'), derive the issue hour and fetch CAP hourly file(s) from mtarchive; parse radar indicators using our existing regex method, update radar_indicated JSONB and raw CAP text. 
+Iowa Environmental Mesonet
+
+LSRs: For each processed month/state, call .../cgi-bin/request/gis/lsr.py?state=XX&sts=YYYY-MM-01T00:00Z&ets=YYYY-MM-01T00:00Z&fmt=csv, load into spc_reports with your current schema and row_hash dedupe; run match_spc_reports_batch() afterwards. 
+Iowa Environmental Mesonet
+
+Checkpointing: Persist (state, year, step) in a small table (backfill_progress) so the job can resume.
+
+Weekly recon job
+
+For the last 14 days by state, re-pull watchwarn.py and UPSERT.
+
+Optional: hit VTEC Max Event ID to detect if any WFO’s ETN exceeds our current max → trigger a targeted gap fill. (Service listed on API page.) 
+Iowa Environmental Mesonet
+
+Observability
+
+Write to scheduler_logs (operation_type='iem_backfill' | 'iem_weekly', with counts, new vs updated, errors, and request timing).
+
+Tests
+
+Unit test VTEC key builder.
+
+Golden-file test for a small (IA, 2024) shapefile.
+
+Point-in-polygon test for a known TOR polygon and a contained address.
+
+Non-functional requirements:
+
+Throttle: max 2 concurrent downloads; back off on HTTP 429/5xx.
+
+Memory: stream ZIPs; don’t keep more than one state/year in memory.
+
+Idempotency: re-running the job for the same slice yields 0 inserts and some updates at most.
+
+Nice-to-have (if time permits):
+
+alerts.source_key storing the original IEM feature identifier(s).
+
+alerts.versions (JSONB) if you want to keep a tiny change log per alert (updated time, polygon changes).
