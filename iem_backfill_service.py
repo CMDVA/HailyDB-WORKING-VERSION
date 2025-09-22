@@ -74,9 +74,9 @@ class IemBackfillService:
                 response.raise_for_status()
                 
                 if response.status_code == 429:
-                    # Rate limited, wait longer
+                    # Rate limited, use exponential backoff
                     wait_time = self.retry_delay * (2 ** attempt)
-                    logger.warning(f"Rate limited, waiting {wait_time} seconds")
+                    logger.warning(f"Rate limited, waiting {wait_time} seconds (attempt {attempt + 1})")
                     time.sleep(wait_time)
                     continue
                 
@@ -90,9 +90,12 @@ class IemBackfillService:
             except requests.exceptions.RequestException as e:
                 logger.error(f"Download attempt {attempt + 1} failed: {e}")
                 if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay)
+                    # Exponential backoff for all request exceptions
+                    wait_time = self.retry_delay * (2 ** attempt)
+                    logger.info(f"Retrying in {wait_time} seconds (attempt {attempt + 1}/{self.max_retries})")
+                    time.sleep(wait_time)
                 else:
-                    logger.error("All download attempts failed")
+                    logger.error("All download attempts failed after exponential backoff")
                     return None
         
         return None
@@ -106,9 +109,9 @@ class IemBackfillService:
         
         with tempfile.TemporaryDirectory() as temp_dir:
             try:
-                # Extract ZIP file
+                # Securely extract ZIP file with path traversal protection
                 with zipfile.ZipFile(BytesIO(zip_data)) as zip_file:
-                    zip_file.extractall(temp_dir)
+                    self._safe_extract_zip(zip_file, temp_dir)
                 
                 # Find the .shp file
                 shp_file = None
@@ -365,21 +368,47 @@ class IemBackfillService:
             # Record start of database operations
             self.record_progress('FL', year, month, 'database_insert')
             
-            # Process each alert
+            # Process alerts in batches with progress checkpoints
+            batch_size = 50  # Process in smaller batches for better progress tracking
             inserted = 0
             updated = 0
             
-            for alert_record in alerts:
-                try:
-                    result = self.upsert_alert(alert_record)
-                    if result == 'inserted':
-                        inserted += 1
-                    elif result == 'updated':
-                        updated += 1
-                except Exception as e:
-                    error_msg = f"Error upserting alert: {e}"
-                    stats['errors'].append(error_msg)
-                    logger.error(error_msg)
+            for i in range(0, len(alerts), batch_size):
+                batch = alerts[i:i + batch_size]
+                batch_start = i + 1
+                batch_end = min(i + batch_size, len(alerts))
+                
+                logger.info(f"Processing batch {batch_start}-{batch_end} of {len(alerts)} alerts")
+                
+                # Record batch progress
+                self.record_progress('FL', year, month, 'processing_batch', 
+                                   records_processed=batch_end,
+                                   metadata={'batch_start': batch_start, 'batch_end': batch_end})
+                
+                batch_inserted = 0
+                batch_updated = 0
+                
+                for alert_record in batch:
+                    try:
+                        result = self.upsert_alert(alert_record)
+                        if result == 'inserted':
+                            inserted += 1
+                            batch_inserted += 1
+                        elif result == 'updated':
+                            updated += 1
+                            batch_updated += 1
+                    except Exception as e:
+                        error_msg = f"Error upserting alert: {e}"
+                        stats['errors'].append(error_msg)
+                        logger.error(error_msg)
+                        continue
+                
+                # Log batch completion
+                logger.info(f"Completed batch {batch_start}-{batch_end}: {batch_inserted} inserted, {batch_updated} updated")
+                
+                # Small pause between batches to prevent overwhelming the database
+                if i + batch_size < len(alerts):
+                    time.sleep(0.1)  # 100ms pause
             
             stats['records_inserted'] = inserted
             stats['records_updated'] = updated
@@ -426,7 +455,7 @@ class IemBackfillService:
             
             from sqlalchemy import text
             
-            # Use PostGIS ST_GeomFromGeoJSON for geometry conversion
+            # Use PostGIS with SRID=4326, ST_MakeValid for geometry repair, and proper conflict resolution
             query = text("""
                 INSERT INTO alerts (
                     id, event, severity, area_desc, effective, expires, sent,
@@ -434,14 +463,22 @@ class IemBackfillService:
                     ingested_at, updated_at
                 ) VALUES (
                     :vtec_key, :event, :severity, :area_desc, :effective, :expires, :effective,
-                    :geometry_json, :properties, ST_GeomFromGeoJSON(:geometry_str), 
+                    :geometry_json, :properties, 
+                    ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(:geometry_str), 4326)),
                     :vtec_key, 'iem_watchwarn', NOW(), NOW()
                 )
-                ON CONFLICT (vtec_key) WHERE data_source = 'iem_watchwarn' DO UPDATE SET
+                ON CONFLICT (id) DO UPDATE SET
+                    event = EXCLUDED.event,
+                    severity = EXCLUDED.severity,
+                    area_desc = EXCLUDED.area_desc,
+                    effective = EXCLUDED.effective,
+                    expires = EXCLUDED.expires,
                     geometry = EXCLUDED.geometry,
                     properties = EXCLUDED.properties,
-                    geom = EXCLUDED.geom,
+                    geom = ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(EXCLUDED.properties->>'geometry'), 4326)),
+                    data_source = EXCLUDED.data_source,
                     updated_at = NOW()
+                WHERE alerts.data_source = 'iem_watchwarn' OR alerts.data_source IS NULL
                 RETURNING (xmax = 0) AS inserted
             """)
             
@@ -492,3 +529,59 @@ class IemBackfillService:
         except Exception as e:
             logger.warning(f"Could not parse timestamp {timestamp_str}: {e}")
             return None
+    
+    def _safe_extract_zip(self, zip_file: zipfile.ZipFile, extract_to: str):
+        """
+        Safely extract ZIP file with path traversal protection
+        """
+        for member in zip_file.infolist():
+            # Get the file path and normalize it
+            file_path = member.filename
+            
+            # Security checks
+            if self._is_safe_path(file_path, extract_to):
+                try:
+                    # Extract individual file
+                    zip_file.extract(member, extract_to)
+                    logger.debug(f"Extracted safe file: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to extract {file_path}: {e}")
+                    continue
+            else:
+                logger.warning(f"Blocked unsafe path in ZIP: {file_path}")
+    
+    def _is_safe_path(self, file_path: str, extract_to: str) -> bool:
+        """
+        Check if file path is safe for extraction (prevents path traversal)
+        """
+        # Normalize the paths
+        extract_to = os.path.abspath(extract_to)
+        full_path = os.path.abspath(os.path.join(extract_to, file_path))
+        
+        # Security checks
+        # 1. Must be within the extraction directory
+        if not full_path.startswith(extract_to):
+            return False
+        
+        # 2. No suspicious path components
+        path_parts = file_path.split('/')
+        for part in path_parts:
+            if part in ['..', '.', ''] or part.startswith('.'):
+                return False
+        
+        # 3. No absolute paths
+        if os.path.isabs(file_path):
+            return False
+        
+        # 4. Reasonable filename (no control characters)
+        if any(ord(c) < 32 for c in file_path):
+            return False
+        
+        # 5. File extension whitelist for shapefiles
+        allowed_extensions = ['.shp', '.shx', '.dbf', '.prj', '.cpg', '.xml']
+        file_ext = os.path.splitext(file_path)[1].lower()
+        if file_ext and file_ext not in allowed_extensions:
+            logger.debug(f"Ignoring non-shapefile: {file_path}")
+            return False
+        
+        return True
