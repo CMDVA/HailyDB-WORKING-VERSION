@@ -700,8 +700,42 @@ function updateDirectRadarTable(alerts) {
 }
 
 function updateDirectPagination() {
-    // Add pagination controls for direct table if needed
-    // For now, we'll keep it simple and just load the first page
+    const container = document.getElementById('paginationContainer');
+    const pagination = document.getElementById('pagination');
+    
+    if (directTotalPages <= 1) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    container.style.display = 'block';
+    
+    let paginationHTML = '';
+    
+    // Previous button
+    paginationHTML += `
+        <li class="page-item ${directCurrentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadDirectRadarAlerts(${directCurrentPage - 1}); return false;">Previous</a>
+        </li>
+    `;
+    
+    // Page numbers
+    for (let i = 1; i <= Math.min(directTotalPages, 10); i++) {
+        paginationHTML += `
+            <li class="page-item ${i === directCurrentPage ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="loadDirectRadarAlerts(${i}); return false;">${i}</a>
+            </li>
+        `;
+    }
+    
+    // Next button
+    paginationHTML += `
+        <li class="page-item ${directCurrentPage === directTotalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadDirectRadarAlerts(${directCurrentPage + 1}); return false;">Next</a>
+        </li>
+    `;
+    
+    pagination.innerHTML = paginationHTML;
 }
 
 function applyFilters() {
