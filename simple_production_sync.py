@@ -50,13 +50,13 @@ def copy_missing_production_alerts():
             INSERT INTO alerts (
                 id, event, severity, area_desc, effective, expires, sent,
                 geometry, properties, radar_indicated, city_names, county_names,
-                affected_states, data_source, source_type, spc_verified,
+                affected_states, data_source, spc_verified,
                 ingested_at
             ) VALUES (
                 %(id)s, %(event)s, %(severity)s, %(area_desc)s, 
                 %(effective)s, %(expires)s, %(sent)s, %(geometry)s, %(properties)s,
                 %(radar_indicated)s, %(city_names)s, %(county_names)s, %(affected_states)s,
-                %(data_source)s, %(source_type)s, %(spc_verified)s, %(ingested_at)s
+                %(data_source)s, %(spc_verified)s, %(ingested_at)s
             ) ON CONFLICT (id) DO NOTHING
             """
             
@@ -76,7 +76,6 @@ def copy_missing_production_alerts():
                 'county_names': alert_data.get('county_names', []),
                 'affected_states': json.dumps(alert_data.get('affected_states', [])),
                 'data_source': alert_data.get('data_source', 'National Weather Service'),
-                'source_type': alert_data.get('source_type', 'historical_nws_alert'),
                 'spc_verified': alert_data.get('spc_verified', False),
                 'ingested_at': datetime.now()
             }
