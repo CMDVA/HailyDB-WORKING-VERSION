@@ -2739,7 +2739,8 @@ def api_radar_alerts_list():
         # Get query parameters matching the web interface expectations
         limit = min(int(request.args.get('limit', 50)), 1000)
         page = int(request.args.get('page', 1))
-        offset = int(request.args.get('offset', (page - 1) * limit))
+        # Calculate offset from page number (page 1 = offset 0, page 2 = offset 25, etc.)
+        offset = (page - 1) * limit
         state = request.args.get('state')
         event_type = request.args.get('event_type')
         min_hail_size = request.args.get('min_hail_size', 'All Sizes')
