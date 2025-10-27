@@ -2738,7 +2738,8 @@ def api_radar_alerts_list():
         
         # Get query parameters matching the web interface expectations
         limit = min(int(request.args.get('limit', 50)), 1000)
-        offset = int(request.args.get('offset', 0))
+        page = int(request.args.get('page', 1))
+        offset = int(request.args.get('offset', (page - 1) * limit))
         state = request.args.get('state')
         event_type = request.args.get('event_type')
         min_hail_size = request.args.get('min_hail_size', 'All Sizes')
@@ -2798,11 +2799,17 @@ def api_radar_alerts_list():
                 'expires': alert.expires.isoformat() if alert.expires else None
             })
         
+        # Calculate number of pages
+        pages = (total + limit - 1) // limit if limit > 0 else 1
+        page = (offset // limit) + 1 if limit > 0 else 1
+        
         return jsonify({
             'events': events,
             'total': total,
             'limit': limit,
-            'offset': offset
+            'offset': offset,
+            'pages': pages,
+            'page': page
         })
         
     except Exception as e:
