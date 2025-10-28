@@ -1,0 +1,100 @@
+HailyAI API 500 Error - Detailed Bug Report
+Issue Summary
+The /api/alerts/radar_detected endpoint is consistently returning HTTP 500 Internal Server Error when called with geographic coordinate + date range parameters.
+
+Error Details
+Failing Endpoint
+GET https://api.hailyai.com/api/alerts/radar_detected
+Example Failing Request
+https://api.hailyai.com/api/alerts/radar_detected?lat=27.99510841878705&lon=-82.47211592280661&radius_mi=25&start_date=2025-09-28&end_date=2025-10-28&limit=1000
+HTTP Response
+Status Code: 500 Internal Server Error
+Content-Type: text/html
+Response Body:
+<!doctype html>
+<html lang=en>
+<title>500 Internal Server Error</title>
+<h1>Internal Server Error</h1>
+<p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>
+Request Parameters Used
+Parameter	Value	Type	Purpose
+lat	27.99510841878705	float	Geographic latitude
+lon	-82.47211592280661	float	Geographic longitude
+radius_mi	25	integer	Search radius in miles
+start_date	2025-09-28	YYYY-MM-DD	Beginning of date range
+end_date	2025-10-28	YYYY-MM-DD	End of date range
+limit	1000	integer	Maximum results
+Request Headers
+User-Agent: IDOLCheck/1.0 (Storm Damage Assessment App)
+Accept: application/json
+Expected Behavior
+Based on HailyDB v2.1 documentation, this endpoint should return:
+
+GeoJSON FeatureCollection with NWS radar-detected alerts
+Filters: Any hail size OR wind speeds ≥50mph
+Each feature should include properties.radar_indicated with hail/wind data
+What We're Trying to Achieve
+We need historical radar-detected severe weather alerts (expired NWS warnings with radar-detected hail and wind measurements) for the Tampa, FL area from the last 30 days. This data is critical for storm damage assessment and insurance claims validation.
+
+Comparison with Working Endpoint
+The SPC reports endpoint works perfectly with similar parameters:
+
+https://api.hailyai.com/api/reports/spc?lat=27.99510841878705&lon=-82.47211592280661&radius_mi=25&start_date=2025-09-28&end_date=2025-10-28&limit=1000
+✅ Returns: 200 OK with proper JSON data
+
+Alternative Data Source Comparison
+We're successfully retrieving similar Storm Based Warning (SBW) data from Iowa Environmental Mesonet:
+
+https://mesonet.agron.iastate.edu/json/sbw_by_point.py?lat=27.99510841878705&lon=-82.47211592280661&sdate=2025-09-28&edate=2025-10-28&buffer=0.36231884057971014
+✅ Returns: 200 OK with 6 warnings including:
+
+Severe Thunderstorm Warning with 60mph wind and 0.75" hail
+VTEC product links
+Damage tags and storm motion data
+Question for API Engineers
+Why can't we get this same Severe Thunderstorm Warning data (60mph wind, 0.75" hail) from your /api/alerts/radar_detected endpoint when it should be in your database?
+
+This specific event should appear in your radar_detected alerts since it meets the criteria:
+
+Has radar-detected wind: 60 mph (≥50mph threshold)
+Has radar-detected hail: 0.75 inches (any size threshold)
+Within geographic search area (Tampa, FL - lat/lon provided)
+Within date range (2025-09-28 to 2025-10-28)
+Troubleshooting Attempts
+❌ Attempt 1: Using days_back parameter
+?lat=27.995&lon=-82.472&radius_mi=25&days_back=30&limit=1000
+Result: 500 Error
+
+❌ Attempt 2: Using start_date and end_date parameters
+?lat=27.995&lon=-82.472&radius_mi=25&start_date=2025-09-28&end_date=2025-10-28&limit=1000
+Result: 500 Error (current issue)
+
+Possible Root Causes
+Database Query Error: Geographic + date filtering combination may trigger SQL error
+Data Type Issue: Coordinate precision (14 decimal places) causing parsing errors
+Missing Index: Database index missing for combined lat/lon/date queries
+Date Range Logic: Issue with date comparison logic in the application layer
+Status Filter Missing: Endpoint may require explicit status=expired parameter
+Impact on Production
+Critical: Cannot retrieve historical NWS radar-detected alerts
+Workaround: Using Iowa Environmental Mesonet API instead
+Business Impact: Missing HailyAI's AI-enhanced summaries and enrichments
+User Experience: Inconsistent data sources across the application
+Recommended Fixes
+Immediate Action Needed
+Add detailed error logging to /api/alerts/radar_detected endpoint
+Log the actual database query being executed when this 500 error occurs
+Return proper JSON error response with error details (not HTML page)
+Long-term Improvements
+Implement proper error handling with specific error messages
+Add input validation with clear error messages for invalid parameters
+Consider implementing health check endpoint for each specific endpoint
+Add rate limiting headers to prevent accidental DoS
+Testing Recommendation
+Please test the following scenarios:
+
+Small radius (5 miles) with recent dates (last 7 days)
+Larger radius (50 miles) with longer date range (last 90 days)
+State-based query instead of lat/lon coordinates
+Different coordinate precision (reduce to 6 decimal places)
+Add status=expired parameter explicitly
