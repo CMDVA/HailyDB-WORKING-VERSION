@@ -1,0 +1,101 @@
+Moderate
+Special Weather Statement
+ Jones; Southern Craven; West Carteret; Coastal Onslow
+
+Radar-Indicated Measurements
+50 mph
+Wind Speed
+
+Strong
+⚠️ Alert Summary
+Event: Special Weather Statement
+
+Issued By: NWS Newport/Morehead City NC
+
+Affected Areas: Jones; Southern Craven; West Carteret; Coastal Onslow
+
+At 710 AM EST, Doppler radar was tracking a strong thunderstorm over Bogue Inlet Pier, or 12 miles west of Morehead City, moving north at 40 mph. HAZARD...Wind gusts up to 50 mph. SOURCE...Radar indicated. IMPACT...Gusty winds could knock down tree limbs and blow around unsecured objects. Locations impacted include... Havelock, Morehead City, Newport, Stella, Swansboro, Cape Carteret, Broad Creek, Kuhns, Peletier, Bogue, Hammocks Beach, Bogue Inlet Pier, Hammocks Beach State Park, Cedar Point, and Indian Beach.
+
+📅 Timing
+Alert Issued:	2025-12-02T07:10:00-05:00
+Effective From:	2025-12-02 12:10:00
+Warning Expired:	2025-12-02 12:45:00
+🌀 Storm Details
+Type: Special Weather Statement
+Severity: Moderate (initially)
+Certainty: Observed
+Status: Actual
+Hazards Remaining: Gusty winds, heavy rain possible
+Storm Path Coordinates (Polygon):
+NW: 34.61°N, -77.16°W
+NE: 34.94°N, -77.13°W
+SE: 34.89°N, -76.77°W
+SW: 34.57°N, -76.95°W
+📍 Affected Zones (Official Designations)
+County	FIPS Code	NWS Zone Code
+Jones	037103	NCZ092
+Southern Craven	037049	NCZ194
+West Carteret	037031	NCZ195
+Coastal Onslow	037133	NCZ199
+📡 Technical Information
+Alert ID: urn:oid:2.49.0.1.840.0.e6c0127727d1e4c45ca81db2da5511ac550dd40f.001.1
+WMO ID: WWUS82 KMHX 021210
+AWIPS ID: SPSMHX
+Message Type: Alert (expiration notice)
+Distribution Channels: EAS, NWEM, CMAS (Emergency Alert, Wireless Emergency, etc.)
+Response Type: Shelter (initially)
+🌐 Resources
+Official NWS Site
+Full Alert JSON
+Instructions
+If outdoors, consider seeking shelter inside a building.
+Alert Information
+Timing
+ Effective: December 02, 2025 at 12:10 PM UTC
+
+ Expires: December 02, 2025 at 12:45 PM UTC
+
+ Sent: December 02, 2025 at 12:10 PM UTC
+
+ Duration: 35 minutes
+
+Status
+ Active: No
+
+ AI Enriched: No
+
+System Info
+ Ingested: December 02, 2025 at 12:30 PM UTC
+
+ Alert ID: 0dd40f.001.1...
+
+Geographic Coverage
+Alert Coverage Area (GeoJSON)
+
+{
+  "coordinates": [
+    [
+      [
+        -77.16,
+        34.61
+      ],
+      [
+        -77.13,
+        34.94
+      ],
+      [
+        -76.77,
+        34.89
+      ],
+      [
+        -76.95,
+        34.57
+      ],
+      [
+        -77.16,
+        34.61
+      ]
+    ]
+  ],
+  "type": "Polygon"
+}
