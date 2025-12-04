@@ -1,0 +1,82 @@
+Clarifying NWS vs. radar‑enriched labeling in HailyDB (examples + proposal)
+Hi [Name],
+I’ve been stepping through how HailyDB ingests NWS alerts and adds radar-based enrichments, and I’d like to propose a small but important change to how we label these products so downstream tools (like IDOLCheck) don’t overstate what is “official” vs. “derived.”
+Below are concrete examples and URLs so you can self‑investigate.
+1) Concrete example: CA Wind Advisory (urn:oid:…ba3f1a.004.1)
+NWS CAP JSON
+NWS exposes this alert at:
+NWS API:
+https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.26c8f24d657511080a08c56869c0a67a36ba3f1a.004.1
+(same urn:oid is also visible in our own idolcheck.io event URL’s path/query)
+Key fields from properties in the NWS JSON:
+event: "Wind Advisory"
+severity: "Moderate"
+description:
+> WHAT...Northeast winds 25 to 40 mph with gusts of 40 to 55 mph expected. Isolated gusts to 60 mph are possible.
+geometry: null (no CAP polygon in this product)
+Time fields: effective, expires, ends etc. are standard CAP values.
+There is no native NWS numeric field that says “60 mph observed at a given point”; the only mention is the free‑text “Isolated gusts to 60 mph are possible.”
+HailyDB alert record
+The corresponding HailyDB alert object (as seen in our app) looks roughly like:
+{  "id": "urn:oid:2.49.0.1.840.0.26c8f24d657511080a08c56869c0a67a36ba3f1a.004.1",  "data_source": "nws",  "event": "Wind Advisory",  "severity": "Moderate",  "description": "* WHAT...Northeast winds 25 to 40 mph with gusts of 40 to 55 mph\nexpected. Isolated gusts to 60 mph are possible.\n...",  "hailydb_enrichments": {    "affected_states": ["CA"],    "radar_indicated": {      "wind_mph": 60    },    "spc_reports": null,    "spc_report_count": 0,    "spc_verified": false,    ...  },  "radar_indicated": {    "wind_mph": 60  },  ...}
+So:
+HailyDB correctly preserves the raw NWS fields (event, description, severity, etc.).
+HailyDB adds a derived field: hailydb_enrichments.radar_indicated.wind_mph = 60 (and a mirrored top‑level radar_indicated).
+In some front‑end views (and in how we currently phrase things in IDOLCheck), this can easily be interpreted as “Radar‑indicated 60 mph wind event”, as if NWS itself labeled it that way.
+From a data perspective, nothing is “wrong”: the enrichment is clearly namespaced under hailydb_enrichments. The issue is how we label and present it.
+2) Why this matters downstream
+Right now, IDOLCheck’s back end uses two separate sources:
+SPC storm reports via a proximity query.
+HailyDB’s /api/alerts/radar_detected endpoint via storage.getHistoricalAlerts, which:
+queries .../api/alerts/radar_detected?lat=39&lon=-98&radius_mi=1200&start_date=...&end_date=..., and
+then filters to wind_mph >= 50 or hail_inches > 0.
+The CA example above shows up in the alert ingestion layer, but may or may not correspond to a radar_detected record that our /api/feed/national endpoint sees.
+So two things can be true at the same time:
+HailyDB is faithfully ingesting the NWS alert and adding a radar-derived 60 mph estimate.
+IDOLCheck’s national feed might not show this alert, because we’re only looking at radar_detected + SPC for the tape.
+The risk is mainly UX/semantics: a user can see “Radar‑indicated 60 mph” on a card and reasonably infer that this came directly from a radar‑specific NWS product or an SPC report, when in reality it is:
+an NWS Wind Advisory, and
+HailyDB’s radar enrichment on top of that advisory.
+3) Proposed changes to HailyDB labeling & schema usage
+I don’t think you need to change the HailyDB ingestion logic or JSON shape. Instead, I’d suggest tightening up how we label and visually present these mixed NWS+radar cases.
+A. Lead with the official NWS product type
+For any alert whose data_source/origin is NWS CAP (like the example above):
+Primary label / chip:
+“Wind Advisory” or “NWS Wind Advisory”, using event.
+Optional state tag:
+e.g. “CA” or “CA – Wind Advisory” based on affected_states or geocode.UGC.
+That keeps the user anchored on “this is an NWS advisory/warning,” not “this is a radar cell.”
+B. Make HailyDB radar enrichment explicitly secondary
+If hailydb_enrichments.radar_indicated.wind_mph is present:
+Show it as a secondary line, e.g.:
+“Radar‑derived estimate: 60 mph gust potential”
+“HailyDB radar enrichment: 60 mph”
+Avoid phrasing that sounds like an NWS product name, e.g.:
+Avoid: “Radar‑indicated 60 mph wind” as the main title.
+Better: “Wind Advisory (NWS), radar‑derived: 60 mph potential.”
+That way:
+NWS is clearly the official issuer of the product.
+HailyDB is clearly the intelligence layer estimating magnitudes.
+C. Consider an explicit “enriched vs. native” marker
+The existing hailydb_enrichments structure is already good. To make life easier for downstream apps, you could:
+Add something like is_radar_enriched: true when we’ve computed radar_indicated.
+Or more granular tags, e.g.:
+enrichment_sources: ["radar"]
+confidence_score (if/when we have it).
+That lets clients choose:
+“Only show official advisory/warning, ignore enrichment,” or
+“Show both, but visually de‑emphasize the enrichment,” etc.
+4) No change requested to CAP ingestion or IDs
+To be explicit:
+I’m not asking for changes to how we fetch or store the NWS CAP payload itself.
+The urn:oid IDs, areaDesc, UGC codes, etc. are all coming through correctly.
+The proposal is about:
+product semantics and labeling in the HailyDB front end, and
+helping downstream consumers (like IDOLCheck) avoid conflating “NWS advisory” with “radar cell / verified report.”
+5) Follow‑ups / collaboration
+If this direction sounds reasonable, I’m happy to:
+Work with you on concrete UI copy for:
+NWS advisory/warning cards with radar enrichment vs. without enrichment.
+Draft a short API consumer note:
+e.g. “Fields under hailydb_enrichments are derived; always pair them with the upstream NWS event and description, do not re‑label the product type.”
+Thanks for taking a look. This feels like a small change in wording, but it will help us keep regulators, partners, and end users clear on what is official NWS vs. what is HailyDB’s analytics layer—using alerts like urn:oid:2.49.0.1.840.0.26c8f24d657511080a08c56869c0a67a36ba3f1a.004.1 as a concrete reference point.

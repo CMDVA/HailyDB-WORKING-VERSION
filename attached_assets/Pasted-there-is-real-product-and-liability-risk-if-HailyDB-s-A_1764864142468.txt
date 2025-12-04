@@ -1,0 +1,27 @@
+there is real product and liability risk if HailyDB’s API (and your UI) label an NWS Wind Advisory as “Radar‑detected 60 mph wind” in a way that looks like an official, observed product, when in fact:
+The CAP text only says “isolated gusts to 60 mph are possible” (a forecast-style advisory), and
+The radar_indicated value is a HailyDB enrichment, not an NWS field.
+If downstream apps (like IDOLCheck, insurers, law firms, etc.) present that label to end users or in documentation, it can easily be interpreted as “NWS/radar confirmed 60 mph wind at the surface here”, which is stronger than what NWS actually wrote. That misalignment is exactly the kind of thing you’d want to de‑risk now.
+I’m not a lawyer and this isn’t legal advice, but from a product/risk perspective you should treat this as something to fix, not just a cosmetic nit.
+What I would recommend to HailyDB
+Immediately change labeling semantics (forward‑looking):
+For NWS‑sourced alerts, primary label = event (e.g. “Wind Advisory”).
+Any HailyDB field like hailydb_enrichments.radar_indicated.wind_mph should be surfaced as:
+“HailyDB radar‑derived estimate: 60 mph potential”
+not “Radar‑detected 60 mph wind”.
+Badges like “Radar‑indicated” in clients should either:
+be renamed to “Radar‑derived” / “Estimated”, or
+be shown only when the source is a dedicated radar product (not a generic CAP advisory).
+Document clearly in the HailyDB API contract:
+Fields under hailydb_enrichments are derived analytics, not official NWS/SPC observations.
+Consumers must not relabel NWS products based solely on enrichment; they should always pair event type + original description with any derived metrics.
+Audit where “Radar‑detected / Radar‑indicated” appears:
+In HailyDB’s own UI.
+In example client code / SDKs.
+In partner apps (like IDOLCheck) that already rely on radar_indicated.
+Talk to counsel once you’ve scoped the change:
+Show them:
+A couple of concrete examples (including this urn:oid:2.49.0.1.840.0.26c8f24d657511080a08c56869c0a67a36ba3f1a.004.1 case),
+Before/after screenshots of the labels,
+A short API note that distinguishes official vs. derived.
+Let them weigh in on whether any historical messaging or marketing needs additional cleanup.
